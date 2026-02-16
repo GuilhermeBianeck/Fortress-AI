@@ -8,6 +8,7 @@ import Matter from 'matter-js';
 import { createWorld } from './physics/world';
 import { GameLoop } from './physics/loop';
 import { generateFortress } from './ai/gemini';
+import type { KingState } from './types';
 
 dotenv.config();
 
@@ -33,11 +34,105 @@ const MATERIAL_PROPS: Record<string, { density: number; friction: number; restit
     steel: { density: 0.008, friction: 0.3, restitution: 0.05 },
 };
 
+// Damage multipliers per material hitting the King
+const DAMAGE_MULTIPLIERS: Record<string, number> = {
+    wood: 1.0,
+    stone: 3.0,
+    ice: 0.5,
+    rubber: 1.0,
+    steel: 10.0,
+    Terrain: 1.0,
+};
+
+const KING_MAX_HP = 100;
+const IMPACT_THRESHOLD = 5;
+
+function spawnKing(world: Matter.World, terrain: { buildZones: { x: number; width: number; y: number }[]; points: { x: number; y: number }[] }): { body: Matter.Body; state: KingState } {
+    let spawnX: number;
+    let spawnY: number;
+
+    if (terrain.buildZones.length > 0) {
+        const zone = terrain.buildZones[0];
+        spawnX = zone.x + zone.width / 2;
+        spawnY = zone.y - 15; // radius 12 + small gap
+    } else {
+        // Fallback: center of canvas, interpolate terrain Y
+        spawnX = 400;
+        spawnY = 500; // rough fallback
+        for (let i = 0; i < terrain.points.length - 1; i++) {
+            if (terrain.points[i].x <= spawnX && terrain.points[i + 1].x >= spawnX) {
+                const t = (spawnX - terrain.points[i].x) / (terrain.points[i + 1].x - terrain.points[i].x);
+                spawnY = terrain.points[i].y + t * (terrain.points[i + 1].y - terrain.points[i].y) - 15;
+                break;
+            }
+        }
+    }
+
+    const body = Matter.Bodies.circle(spawnX, spawnY, 12, {
+        density: 0.003,
+        restitution: 0.5,
+        friction: 0.5,
+        label: 'king',
+    });
+
+    Matter.World.add(world, body);
+
+    const state: KingState = {
+        bodyId: body.id,
+        hp: KING_MAX_HP,
+        maxHp: KING_MAX_HP,
+        position: { x: body.position.x, y: body.position.y },
+    };
+
+    return { body, state };
+}
+
 // Initialize Physics
 let worldState = createWorld();
 let { engine, world, terrain, seed } = worldState;
-const gameLoop = new GameLoop(engine, io);
+
+const king = spawnKing(world, terrain);
+let kingBody = king.body;
+let kingState = king.state;
+
+const gameLoop = new GameLoop(engine, io, kingState);
 gameLoop.start();
+
+// Collision damage system
+Matter.Events.on(engine, 'collisionStart', (event) => {
+    for (const pair of event.pairs) {
+        const { bodyA, bodyB } = pair;
+
+        let otherBody: Matter.Body | null = null;
+        if (bodyA.id === kingState.bodyId) otherBody = bodyB;
+        else if (bodyB.id === kingState.bodyId) otherBody = bodyA;
+        else continue;
+
+        if (kingState.hp <= 0) continue;
+
+        const impactForce = (bodyA.speed * bodyA.mass) + (bodyB.speed * bodyB.mass);
+        if (impactForce < IMPACT_THRESHOLD) continue;
+
+        const multiplier = DAMAGE_MULTIPLIERS[otherBody.label] ?? 1.0;
+        const damage = (impactForce - IMPACT_THRESHOLD) * multiplier;
+        kingState.hp = Math.max(0, kingState.hp - damage);
+        kingState.position = { x: kingBody.position.x, y: kingBody.position.y };
+
+        console.log(`King hit by ${otherBody.label} | force=${impactForce.toFixed(1)} | damage=${damage.toFixed(1)} | HP=${kingState.hp.toFixed(1)}/${kingState.maxHp}`);
+
+        io.emit('king_damage', {
+            hp: kingState.hp,
+            maxHp: kingState.maxHp,
+            damage,
+            source: otherBody.label,
+        });
+
+        if (kingState.hp <= 0) {
+            console.log('King is dead!');
+            io.emit('king_dead');
+        }
+    }
+});
 
 console.log(`World created with terrain seed: ${seed}`);
 
@@ -151,11 +246,25 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Clear all dynamic bodies
+    // Clear all dynamic bodies (preserve the King)
     socket.on('clear_world', () => {
         const allBodies = Matter.Composite.allBodies(world);
-        const dynamicBodies = allBodies.filter(b => !b.isStatic);
+        const dynamicBodies = allBodies.filter(b => !b.isStatic && b.id !== kingState.bodyId);
         Matter.Composite.remove(world, dynamicBodies);
+
+        // Reset King HP and position
+        kingState.hp = kingState.maxHp;
+
+        if (terrain.buildZones.length > 0) {
+            const zone = terrain.buildZones[0];
+            const resetX = zone.x + zone.width / 2;
+            const resetY = zone.y - 15;
+            Matter.Body.setPosition(kingBody, { x: resetX, y: resetY });
+            Matter.Body.setVelocity(kingBody, { x: 0, y: 0 });
+            Matter.Body.setAngularVelocity(kingBody, 0);
+        }
+        kingState.position = { x: kingBody.position.x, y: kingBody.position.y };
+
         io.emit('world_cleared');
     });
 

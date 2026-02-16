@@ -14,4 +14,13 @@ export interface BodyState {
 export interface GameState {
     bodies: BodyState[];
     timestamp: number;
+    kingHp: number;
+    kingMaxHp: number;
+}
+
+export interface KingState {
+    bodyId: number;
+    hp: number;
+    maxHp: number;
+    position: Vector;
 }

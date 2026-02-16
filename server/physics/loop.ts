@@ -1,5 +1,6 @@
 import Matter from 'matter-js';
 import { Server } from 'socket.io';
+import type { KingState } from '../types';
 
 const TICK_RATE = 60;
 const SNAPSHOT_RATE = 20;
@@ -20,10 +21,16 @@ export class GameLoop {
     private io: Server;
     private interval: ReturnType<typeof setInterval> | null = null;
     private lastSnapshotTime = 0;
+    private kingState: KingState | null = null;
 
-    constructor(engine: Matter.Engine, io: Server) {
+    constructor(engine: Matter.Engine, io: Server, kingState?: KingState) {
         this.engine = engine;
         this.io = io;
+        this.kingState = kingState ?? null;
+    }
+
+    setKingState(kingState: KingState) {
+        this.kingState = kingState;
     }
 
     start() {
@@ -77,7 +84,9 @@ export class GameLoop {
 
         this.io.emit('gameState', {
             bodies,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            kingHp: this.kingState?.hp ?? 0,
+            kingMaxHp: this.kingState?.maxHp ?? 0,
         });
     }
 }
