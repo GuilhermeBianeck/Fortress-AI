@@ -8,6 +8,8 @@ import Matter from 'matter-js';
 import { createWorld } from './physics/world';
 import { GameLoop } from './physics/loop';
 import { generateFortress } from './ai/gemini';
+import type { TerrainContext } from './ai/prompts';
+import { safeSpawn } from './ai/overlap';
 import type { KingState } from './types';
 
 dotenv.config();
@@ -110,8 +112,12 @@ Matter.Events.on(engine, 'collisionStart', (event) => {
 
         if (kingState.hp <= 0) continue;
 
-        const impactForce = (bodyA.speed * bodyA.mass) + (bodyB.speed * bodyB.mass);
-        if (impactForce < IMPACT_THRESHOLD) continue;
+        const getMomentum = (b: Matter.Body) => {
+            if (b.isStatic) return 0;
+            return b.speed * b.mass;
+        };
+        const impactForce = getMomentum(bodyA) + getMomentum(bodyB);
+        if (impactForce < IMPACT_THRESHOLD || isNaN(impactForce)) continue;
 
         const multiplier = DAMAGE_MULTIPLIERS[otherBody.label] ?? 1.0;
         const damage = (impactForce - IMPACT_THRESHOLD) * multiplier;
@@ -187,12 +193,24 @@ io.on('connection', (socket) => {
         try {
             socket.emit('build_status', { status: 'generating', message: 'Architect is thinking...' });
 
-            const plan = await generateFortress(apiKey, prompt);
+            const terrainCtx: TerrainContext = {
+                surfacePoints: terrain.points,
+                buildZones: terrain.buildZones,
+                kingPosition: { x: kingBody.position.x, y: kingBody.position.y },
+            };
+
+            const plan = await generateFortress(apiKey, prompt, terrainCtx);
 
             socket.emit('build_status', { status: 'building', message: plan.thought_chain });
 
+            // Run safe spawn to resolve overlaps
+            const { adjustedBodies, adjustmentCount } = safeSpawn(plan.bodies, world);
+            if (adjustmentCount > 0) {
+                console.log(`Safe spawn adjusted ${adjustmentCount} bodies to avoid overlaps`);
+            }
+
             let spawnedCount = 0;
-            plan.bodies.forEach(b => {
+            adjustedBodies.forEach(b => {
                 const props = MATERIAL_PROPS[b.material] || MATERIAL_PROPS.wood;
 
                 let body: Matter.Body;

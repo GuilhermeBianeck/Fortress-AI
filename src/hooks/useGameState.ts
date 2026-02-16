@@ -8,6 +8,9 @@ export const useGameState = () => {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [terrain, setTerrain] = useState<TerrainData | null>(null);
     const [buildStatus, setBuildStatus] = useState<BuildStatus>({ status: 'idle', message: '' });
+    const [kingHp, setKingHp] = useState(100);
+    const [kingMaxHp, setKingMaxHp] = useState(100);
+    const [kingDead, setKingDead] = useState(false);
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
@@ -19,6 +22,10 @@ export const useGameState = () => {
 
         socketRef.current.on('gameState', (state: GameState) => {
             setGameState(state);
+            if (state.kingMaxHp > 0) {
+                setKingHp(state.kingHp);
+                setKingMaxHp(state.kingMaxHp);
+            }
         });
 
         socketRef.current.on('terrain', (data: TerrainData) => {
@@ -38,7 +45,6 @@ export const useGameState = () => {
                 status: 'success',
                 message: `Built ${data.count} blocks! "${data.thought}"`
             });
-            // Auto-clear status after 5s
             setTimeout(() => setBuildStatus({ status: 'idle', message: '' }), 5000);
         });
 
@@ -47,8 +53,20 @@ export const useGameState = () => {
             setTimeout(() => setBuildStatus({ status: 'idle', message: '' }), 5000);
         });
 
+        socketRef.current.on('king_damage', (data: { hp: number; maxHp: number; damage: number; source: string }) => {
+            setKingHp(data.hp);
+            setKingMaxHp(data.maxHp);
+            console.log(`King hit by ${data.source}! Damage: ${data.damage.toFixed(1)} | HP: ${data.hp.toFixed(1)}/${data.maxHp}`);
+        });
+
+        socketRef.current.on('king_dead', () => {
+            setKingDead(true);
+            console.log('The King has fallen!');
+        });
+
         socketRef.current.on('world_cleared', () => {
             console.log('World cleared');
+            setKingDead(false);
         });
 
         socketRef.current.on('disconnect', () => {
@@ -80,5 +98,5 @@ export const useGameState = () => {
         socketRef.current?.emit('clear_world');
     }, []);
 
-    return { gameState, terrain, buildStatus, spawnBox, requestBuild, clearWorld };
+    return { gameState, terrain, buildStatus, kingHp, kingMaxHp, kingDead, spawnBox, requestBuild, clearWorld };
 };

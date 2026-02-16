@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { FortressSchema, FortressPlan } from './schema';
-import { SYSTEM_PROMPT } from './prompts';
+import { buildSystemPrompt, TerrainContext } from './prompts';
 
-export const generateFortress = async (apiKey: string, userPrompt: string): Promise<FortressPlan> => {
+export const generateFortress = async (apiKey: string, userPrompt: string, terrainCtx?: TerrainContext): Promise<FortressPlan> => {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const model = genAI.getGenerativeModel({
@@ -35,12 +35,14 @@ export const generateFortress = async (apiKey: string, userPrompt: string): Prom
         }
     });
 
+    const systemPrompt = buildSystemPrompt(terrainCtx);
+
     const result = await model.generateContent({
         contents: [
             {
                 role: 'user',
                 parts: [
-                    { text: SYSTEM_PROMPT },
+                    { text: systemPrompt },
                     { text: `User Request: "${userPrompt}"` }
                 ]
             }

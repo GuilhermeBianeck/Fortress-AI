@@ -1,18 +1,59 @@
-export const SYSTEM_PROMPT = `
+export interface TerrainContext {
+    surfacePoints: { x: number; y: number }[];
+    buildZones: { x: number; width: number; y: number }[];
+    kingPosition: { x: number; y: number };
+}
+
+export function buildSystemPrompt(ctx?: TerrainContext): string {
+    let terrainSection = '';
+    let kingSection = '';
+    let groundRule = '3. **Stability:** Objects must rest on the ground (Y~575 for a 50px high block) or on other objects.';
+
+    if (ctx) {
+        // Simplify terrain: every other point to keep token count low
+        const simplified = ctx.surfacePoints.filter((_, i) => i % 2 === 0);
+        const pointsStr = simplified.map(p => `(${Math.round(p.x)},${Math.round(p.y)})`).join(' ');
+
+        terrainSection = `
+### TERRAIN SURFACE
+The terrain is NOT flat. Here are the surface points (x,y) from left to right:
+${pointsStr}
+Place blocks so their bottom edge touches the terrain surface at that X coordinate.
+`;
+
+        const zonesStr = ctx.buildZones.map(z =>
+            `  - x=${Math.round(z.x)} to x=${Math.round(z.x + z.width)}, surface Y~${Math.round(z.y)}`
+        ).join('\n');
+
+        terrainSection += `
+### BUILD ZONES (flat areas suitable for building)
+${zonesStr || '  - No flat zones detected — build carefully on slopes'}
+`;
+
+        kingSection = `
+### KING POSITION
+The King unit is at (${Math.round(ctx.kingPosition.x)}, ${Math.round(ctx.kingPosition.y)}).
+Build your fortress around or near the King to protect it. Do NOT place blocks on top of the King.
+`;
+
+        // Override ground rule with terrain-aware version
+        groundRule = `3. **Stability:** The terrain is uneven. Check the TERRAIN SURFACE points to find the correct Y for each X. Place blocks so they rest on the terrain surface or on other blocks. Do NOT assume Y=575 for ground level.`;
+    }
+
+    return `
 You are a structural engineer and architect for a 2D physics engine (Matter.js).
 Your goal is to design stable, defensive structures to protect a 'King' unit based on a user's request.
 
 ### PHYSICS RULES
 1. **Gravity:** Acts downwards (Y+ direction).
-2. **Coordinates:** 
+2. **Coordinates:**
    - Origin (0,0) is Top-Left.
-   - Ground level is at Y = 600.
+   - Canvas height is 600, width is 800.
    - Sky is Y = 0.
-   - Width is 800.
-3. **Stability:** Objects must rest on the ground (Y=575 for a 50px high block) or on other objects.
+${groundRule}
    - Do not spawn objects in the air unless requested (they will fall).
    - Do not overlap objects (they will explode).
-
+${terrainSection}${kingSection}
 ### MATERIALS
 - **wood**: Light, medium friction. Good for height.
 - **stone**: Heavy, high friction. Good for base.
@@ -30,9 +71,10 @@ You must return a valid JSON object matching this schema:
 }
 
 ### CRITICAL INSTRUCTIONS
-1. **Ground Support:** The first layer of blocks must be at Y ~ 575 (assuming 50px height) to touch the ground at Y=600.
+1. **Ground Support:** The first layer of blocks must sit on the terrain surface. Calculate Y so the block's bottom edge touches the surface.
 2. **Stacking:** If placing a block on top of another, ensure the Y coordinates account for the height.
-   - Example: specific block at y=575 (height 50). Next block on top should be at y=525.
+   - Example: block at y=550 (height 50). Next block on top should be at y=500.
 3. **King Protection:** The user wants to protect a unit. Build walls and a roof.
 4. **Economy:** Use fewer than 20 blocks unless necessary.
 `;
+}

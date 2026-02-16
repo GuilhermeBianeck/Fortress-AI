@@ -5,6 +5,8 @@ interface GameCanvasProps {
     gameState: GameState | null;
     terrain: TerrainData | null;
     onSpawn: (x: number, y: number) => void;
+    kingHp: number;
+    kingMaxHp: number;
 }
 
 // Material color map (fallback if server doesn't send color)
@@ -27,7 +29,13 @@ const MATERIAL_STROKE: Record<string, string> = {
     king: '#DAA520',
 };
 
-export const GameCanvas = ({ gameState, terrain, onSpawn }: GameCanvasProps) => {
+function getHpColor(ratio: number): string {
+    if (ratio > 0.6) return '#22c55e';  // green
+    if (ratio > 0.3) return '#eab308';  // yellow
+    return '#ef4444';                    // red
+}
+
+export const GameCanvas = ({ gameState, terrain, onSpawn, kingHp, kingMaxHp }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -133,6 +141,15 @@ export const GameCanvas = ({ gameState, terrain, onSpawn }: GameCanvasProps) => 
                 ctx.strokeStyle = strokeColor;
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
+
+                // King crown indicator
+                if (body.label === 'king') {
+                    ctx.shadowColor = 'transparent';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillText('\u265A', 0, 4); // chess king unicode
+                }
             } else if (!body.isStatic) {
                 // Draw rectangle for dynamic bodies
                 const w = body.width || 50;
@@ -149,9 +166,66 @@ export const GameCanvas = ({ gameState, terrain, onSpawn }: GameCanvasProps) => 
             }
 
             ctx.restore();
+
+            // Draw floating HP bar above King
+            if (body.label === 'king' && kingMaxHp > 0) {
+                const barWidth = 30;
+                const barHeight = 4;
+                const barX = body.position.x - barWidth / 2;
+                const barY = body.position.y - (body.circleRadius || 12) - 10;
+                const hpRatio = Math.max(0, kingHp / kingMaxHp);
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+
+                ctx.fillStyle = '#333';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+
+                ctx.fillStyle = getHpColor(hpRatio);
+                ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+            }
         }
 
-    }, [gameState, terrain]);
+        // HUD: King HP bar (top-left corner)
+        if (kingMaxHp > 0) {
+            const hudX = 12;
+            const hudY = 12;
+            const hudWidth = 120;
+            const hudHeight = 14;
+            const hpRatio = Math.max(0, kingHp / kingMaxHp);
+
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
+
+            // Label
+            ctx.font = 'bold 10px monospace';
+            ctx.fillStyle = '#FFD700';
+            ctx.textAlign = 'left';
+            ctx.fillText('\u265A KING', hudX, hudY + 10);
+
+            // Bar background
+            const barY = hudY + 14;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(hudX, barY, hudWidth, hudHeight);
+
+            // Bar fill
+            ctx.fillStyle = getHpColor(hpRatio);
+            ctx.fillRect(hudX, barY, hudWidth * hpRatio, hudHeight);
+
+            // Bar border
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(hudX, barY, hudWidth, hudHeight);
+
+            // HP text
+            ctx.font = 'bold 9px monospace';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${Math.ceil(kingHp)} / ${kingMaxHp}`, hudX + hudWidth / 2, barY + 11);
+        }
+
+    }, [gameState, terrain, kingHp, kingMaxHp]);
 
     const handleClick = (e: React.MouseEvent) => {
         if (!canvasRef.current) return;

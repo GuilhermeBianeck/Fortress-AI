@@ -7,7 +7,7 @@ import { Bot, Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle } from 'lu
 import type { MaterialType, ShapeType } from './types';
 
 function App() {
-  const { gameState, terrain, buildStatus, spawnBox, requestBuild, clearWorld } = useGameState();
+  const { gameState, terrain, buildStatus, kingHp, kingMaxHp, spawnBox, requestBuild, clearWorld } = useGameState();
 
   // God Tools state
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>('wood');
@@ -125,7 +125,7 @@ function App() {
         {/* Game Canvas */}
         <div className="relative group">
           <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
-          <GameCanvas gameState={gameState} terrain={terrain} onSpawn={handleSpawn} />
+          <GameCanvas gameState={gameState} terrain={terrain} onSpawn={handleSpawn} kingHp={kingHp} kingMaxHp={kingMaxHp} />
         </div>
 
         {/* Prompt Input */}
