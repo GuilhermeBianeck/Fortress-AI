@@ -131,6 +131,9 @@ export class RoomManager {
         room.players.delete(socketId);
         this.playerRoomMap.delete(socketId);
 
+        // Clear rematch requests on disconnect
+        room.rematchRequests.delete(socketId);
+
         // If match was in progress, opponent wins by forfeit
         if (room.session && room.phase !== 'lobby' && room.phase !== 'result') {
             const remainingPlayer = Array.from(room.players.values())[0];

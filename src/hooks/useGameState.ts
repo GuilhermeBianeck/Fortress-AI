@@ -132,6 +132,7 @@ export const useGameState = () => {
 
         socketRef.current.on('player_left', (data: { side: Side; reason: string }) => {
             setRoomState(prev => prev ? { ...prev, opponentConnected: false } : prev);
+            setRematchState('none');
             console.log(`Player ${data.side} left: ${data.reason}`);
         });
 

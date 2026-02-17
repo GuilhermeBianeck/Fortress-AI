@@ -6,7 +6,7 @@ import { GodTools } from './components/GodTools';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
-import { Bot, Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Bot, Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 
 function App() {
@@ -24,6 +24,7 @@ function App() {
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>('wood');
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
   const [gameMode, setGameMode] = useState<GameMode>('build');
+  const [showChat, setShowChat] = useState(false);
 
   // Player name state (persisted)
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('fortress_player_name') || '');
@@ -86,27 +87,40 @@ function App() {
   } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white font-sans selection:bg-rose-500/30">
+    <div className="h-screen bg-neutral-950 text-white font-sans selection:bg-rose-500/30 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="p-4 sm:p-6 border-b border-white/10 flex justify-between items-center bg-black/20 backdrop-blur-md sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="bg-rose-600 p-2 rounded-lg">
-            <Bot size={24} className="text-white" />
+      <header className="px-4 py-2 border-b border-white/10 flex justify-between items-center bg-black/20 backdrop-blur-md sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <div className="bg-rose-600 p-1.5 rounded-lg">
+            <Bot size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">FORTRESS AI</h1>
-            <div className="text-xs text-neutral-400 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <h1 className="text-base font-bold tracking-tight">FORTRESS AI</h1>
+            <div className="text-[10px] text-neutral-400 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               {inGame && roomState ? `Room: ${roomState.roomId}` : 'ONLINE'}
             </div>
           </div>
         </div>
 
         <div className="flex gap-2 items-center">
+          {/* Chat toggle (mobile only, in-game) */}
+          {inGame && (
+            <button
+              onClick={() => setShowChat(!showChat)}
+              className="xl:hidden px-2 py-1.5 text-sm rounded-lg transition-all bg-neutral-800 border border-white/10 hover:bg-neutral-700 flex items-center gap-1.5"
+            >
+              <MessageCircle size={14} />
+              <span className="hidden sm:inline text-xs">Chat</span>
+              {chatMessages.length > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+              )}
+            </button>
+          )}
           {/* API Key toggle */}
           <button
             onClick={() => setShowApiKey(!showApiKey)}
-            className={`px-3 py-2 text-sm rounded-lg transition-all duration-200 flex items-center gap-2
+            className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 flex items-center gap-1.5
                        ${apiKey ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'}
                        hover:bg-white/10`}
           >
@@ -116,22 +130,22 @@ function App() {
         </div>
       </header>
 
-      <main className="flex flex-col items-center justify-center p-4 sm:p-8 gap-4">
+      <main className={`flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto min-h-0 ${inGame ? 'p-3 gap-3' : ''}`}>
         {/* API Key Input (collapsible) */}
         {showApiKey && (
-          <div className="w-full max-w-[800px] bg-black/60 border border-white/10 rounded-xl p-4 backdrop-blur-sm animate-in slide-in-from-top-2">
-            <label className="text-xs text-neutral-400 mb-2 block">Gemini API Key (stored locally, never sent to our servers)</label>
+          <div className="w-full bg-black/60 border border-white/10 rounded-xl p-3 sm:p-4 backdrop-blur-sm">
+            <label className="text-xs text-neutral-400 mb-2 block">Gemini API Key (stored locally)</label>
             <div className="flex gap-2">
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => handleApiKeyChange(e.target.value)}
                 placeholder="AIzaSy..."
-                className="flex-1 bg-neutral-900/80 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/20 transition-all font-mono"
+                className="flex-1 min-w-0 bg-neutral-900/80 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 transition-all font-mono"
               />
               <button
                 onClick={() => setShowApiKey(false)}
-                className="px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-500 transition-colors"
+                className="shrink-0 px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-500 transition-colors"
               >
                 Save
               </button>
@@ -153,10 +167,11 @@ function App() {
             onReady={playerReady}
           />
         ) : (
-          <>
+          <div className="flex flex-col items-center gap-3 flex-1 w-full"
+               style={{ maxWidth: 'calc((100vh - 10rem) * 4 / 3)' }}>
             {/* Build Status Overlay */}
             {buildStatus.status !== 'idle' && (
-              <div className={`w-full max-w-[800px] border rounded-xl p-3 backdrop-blur-sm flex items-center gap-3 transition-all
+              <div className={`w-full border rounded-xl p-2 sm:p-3 backdrop-blur-sm flex items-center gap-2 sm:gap-3 transition-all
                 ${buildStatus.status === 'error'
                   ? 'bg-red-500/10 border-red-500/20 text-red-300'
                   : buildStatus.status === 'success'
@@ -164,27 +179,12 @@ function App() {
                     : 'bg-violet-500/10 border-violet-500/20 text-violet-300'
                 }`}
               >
-                {isBuilding && <Loader2 size={16} className="animate-spin" />}
-                {buildStatus.status === 'success' && <CheckCircle2 size={16} />}
-                {buildStatus.status === 'error' && <AlertCircle size={16} />}
-                <span className="text-sm font-mono truncate">{buildStatus.message}</span>
+                {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" />}
+                {buildStatus.status === 'success' && <CheckCircle2 size={14} className="shrink-0" />}
+                {buildStatus.status === 'error' && <AlertCircle size={14} className="shrink-0" />}
+                <span className="text-xs sm:text-sm font-mono truncate">{buildStatus.message}</span>
               </div>
             )}
-
-            {/* Phase Overlay */}
-            <PhaseOverlay
-              phase={phase}
-              phaseEndsAt={phaseEndsAt}
-              turnPlayer={turnPlayer}
-              mySide={mySide}
-              matchResult={matchResult}
-              playerNames={playerNamesMap}
-              roundScore={roundScore}
-              currentRound={currentRound}
-              rematchState={rematchState}
-              onRequestRematch={requestRematch}
-              hazards={hazards}
-            />
 
             {/* God Tools (build phase only) */}
             <GodTools
@@ -199,65 +199,109 @@ function App() {
             />
 
             {/* Game Canvas + Chat */}
-            <div className="flex gap-4 items-start">
-              <div className="relative group">
+            <div className="flex gap-4 items-start w-full justify-center">
+              {/* Canvas container — fluid, maintains 4:3 aspect */}
+              <div className="relative group flex-1 min-w-0">
                 <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
-                <GameCanvas
-                  gameState={gameState}
-                  terrain={terrain}
-                  onSpawn={handleSpawn}
-                  kingsHp={kingsHp}
+                <div className="relative">
+                  <GameCanvas
+                    gameState={gameState}
+                    terrain={terrain}
+                    onSpawn={handleSpawn}
+                    kingsHp={kingsHp}
+                    mySide={mySide}
+                    gameMode={gameMode}
+                    phase={phase}
+                    turnPlayer={turnPlayer}
+                    onFire={fireProjectile}
+                    setBlockDestroyedCallback={setBlockDestroyedCallback}
+                    setProjectileImpactCallback={setProjectileImpactCallback}
+                    playerNames={playerNamesMap}
+                    hazards={hazards}
+                    roundScore={roundScore}
+                    currentRound={currentRound}
+                  />
+                  {/* Phase overlay — on top of canvas */}
+                  {phase && (
+                    <div className={`absolute inset-x-0 z-10 flex justify-center pointer-events-none ${
+                      phase === 'result' ? 'inset-0 items-center' : 'top-0 pt-2'
+                    }`}>
+                      <div className="pointer-events-auto">
+                        <PhaseOverlay
+                          phase={phase}
+                          phaseEndsAt={phaseEndsAt}
+                          turnPlayer={turnPlayer}
+                          mySide={mySide}
+                          matchResult={matchResult}
+                          playerNames={playerNamesMap}
+                          roundScore={roundScore}
+                          currentRound={currentRound}
+                          rematchState={rematchState}
+                          onRequestRematch={requestRematch}
+                          hazards={hazards}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Chat — visible on xl screens, toggleable overlay on smaller */}
+              <div className="hidden xl:block">
+                <ChatPanel
+                  messages={chatMessages}
+                  onSend={sendChatMessage}
                   mySide={mySide}
-                  gameMode={gameMode}
-                  phase={phase}
-                  turnPlayer={turnPlayer}
-                  onFire={fireProjectile}
-                  setBlockDestroyedCallback={setBlockDestroyedCallback}
-                  setProjectileImpactCallback={setProjectileImpactCallback}
-                  playerNames={playerNamesMap}
-                  hazards={hazards}
-                  roundScore={roundScore}
-                  currentRound={currentRound}
                 />
               </div>
-              <ChatPanel
-                messages={chatMessages}
-                onSend={sendChatMessage}
-                mySide={mySide}
-              />
             </div>
+
+            {/* Mobile chat overlay */}
+            {showChat && (
+              <div className="fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
+                <div className="w-full max-w-md mb-0 sm:mb-4">
+                  <ChatPanel
+                    messages={chatMessages}
+                    onSend={sendChatMessage}
+                    mySide={mySide}
+                    mobile
+                    onClose={() => setShowChat(false)}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Prompt Input — only in build mode during build phase */}
             {phase === 'build' && gameMode === 'build' && (
-              <form onSubmit={handleSubmitPrompt} className="w-full max-w-[800px] bg-black/40 border border-white/10 rounded-xl p-3 flex gap-3 backdrop-blur-sm">
-                <div className="p-2.5 bg-neutral-900 rounded-lg shrink-0">
-                  <Terminal size={18} className="text-neutral-400" />
+              <form onSubmit={handleSubmitPrompt} className="w-full bg-black/40 border border-white/10 rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3 backdrop-blur-sm">
+                <div className="p-2 sm:p-2.5 bg-neutral-900 rounded-lg shrink-0">
+                  <Terminal size={16} className="text-neutral-400" />
                 </div>
                 <input
                   type="text"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your fortress... (e.g., 'Build a stone tower with a wood base')"
-                  className="w-full bg-transparent outline-none text-neutral-200 placeholder:text-neutral-600 font-mono text-sm"
+                  placeholder="Describe your fortress..."
+                  className="w-full min-w-0 bg-transparent outline-none text-neutral-200 placeholder:text-neutral-600 font-mono text-xs sm:text-sm"
                   disabled={isBuilding}
                 />
                 <button
                   type="submit"
                   disabled={isBuilding || !prompt.trim()}
-                  className="p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-2 sm:p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  {isBuilding ? <Loader2 size={18} className="animate-spin text-white" /> : <Send size={18} className="text-white" />}
+                  {isBuilding ? <Loader2 size={16} className="animate-spin text-white" /> : <Send size={16} className="text-white" />}
                 </button>
               </form>
             )}
 
             {/* Combat hint */}
             {phase === 'combat' && turnPlayer === mySide && (
-              <div className="text-xs text-neutral-500 font-mono">
+              <div className="text-[10px] sm:text-xs text-neutral-500 font-mono text-center">
                 Drag on canvas to aim &amp; fire &middot; Arrow keys to fine-tune &middot; A/D to pan camera
               </div>
             )}
-          </>
+          </div>
         )}
       </main>
     </div>

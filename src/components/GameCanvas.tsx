@@ -217,6 +217,18 @@ export const GameCanvas = ({
         }
     }, [phase, mySide]);
 
+    // Auto-pan to own cannon when it's my turn
+    useEffect(() => {
+        if (phase !== 'combat') return;
+        if (turnPlayer === mySide) {
+            const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+            cameraRef.current.targetX = Math.max(0, Math.min(
+                WORLD_WIDTH - CANVAS_WIDTH,
+                cannonX - CANVAS_WIDTH / 2
+            ));
+        }
+    }, [phase, turnPlayer, mySide]);
+
     // Track projectile during combat for auto-pan
     useEffect(() => {
         if (phase !== 'combat' || !gameState) return;
@@ -359,28 +371,58 @@ export const GameCanvas = ({
             const animPhase = Date.now() / 1000;
             for (const h of hzds) {
                 if (h.type === 'wind_zone') {
-                    // Semi-transparent blue
-                    ctx.fillStyle = 'rgba(100, 150, 255, 0.08)';
+                    // Subtle blue tint
+                    ctx.fillStyle = 'rgba(100, 150, 255, 0.03)';
                     ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
-                    ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([6, 4]);
-                    ctx.strokeRect(h.position.x, h.position.y, h.width, h.height);
-                    ctx.setLineDash([]);
 
-                    // Animated wind lines
+                    // Organic wind particles — curved streaks with wobble
                     const dir = h.windDirection ?? 1;
-                    const lineCount = 5;
-                    for (let i = 0; i < lineCount; i++) {
-                        const ly = h.position.y + (i + 0.5) * (h.height / lineCount);
-                        const offset = ((animPhase * 60 * dir + i * 40) % h.width);
-                        const lx = h.position.x + (dir > 0 ? offset : h.width - offset);
+                    const visibleLeft = cam.x - 100;
+                    const visibleRight = cam.x + CANVAS_WIDTH + 100;
+                    const particleCount = 50;
+                    const wrapWidth = visibleRight - visibleLeft + 200;
+
+                    for (let i = 0; i < particleCount; i++) {
+                        const seed = i * 137.508;
+                        // Horizontal position wraps across the visible area
+                        const rawX = visibleLeft + ((seed + animPhase * (50 + (i % 4) * 15) * dir) % wrapWidth + wrapWidth) % wrapWidth;
+                        // Vertical position distributed across height with some jitter
+                        const baseY = h.position.y + ((seed * 73.7) % h.height);
+                        // Wobble for organic movement
+                        const wobble = Math.sin(animPhase * (1.5 + (i % 3) * 0.5) + seed * 0.1) * 6;
+                        const wobble2 = Math.cos(animPhase * 0.8 + seed * 0.07) * 3;
+                        // Varying streak length
+                        const len = 12 + (i % 7) * 6;
+                        // Pulsing opacity
+                        const alpha = 0.08 + 0.12 * Math.sin(animPhase * (2 + (i % 5) * 0.3) + seed * 0.15);
+
+                        const x = rawX;
+                        const y = baseY + wobble;
+
+                        // Draw curved streak
                         ctx.beginPath();
-                        ctx.moveTo(lx, ly);
-                        ctx.lineTo(lx + dir * 20, ly);
-                        ctx.strokeStyle = 'rgba(150, 200, 255, 0.4)';
-                        ctx.lineWidth = 1.5;
+                        ctx.moveTo(x, y);
+                        ctx.quadraticCurveTo(
+                            x + dir * len * 0.4, y + wobble2 - 2,
+                            x + dir * len, y + wobble2
+                        );
+                        ctx.strokeStyle = `rgba(180, 215, 255, ${alpha.toFixed(3)})`;
+                        ctx.lineWidth = 0.8 + (i % 3) * 0.4;
                         ctx.stroke();
+
+                        // Small arrowhead on some streaks
+                        if (i % 4 === 0) {
+                            const tipX = x + dir * len;
+                            const tipY = y + wobble2;
+                            ctx.beginPath();
+                            ctx.moveTo(tipX, tipY);
+                            ctx.lineTo(tipX - dir * 4, tipY - 2);
+                            ctx.moveTo(tipX, tipY);
+                            ctx.lineTo(tipX - dir * 4, tipY + 2);
+                            ctx.strokeStyle = `rgba(180, 215, 255, ${(alpha * 0.7).toFixed(3)})`;
+                            ctx.lineWidth = 0.6;
+                            ctx.stroke();
+                        }
                     }
                 } else if (h.type === 'lava_pool') {
                     // Glowing orange/red
@@ -435,30 +477,69 @@ export const GameCanvas = ({
 
                 // Trajectory preview (only for active cannon during fire mode)
                 if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
-                    const gravity = 2;
+                    // Match server physics: gravity.y=2, gravity.scale=0.001, delta=1000/60
+                    // gravityAccel = gravity.y * gravity.scale * delta^2 = 2 * 0.001 * (1000/60)^2 ≈ 0.556
+                    const gravityAccel = 0.556;
+                    const airDamp = 0.995; // matches server frictionAir=0.005
+                    const maxSpeed = 35;
+
                     const dirMult = facingRight ? 1 : -1;
                     let px = cannonX + dirMult * Math.cos(currentAngle) * 24;
                     let py = cannonY - Math.sin(currentAngle) * 24;
                     let vx = dirMult * aim.power * Math.cos(currentAngle);
                     let vy = -aim.power * Math.sin(currentAngle);
 
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                    for (let step = 0; step < 15; step++) {
+                    // Apply speed cap (same as server)
+                    const speed = Math.sqrt(vx * vx + vy * vy);
+                    if (speed > maxSpeed) {
+                        const s = maxSpeed / speed;
+                        vx *= s;
+                        vy *= s;
+                    }
+
+                    const steps = 80;
+                    for (let step = 0; step < steps; step++) {
+                        vx *= airDamp;
+                        vy *= airDamp;
                         px += vx;
                         py += vy;
-                        vy += gravity * (1000 / 60 / 1000) * 60;
+                        vy += gravityAccel;
+
+                        const alpha = 0.6 * (1 - step / steps);
+                        if (alpha < 0.05) break;
                         ctx.beginPath();
                         ctx.arc(px, py, 2, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
                         ctx.fill();
+
+                        // Stop if it goes off-screen
+                        if (py > CANVAS_HEIGHT + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
                     }
                 }
 
-                // Keyboard readout
-                if (isActive && aim.useKeyboard && currentPhase === 'combat') {
+                // Aim readout (always show when aiming)
+                if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
                     ctx.font = 'bold 10px monospace';
                     ctx.fillStyle = '#fff';
                     ctx.textAlign = 'left';
-                    ctx.fillText(`${(currentAngle * 180 / Math.PI).toFixed(0)}° P:${aim.power.toFixed(0)}`, cannonX + 12, cannonY - 18);
+                    const labelX = facingRight ? cannonX + 14 : cannonX - 90;
+                    ctx.fillText(`${(currentAngle * 180 / Math.PI).toFixed(0)}° P:${aim.power.toFixed(0)}`, labelX, cannonY - 18);
+
+                    // Power bar
+                    const barX = facingRight ? cannonX + 14 : cannonX - 90;
+                    const barY = cannonY - 8;
+                    const barW = 60;
+                    const barH = 5;
+                    const powerRatio = (aim.power - 5) / 45;
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(barX, barY, barW, barH);
+                    const r = Math.round(255 * powerRatio);
+                    const g = Math.round(255 * (1 - powerRatio));
+                    ctx.fillStyle = `rgb(${r}, ${g}, 80)`;
+                    ctx.fillRect(barX, barY, barW * powerRatio, barH);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(barX, barY, barW, barH);
                 }
             };
 
@@ -630,40 +711,8 @@ export const GameCanvas = ({
         // Right King HP bar (top-right)
         drawKingHud(ctx, canvas.width - 132, 12, kings.right, rightLabel);
 
-        // Mode indicator (top-center)
-        {
-            let modeLabel = '';
-            let modeColor = '#888';
-            if (currentPhase === 'build') {
-                modeLabel = 'BUILD PHASE';
-                modeColor = '#22c55e';
-            } else if (currentPhase === 'combat') {
-                modeLabel = currentTurn === side ? 'YOUR TURN' : "OPPONENT'S TURN";
-                modeColor = currentTurn === side ? '#ef4444' : '#888';
-            } else if (currentPhase === 'reveal') {
-                modeLabel = 'REVEALING';
-                modeColor = '#a78bfa';
-            } else if (currentPhase === 'result') {
-                modeLabel = 'MATCH OVER';
-                modeColor = '#fbbf24';
-            }
-            if (modeLabel) {
-                ctx.font = 'bold 12px monospace';
-                ctx.fillStyle = modeColor;
-                ctx.textAlign = 'center';
-                ctx.fillText(modeLabel, canvas.width / 2, 22);
-            }
-
-            // Round score
-            const rs = roundScoreRef.current;
-            const cr = currentRoundRef.current;
-            if (rs && (rs.left > 0 || rs.right > 0 || (cr && cr > 1))) {
-                ctx.font = 'bold 11px monospace';
-                ctx.fillStyle = '#fbbf24';
-                ctx.textAlign = 'center';
-                ctx.fillText(`R${cr || 1}  [${rs.left} - ${rs.right}]`, canvas.width / 2, 38);
-            }
-        }
+        // Mode indicator and round score are shown by PhaseOverlay (HTML overlay)
+        // so we don't draw them on canvas to avoid overlap
 
         // === Minimap ===
         drawMinimap(ctx, canvas, terr, gs, cam, hazardsRef.current);
@@ -841,7 +890,7 @@ export const GameCanvas = ({
             aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
             aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
             const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-            aim.power = Math.max(5, Math.min(30, dist / 10));
+            aim.power = Math.max(5, Math.min(50, 5 + (dist / 15) * 45));
         }
     };
 
@@ -853,7 +902,7 @@ export const GameCanvas = ({
         aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
         const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        aim.power = Math.max(5, Math.min(30, dist / 10));
+        aim.power = Math.max(5, Math.min(30, 5 + (dist / 15) * 25));
     };
 
     const handleMouseUp = () => {
@@ -891,7 +940,7 @@ export const GameCanvas = ({
                         break;
                     case 'ArrowUp':
                         e.preventDefault();
-                        aim.power = Math.min(30, aim.power + 1);
+                        aim.power = Math.min(50, aim.power + 1);
                         aim.useKeyboard = true;
                         break;
                     case 'ArrowDown':
@@ -930,7 +979,7 @@ export const GameCanvas = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`border border-white/20 rounded-lg shadow-2xl ${cursorClass}`}
+            className={`border border-white/20 rounded-lg shadow-2xl w-full h-auto ${cursorClass}`}
             style={{ imageRendering: 'auto' }}
         />
     );

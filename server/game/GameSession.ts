@@ -245,8 +245,7 @@ export class GameSession {
     }
 
     handleFireProjectile(socketId: string, data: { angle: number; power: number }) {
-        const phase = this.stateMachine.getPhase();
-        if (phase !== 'combat') return;
+        if (!this.stateMachine.canFire()) return;
 
         const player = this.players.get(socketId);
         if (!player) return;
@@ -254,11 +253,11 @@ export class GameSession {
         // Only the current turn's player can fire
         if (player.side !== this.stateMachine.getCurrentTurn()) return;
 
-        // Clamp angle to [10deg, 170deg] in radians, power to [5, 30]
+        // Clamp angle to [10deg, 170deg] in radians, power to [5, 50]
         const minAngle = (10 * Math.PI) / 180;
         const maxAngle = (170 * Math.PI) / 180;
         const angle = Math.max(minAngle, Math.min(maxAngle, data.angle));
-        const power = Math.max(5, Math.min(30, data.power));
+        const power = Math.max(5, Math.min(50, data.power));
 
         // Cannon position based on player's side
         const cannonX = player.cannonX;
@@ -268,16 +267,27 @@ export class GameSession {
             density: PROJECTILE_DENSITY,
             restitution: PROJECTILE_RESTITUTION,
             friction: PROJECTILE_FRICTION,
+            frictionAir: 0.005,
             label: 'projectile',
         });
+
+        // Enable CCD to prevent tunneling through terrain
+        (body as any).isBullet = true;
 
         Matter.World.add(this.world, body);
 
         // Right player fires leftward (mirror velocity)
         const directionMultiplier = player.side === 'right' ? -1 : 1;
+        const vx = directionMultiplier * power * Math.cos(angle);
+        const vy = -power * Math.sin(angle);
+
+        // Cap velocity magnitude to prevent tunneling
+        const maxSpeed = 35;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        const scale = speed > maxSpeed ? maxSpeed / speed : 1;
         Matter.Body.setVelocity(body, {
-            x: directionMultiplier * power * Math.cos(angle),
-            y: -power * Math.sin(angle),
+            x: vx * scale,
+            y: vy * scale,
         });
 
         // Auto-remove after lifespan
@@ -570,12 +580,23 @@ export class GameSession {
 
     private checkProjectileBounds() {
         const bodies = Matter.Composite.allBodies(this.world);
+        const tickMaxSpeed = 40;
         for (const body of bodies) {
             if (body.label !== 'projectile') continue;
             if (body.position.y > CANVAS_HEIGHT + 50 ||
                 body.position.x < -50 ||
                 body.position.x > WORLD_WIDTH + 50) {
                 this.removeProjectile(body);
+                continue;
+            }
+            // Per-tick speed cap to prevent gravity-accelerated tunneling
+            const spd = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
+            if (spd > tickMaxSpeed) {
+                const s = tickMaxSpeed / spd;
+                Matter.Body.setVelocity(body, {
+                    x: body.velocity.x * s,
+                    y: body.velocity.y * s,
+                });
             }
         }
     }

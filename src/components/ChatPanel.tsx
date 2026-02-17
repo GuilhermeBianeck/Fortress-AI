@@ -6,9 +6,11 @@ interface ChatPanelProps {
     messages: ChatMessage[];
     onSend: (text: string) => void;
     mySide: Side;
+    mobile?: boolean;
+    onClose?: () => void;
 }
 
-export const ChatPanel = ({ messages, onSend, mySide }: ChatPanelProps) => {
+export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPanelProps) => {
     const [text, setText] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -27,9 +29,16 @@ export const ChatPanel = ({ messages, onSend, mySide }: ChatPanelProps) => {
     };
 
     return (
-        <div className="w-[250px] bg-black/60 border border-white/10 rounded-xl backdrop-blur-sm flex flex-col h-[600px]">
-            <div className="px-3 py-2 border-b border-white/10 text-xs text-neutral-400 font-bold">
-                CHAT
+        <div className={`flex flex-col bg-black/60 border border-white/10 backdrop-blur-sm ${
+            mobile
+                ? 'w-full rounded-t-xl h-[50vh]'
+                : 'w-[250px] rounded-xl h-[600px]'
+        }`}>
+            <div className="px-3 py-2 border-b border-white/10 text-xs text-neutral-400 font-bold flex justify-between items-center">
+                <span>CHAT</span>
+                {mobile && onClose && (
+                    <button onClick={onClose} className="text-neutral-500 hover:text-white text-sm">✕</button>
+                )}
             </div>
             <div
                 ref={scrollRef}

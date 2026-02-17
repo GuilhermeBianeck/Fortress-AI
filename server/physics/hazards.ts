@@ -37,15 +37,13 @@ export function generateHazards(terrain: TerrainResult, seed: number): HazardDat
         const id = `hazard_${type}_${Math.floor(rng() * 10000)}`;
 
         if (type === 'wind_zone') {
-            const w = 200 + rng() * 200;
-            const x = midStart + rng() * (midWidth - w);
-            const terrainY = interpolateTerrainY(terrain.points, x + w / 2);
+            // Wind covers the entire world width, full height
             hazards.push({
                 type: 'wind_zone',
                 id,
-                position: { x, y: terrainY - 250 },
-                width: w,
-                height: 250,
+                position: { x: 0, y: 0 },
+                width: WORLD_WIDTH,
+                height: CANVAS_HEIGHT,
                 windDirection: rng() < 0.5 ? -1 : 1,
                 windStrength: WIND_STRENGTH,
             });

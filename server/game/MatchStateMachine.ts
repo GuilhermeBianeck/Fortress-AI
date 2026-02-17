@@ -33,6 +33,8 @@ export class MatchStateMachine {
 
     private currentTurn: Side = 'left';
     private playersReady: Set<string> = new Set(); // socketIds that clicked ready during build
+    private matchEnded: boolean = false;
+    private hasFiredThisTurn: boolean = false;
 
     constructor(io: Server, roomId: string, callbacks: MatchCallbacks) {
         this.io = io;
@@ -96,7 +98,9 @@ export class MatchStateMachine {
     }
 
     startTurn(side: Side): void {
+        if (this.matchEnded) return;
         this.currentTurn = side;
+        this.hasFiredThisTurn = false;
 
         const endsAt = Date.now() + COMBAT_TURN_DURATION_MS;
         this.io.to(this.roomId).emit('phase_change', {
@@ -117,9 +121,14 @@ export class MatchStateMachine {
         }, COMBAT_TURN_DURATION_MS);
     }
 
+    canFire(): boolean {
+        return this.phase === 'combat' && !this.matchEnded && !this.hasFiredThisTurn;
+    }
+
     onProjectileFired(): void {
         // Cancel the turn timer — now we wait for settle
         this.clearPhaseTimer();
+        this.hasFiredThisTurn = true;
     }
 
     waitForSettle(): void {
@@ -186,6 +195,10 @@ export class MatchStateMachine {
     }
 
     private endMatch(winner: Side, reason: string): void {
+        this.matchEnded = true;
+        this.clearPhaseTimer();
+        this.clearSettleInterval();
+
         // Delegate to round handler first
         const result = this.callbacks.onRoundEnd(winner, reason);
 
