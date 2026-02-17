@@ -1,5 +1,6 @@
 import Matter from 'matter-js';
 import { generateTerrain, getRandomSeed, TerrainResult } from './terrain';
+import { WORLD_WIDTH, CANVAS_HEIGHT } from '../config/constants';
 
 export interface WorldResult {
     engine: Matter.Engine;
@@ -17,11 +18,11 @@ export const createWorld = (seed?: number): WorldResult => {
 
     const terrainSeed = seed ?? getRandomSeed();
 
-    // Generate procedural terrain
+    // Generate procedural terrain for full 1600px world
     const terrain = generateTerrain({
         seed: terrainSeed,
-        width: 800,
-        height: 600,
+        width: WORLD_WIDTH,
+        height: CANVAS_HEIGHT,
         baseHeight: 520,
         amplitude: 60,
         resolution: 25,

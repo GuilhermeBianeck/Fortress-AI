@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { GameSession } from './game/GameSession';
+import { RoomManager } from './game/RoomManager';
 
 dotenv.config();
 
@@ -20,26 +20,150 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3001;
 
-const session = new GameSession(io);
+const roomManager = new RoomManager(io);
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.emit('terrain', session.getTerrainData());
+    // --- Lobby events ---
 
-    socket.on('spawn', (data) => session.handleSpawn(data));
-
-    socket.on('request_build', (data) => session.handleRequestBuild(socket, data));
-
-    socket.on('clear_world', () => {
-        session.handleClearWorld();
-        io.emit('world_cleared');
+    socket.on('create_room', () => {
+        const room = roomManager.createRoom(socket.id);
+        socket.join(room.id);
+        socket.emit('room_created', { roomId: room.id });
+        console.log(`Room ${room.id} created by ${socket.id}`);
     });
 
-    socket.on('fire_projectile', (data) => session.handleFireProjectile(data));
+    socket.on('join_room', (data: { roomId: string }) => {
+        const roomId = data.roomId?.toUpperCase();
+        if (!roomId) {
+            socket.emit('room_error', { message: 'Room code is required.' });
+            return;
+        }
+
+        const room = roomManager.joinRoom(roomId, socket.id);
+        if (!room) {
+            socket.emit('room_error', { message: 'Room not found, full, or already started.' });
+            return;
+        }
+
+        socket.join(room.id);
+
+        const playerInfo = room.players.get(socket.id)!;
+        const players = Array.from(room.players.values()).map(p => ({
+            side: p.side,
+            ready: p.ready,
+        }));
+
+        socket.emit('room_joined', {
+            roomId: room.id,
+            side: playerInfo.side,
+            players,
+        });
+
+        // Notify existing players
+        socket.to(room.id).emit('player_joined', { side: playerInfo.side });
+        console.log(`${socket.id} joined room ${room.id} as ${playerInfo.side}`);
+    });
+
+    socket.on('join_queue', () => {
+        roomManager.joinQueue(socket.id);
+
+        const position = roomManager.getQueuePosition(socket.id);
+        socket.emit('queue_status', { position });
+
+        // Try to match
+        const room = roomManager.tryMatchFromQueue();
+        if (room) {
+            // Both players join the socket.io room
+            for (const [sid, pInfo] of room.players.entries()) {
+                const playerSocket = io.sockets.sockets.get(sid);
+                if (playerSocket) {
+                    playerSocket.join(room.id);
+
+                    const players = Array.from(room.players.values()).map(p => ({
+                        side: p.side,
+                        ready: p.ready,
+                    }));
+
+                    playerSocket.emit('match_found', { roomId: room.id });
+                    playerSocket.emit('room_joined', {
+                        roomId: room.id,
+                        side: pInfo.side,
+                        players,
+                    });
+                }
+            }
+            console.log(`Quick match: room ${room.id}`);
+        }
+    });
+
+    socket.on('leave_queue', () => {
+        roomManager.leaveQueue(socket.id);
+    });
+
+    socket.on('player_ready', () => {
+        const room = roomManager.getRoom(socket.id);
+        if (!room) return;
+
+        // During lobby: ready to start the match
+        if (room.phase === 'lobby') {
+            const allReady = roomManager.setPlayerReady(socket.id);
+            io.to(room.id).emit('player_ready_ack', {
+                side: room.players.get(socket.id)?.side,
+            });
+
+            if (allReady) {
+                // Start the match
+                const session = roomManager.startMatch(room.id);
+                if (session) {
+                    // Send terrain to both players
+                    io.to(room.id).emit('terrain', session.getTerrainData());
+
+                    // Send side info to each player
+                    for (const [sid, pInfo] of room.players.entries()) {
+                        const playerSocket = io.sockets.sockets.get(sid);
+                        playerSocket?.emit('match_started', { side: pInfo.side });
+                    }
+
+                    // Start build phase
+                    session.getStateMachine().startBuildPhase();
+                    console.log(`Match started in room ${room.id}`);
+                }
+            }
+        }
+
+        // During build phase: player finished building early
+        if (room.phase === 'build' && room.session) {
+            room.session.handlePlayerBuildReady(socket.id);
+        }
+    });
+
+    // --- Game events (require active room) ---
+
+    socket.on('spawn', (data) => {
+        const room = roomManager.getRoom(socket.id);
+        if (!room?.session) return;
+        room.session.handleSpawn(socket.id, data);
+    });
+
+    socket.on('request_build', (data) => {
+        const room = roomManager.getRoom(socket.id);
+        if (!room?.session) return;
+        room.session.handleRequestBuild(socket, data);
+    });
+
+    socket.on('fire_projectile', (data) => {
+        const room = roomManager.getRoom(socket.id);
+        if (!room?.session) return;
+        room.session.handleFireProjectile(socket.id, data);
+    });
+
+    // --- Disconnect ---
 
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
+        roomManager.handleDisconnect(socket.id);
     });
 });
 

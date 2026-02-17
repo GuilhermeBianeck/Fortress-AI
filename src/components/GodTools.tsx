@@ -1,4 +1,4 @@
-import type { MaterialType, ShapeType, GameMode } from '../types';
+import type { MaterialType, ShapeType, GameMode, MatchPhase } from '../types';
 import { MATERIAL_COLORS } from '../types';
 
 interface GodToolsProps {
@@ -6,9 +6,10 @@ interface GodToolsProps {
     selectedShape: ShapeType;
     onMaterialChange: (m: MaterialType) => void;
     onShapeChange: (s: ShapeType) => void;
-    onClear: () => void;
     gameMode: GameMode;
     onModeChange: (m: GameMode) => void;
+    phase: MatchPhase;
+    onReady: () => void;
 }
 
 const MATERIALS: { key: MaterialType; label: string; icon: string }[] = [
@@ -29,10 +30,16 @@ export const GodTools = ({
     selectedShape,
     onMaterialChange,
     onShapeChange,
-    onClear,
     gameMode,
     onModeChange,
+    phase,
+    onReady,
 }: GodToolsProps) => {
+    // Only show during build phase
+    if (phase !== 'build') {
+        return null;
+    }
+
     return (
         <div className="flex flex-wrap items-center gap-3 w-full max-w-[800px]">
             {/* Mode Toggle */}
@@ -59,7 +66,7 @@ export const GodTools = ({
                         }
                     `}
                 >
-                    FIRE
+                    PREVIEW
                 </button>
             </div>
 
@@ -114,22 +121,19 @@ export const GodTools = ({
                     </div>
                 </>
             ) : (
-                /* Fire mode: ammo label */
-                <div className="flex items-center gap-2 bg-black/40 border border-red-500/20 rounded-lg px-3 py-1.5 backdrop-blur-sm">
-                    <span className="text-sm">🪨</span>
-                    <span className="text-xs font-medium text-red-300">Stone Shot</span>
+                <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 backdrop-blur-sm">
+                    <span className="text-xs font-medium text-neutral-400">Preview mode (camera only)</span>
                 </div>
             )}
 
-            {/* Clear Button */}
+            {/* Ready Button */}
             <button
-                onClick={onClear}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                           bg-red-500/10 text-red-400 border border-red-500/20
-                           hover:bg-red-500/20 hover:text-red-300 transition-all duration-200 ml-auto"
+                onClick={onReady}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold
+                           bg-emerald-500/20 text-emerald-400 border border-emerald-500/30
+                           hover:bg-emerald-500/30 hover:text-emerald-300 transition-all duration-200 ml-auto"
             >
-                <span>🗑</span>
-                <span>Clear</span>
+                DONE BUILDING
             </button>
         </div>
     );

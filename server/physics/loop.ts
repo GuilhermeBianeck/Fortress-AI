@@ -10,19 +10,20 @@ const TICK_DT = 1000 / TICK_RATE;
 export class GameLoop {
     private engine: Matter.Engine;
     private io: Server;
+    private roomId: string;
     private interval: ReturnType<typeof setInterval> | null = null;
     private lastSnapshotTime = 0;
-    private kingState: KingState | null = null;
+    private kingStates: Map<string, KingState> = new Map(); // side → KingState
     private onTickCallback: (() => void) | null = null;
 
-    constructor(engine: Matter.Engine, io: Server, kingState?: KingState) {
+    constructor(engine: Matter.Engine, io: Server, roomId: string) {
         this.engine = engine;
         this.io = io;
-        this.kingState = kingState ?? null;
+        this.roomId = roomId;
     }
 
-    setKingState(kingState: KingState) {
-        this.kingState = kingState;
+    setKingState(side: string, kingState: KingState) {
+        this.kingStates.set(side, kingState);
     }
 
     setOnTick(cb: () => void) {
@@ -81,11 +82,16 @@ export class GameLoop {
             };
         });
 
-        this.io.emit('gameState', {
+        const leftKing = this.kingStates.get('left');
+        const rightKing = this.kingStates.get('right');
+
+        this.io.to(this.roomId).emit('gameState', {
             bodies,
             timestamp: Date.now(),
-            kingHp: this.kingState?.hp ?? 0,
-            kingMaxHp: this.kingState?.maxHp ?? 0,
+            kings: {
+                left: { hp: leftKing?.hp ?? 0, maxHp: leftKing?.maxHp ?? 0 },
+                right: { hp: rightKing?.hp ?? 0, maxHp: rightKing?.maxHp ?? 0 },
+            },
         });
     }
 }

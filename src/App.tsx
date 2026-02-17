@@ -3,13 +3,17 @@ import type { FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
 import { GodTools } from './components/GodTools';
+import { Lobby } from './components/Lobby';
+import { PhaseOverlay } from './components/PhaseOverlay';
 import { Bot, Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 
 function App() {
   const {
-    gameState, terrain, buildStatus, kingHp, kingMaxHp,
-    spawnBox, requestBuild, clearWorld, fireProjectile,
+    gameState, terrain, buildStatus, kingsHp,
+    roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
+    createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
+    spawnBox, requestBuild, fireProjectile,
     setBlockDestroyedCallback, setProjectileImpactCallback,
   } = useGameState();
 
@@ -23,17 +27,22 @@ function App() {
   const [prompt, setPrompt] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
 
-  // Tab key to toggle mode
+  // Determine screen: lobby or game
+  const inGame = phase !== 'lobby';
+
+  // Tab key to toggle mode (only during build phase)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Tab' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        e.preventDefault();
-        setGameMode(prev => prev === 'build' ? 'fire' : 'build');
+        if (phase === 'build') {
+          e.preventDefault();
+          setGameMode(prev => prev === 'build' ? 'fire' : 'build');
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [phase]);
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -58,6 +67,7 @@ function App() {
   };
 
   const isBuilding = buildStatus.status === 'generating' || buildStatus.status === 'building';
+  const mySide = roomState?.side ?? 'left';
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white font-sans selection:bg-rose-500/30">
@@ -71,7 +81,7 @@ function App() {
             <h1 className="text-xl font-bold tracking-tight">FORTRESS AI</h1>
             <div className="text-xs text-neutral-400 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              ONLINE
+              {inGame && roomState ? `Room: ${roomState.roomId}` : 'ONLINE'}
             </div>
           </div>
         </div>
@@ -113,79 +123,106 @@ function App() {
           </div>
         )}
 
-        {/* Build Status Overlay */}
-        {buildStatus.status !== 'idle' && (
-          <div className={`w-full max-w-[800px] border rounded-xl p-3 backdrop-blur-sm flex items-center gap-3 transition-all
-            ${buildStatus.status === 'error'
-              ? 'bg-red-500/10 border-red-500/20 text-red-300'
-              : buildStatus.status === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                : 'bg-violet-500/10 border-violet-500/20 text-violet-300'
-            }`}
-          >
-            {isBuilding && <Loader2 size={16} className="animate-spin" />}
-            {buildStatus.status === 'success' && <CheckCircle2 size={16} />}
-            {buildStatus.status === 'error' && <AlertCircle size={16} />}
-            <span className="text-sm font-mono truncate">{buildStatus.message}</span>
-          </div>
-        )}
-
-        {/* God Tools */}
-        <GodTools
-          selectedMaterial={selectedMaterial}
-          selectedShape={selectedShape}
-          onMaterialChange={setSelectedMaterial}
-          onShapeChange={setSelectedShape}
-          onClear={clearWorld}
-          gameMode={gameMode}
-          onModeChange={setGameMode}
-        />
-
-        {/* Game Canvas */}
-        <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
-          <GameCanvas
-            gameState={gameState}
-            terrain={terrain}
-            onSpawn={handleSpawn}
-            kingHp={kingHp}
-            kingMaxHp={kingMaxHp}
-            gameMode={gameMode}
-            onFire={fireProjectile}
-            setBlockDestroyedCallback={setBlockDestroyedCallback}
-            setProjectileImpactCallback={setProjectileImpactCallback}
+        {/* Lobby or Game */}
+        {!inGame ? (
+          <Lobby
+            roomState={roomState}
+            queuePosition={queuePosition}
+            onCreateRoom={createRoom}
+            onJoinRoom={joinRoom}
+            onJoinQueue={joinQueue}
+            onLeaveQueue={leaveQueue}
+            onReady={playerReady}
           />
-        </div>
+        ) : (
+          <>
+            {/* Build Status Overlay */}
+            {buildStatus.status !== 'idle' && (
+              <div className={`w-full max-w-[800px] border rounded-xl p-3 backdrop-blur-sm flex items-center gap-3 transition-all
+                ${buildStatus.status === 'error'
+                  ? 'bg-red-500/10 border-red-500/20 text-red-300'
+                  : buildStatus.status === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                    : 'bg-violet-500/10 border-violet-500/20 text-violet-300'
+                }`}
+              >
+                {isBuilding && <Loader2 size={16} className="animate-spin" />}
+                {buildStatus.status === 'success' && <CheckCircle2 size={16} />}
+                {buildStatus.status === 'error' && <AlertCircle size={16} />}
+                <span className="text-sm font-mono truncate">{buildStatus.message}</span>
+              </div>
+            )}
 
-        {/* Prompt Input — only in build mode */}
-        {gameMode === 'build' && (
-          <form onSubmit={handleSubmitPrompt} className="w-full max-w-[800px] bg-black/40 border border-white/10 rounded-xl p-3 flex gap-3 backdrop-blur-sm">
-            <div className="p-2.5 bg-neutral-900 rounded-lg shrink-0">
-              <Terminal size={18} className="text-neutral-400" />
-            </div>
-            <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe your fortress... (e.g., 'Build a stone tower with a wood base')"
-              className="w-full bg-transparent outline-none text-neutral-200 placeholder:text-neutral-600 font-mono text-sm"
-              disabled={isBuilding}
+            {/* Phase Overlay */}
+            <PhaseOverlay
+              phase={phase}
+              phaseEndsAt={phaseEndsAt}
+              turnPlayer={turnPlayer}
+              mySide={mySide}
+              matchResult={matchResult}
             />
-            <button
-              type="submit"
-              disabled={isBuilding || !prompt.trim()}
-              className="p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              {isBuilding ? <Loader2 size={18} className="animate-spin text-white" /> : <Send size={18} className="text-white" />}
-            </button>
-          </form>
-        )}
 
-        {/* Fire mode hint */}
-        {gameMode === 'fire' && (
-          <div className="text-xs text-neutral-500 font-mono">
-            Drag on canvas to aim &amp; fire &middot; Arrow keys to fine-tune &middot; Tab to switch mode
-          </div>
+            {/* God Tools (build phase only) */}
+            <GodTools
+              selectedMaterial={selectedMaterial}
+              selectedShape={selectedShape}
+              onMaterialChange={setSelectedMaterial}
+              onShapeChange={setSelectedShape}
+              gameMode={gameMode}
+              onModeChange={setGameMode}
+              phase={phase}
+              onReady={playerReady}
+            />
+
+            {/* Game Canvas */}
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
+              <GameCanvas
+                gameState={gameState}
+                terrain={terrain}
+                onSpawn={handleSpawn}
+                kingsHp={kingsHp}
+                mySide={mySide}
+                gameMode={gameMode}
+                phase={phase}
+                turnPlayer={turnPlayer}
+                onFire={fireProjectile}
+                setBlockDestroyedCallback={setBlockDestroyedCallback}
+                setProjectileImpactCallback={setProjectileImpactCallback}
+              />
+            </div>
+
+            {/* Prompt Input — only in build mode during build phase */}
+            {phase === 'build' && gameMode === 'build' && (
+              <form onSubmit={handleSubmitPrompt} className="w-full max-w-[800px] bg-black/40 border border-white/10 rounded-xl p-3 flex gap-3 backdrop-blur-sm">
+                <div className="p-2.5 bg-neutral-900 rounded-lg shrink-0">
+                  <Terminal size={18} className="text-neutral-400" />
+                </div>
+                <input
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Describe your fortress... (e.g., 'Build a stone tower with a wood base')"
+                  className="w-full bg-transparent outline-none text-neutral-200 placeholder:text-neutral-600 font-mono text-sm"
+                  disabled={isBuilding}
+                />
+                <button
+                  type="submit"
+                  disabled={isBuilding || !prompt.trim()}
+                  className="p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  {isBuilding ? <Loader2 size={18} className="animate-spin text-white" /> : <Send size={18} className="text-white" />}
+                </button>
+              </form>
+            )}
+
+            {/* Combat hint */}
+            {phase === 'combat' && turnPlayer === mySide && (
+              <div className="text-xs text-neutral-500 font-mono">
+                Drag on canvas to aim &amp; fire &middot; Arrow keys to fine-tune &middot; A/D to pan camera
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

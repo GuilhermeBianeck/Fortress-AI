@@ -1,14 +1,17 @@
 import { useEffect, useRef, useCallback } from 'react';
-import type { GameState, TerrainData, GameMode, Vector } from '../types';
+import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHpState } from '../types';
+import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X } from '../types';
 import { ParticleSystem } from '../effects/particles';
 
 interface GameCanvasProps {
     gameState: GameState | null;
     terrain: TerrainData | null;
     onSpawn: (x: number, y: number) => void;
-    kingHp: number;
-    kingMaxHp: number;
+    kingsHp: { left: KingHpState; right: KingHpState };
+    mySide: Side;
     gameMode: GameMode;
+    phase: MatchPhase;
+    turnPlayer: Side | null;
     onFire: (angle: number, power: number) => void;
     setBlockDestroyedCallback: (cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => void;
     setProjectileImpactCallback: (cb: ((data: { position: Vector }) => void) | null) => void;
@@ -51,8 +54,8 @@ function interpolateTerrainY(points: { x: number; y: number }[], x: number): num
 }
 
 export const GameCanvas = ({
-    gameState, terrain, onSpawn, kingHp, kingMaxHp,
-    gameMode, onFire,
+    gameState, terrain, onSpawn, kingsHp, mySide,
+    gameMode, phase, turnPlayer, onFire,
     setBlockDestroyedCallback, setProjectileImpactCallback,
 }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,11 +63,16 @@ export const GameCanvas = ({
     // Persistent state in refs (no re-render thrashing)
     const gameStateRef = useRef(gameState);
     const terrainRef = useRef(terrain);
-    const kingHpRef = useRef(kingHp);
-    const kingMaxHpRef = useRef(kingMaxHp);
+    const kingsHpRef = useRef(kingsHp);
+    const mySideRef = useRef(mySide);
     const gameModeRef = useRef(gameMode);
+    const phaseRef = useRef(phase);
+    const turnPlayerRef = useRef(turnPlayer);
     const onSpawnRef = useRef(onSpawn);
     const onFireRef = useRef(onFire);
+
+    // Camera state
+    const cameraRef = useRef({ x: 0, targetX: 0 });
 
     // Aim state
     const aimRef = useRef<{ active: boolean; angle: number; power: number; useKeyboard: boolean }>({
@@ -80,28 +88,46 @@ export const GameCanvas = ({
     // Projectile trails: bodyId -> last N positions
     const trailsRef = useRef<Map<number, Vector[]>>(new Map());
 
-    // Previous king HP for shake detection
-    const prevKingHpRef = useRef(kingHp);
+    // Previous kings HP for shake detection
+    const prevKingsHpRef = useRef(kingsHp);
 
     // Animation frame ID
     const rafRef = useRef<number>(0);
 
+    // Keys pressed for camera
+    const keysRef = useRef<Set<string>>(new Set());
+
     // Sync refs
     useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
     useEffect(() => { terrainRef.current = terrain; }, [terrain]);
-    useEffect(() => { kingHpRef.current = kingHp; }, [kingHp]);
-    useEffect(() => { kingMaxHpRef.current = kingMaxHp; }, [kingMaxHp]);
+    useEffect(() => { kingsHpRef.current = kingsHp; }, [kingsHp]);
+    useEffect(() => { mySideRef.current = mySide; }, [mySide]);
     useEffect(() => { gameModeRef.current = gameMode; }, [gameMode]);
+    useEffect(() => { phaseRef.current = phase; }, [phase]);
+    useEffect(() => { turnPlayerRef.current = turnPlayer; }, [turnPlayer]);
     useEffect(() => { onSpawnRef.current = onSpawn; }, [onSpawn]);
     useEffect(() => { onFireRef.current = onFire; }, [onFire]);
 
+    // Set initial camera to own side
+    useEffect(() => {
+        if (mySide === 'right') {
+            cameraRef.current.x = WORLD_WIDTH - CANVAS_WIDTH;
+            cameraRef.current.targetX = WORLD_WIDTH - CANVAS_WIDTH;
+        } else {
+            cameraRef.current.x = 0;
+            cameraRef.current.targetX = 0;
+        }
+    }, [mySide]);
+
     // Detect King HP decrease -> shake
     useEffect(() => {
-        if (kingHp < prevKingHpRef.current) {
+        const myKingHp = kingsHp[mySide].hp;
+        const prevMyKingHp = prevKingsHpRef.current[mySide].hp;
+        if (myKingHp < prevMyKingHp) {
             triggerShake(6, 18);
         }
-        prevKingHpRef.current = kingHp;
-    }, [kingHp]);
+        prevKingsHpRef.current = kingsHp;
+    }, [kingsHp, mySide]);
 
     const triggerShake = useCallback((amplitude: number, duration: number) => {
         const s = shakeRef.current;
@@ -152,6 +178,34 @@ export const GameCanvas = ({
         }
     }, [gameState]);
 
+    // Auto-pan camera based on phase
+    useEffect(() => {
+        const cam = cameraRef.current;
+        if (phase === 'build') {
+            // Pan to own side during build
+            cam.targetX = mySide === 'left' ? 0 : WORLD_WIDTH - CANVAS_WIDTH;
+        } else if (phase === 'reveal') {
+            // Auto-pan from left to right during reveal
+            cam.targetX = 0;
+            const panTimer = setTimeout(() => {
+                cam.targetX = WORLD_WIDTH - CANVAS_WIDTH;
+            }, 2500);
+            return () => clearTimeout(panTimer);
+        }
+    }, [phase, mySide]);
+
+    // Track projectile during combat for auto-pan
+    useEffect(() => {
+        if (phase !== 'combat' || !gameState) return;
+        const projectile = gameState.bodies.find(b => b.label === 'projectile');
+        if (projectile) {
+            cameraRef.current.targetX = Math.max(0, Math.min(
+                WORLD_WIDTH - CANVAS_WIDTH,
+                projectile.position.x - CANVAS_WIDTH / 2
+            ));
+        }
+    }, [phase, gameState]);
+
     // 60fps render loop
     useEffect(() => {
         const render = () => {
@@ -171,12 +225,21 @@ export const GameCanvas = ({
 
         const gs = gameStateRef.current;
         const terr = terrainRef.current;
-        const kHp = kingHpRef.current;
-        const kMaxHp = kingMaxHpRef.current;
-        const mode = gameModeRef.current;
+        const kings = kingsHpRef.current;
+        const side = mySideRef.current;
+        const currentPhase = phaseRef.current;
+        const currentTurn = turnPlayerRef.current;
         const aim = aimRef.current;
         const shake = shakeRef.current;
         const particles = particlesRef.current;
+        const cam = cameraRef.current;
+
+        // Update camera with smooth lerp
+        const keys = keysRef.current;
+        if (keys.has('a') || keys.has('A')) cam.targetX -= 8;
+        if (keys.has('d') || keys.has('D')) cam.targetX += 8;
+        cam.targetX = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, cam.targetX));
+        cam.x += (cam.targetX - cam.x) * 0.1;
 
         // Update particles
         particles.update();
@@ -201,7 +264,7 @@ export const GameCanvas = ({
         ctx.fillStyle = bgGrad;
         ctx.fillRect(-10, -10, canvas.width + 20, canvas.height + 20);
 
-        // Draw stars
+        // Draw stars (fixed to screen, not world)
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         for (let i = 0; i < 40; i++) {
             const sx = (i * 137.5) % canvas.width;
@@ -212,6 +275,10 @@ export const GameCanvas = ({
             ctx.fill();
         }
 
+        // === Apply camera offset for world drawing ===
+        ctx.save();
+        ctx.translate(-cam.x, 0);
+
         // Draw terrain
         if (terr && terr.points.length > 0) {
             ctx.beginPath();
@@ -219,7 +286,7 @@ export const GameCanvas = ({
             for (const pt of terr.points) {
                 ctx.lineTo(pt.x, pt.y);
             }
-            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(WORLD_WIDTH, canvas.height);
             ctx.closePath();
 
             const terrainGrad = ctx.createLinearGradient(0, 400, 0, canvas.height);
@@ -238,6 +305,7 @@ export const GameCanvas = ({
             ctx.lineWidth = 2;
             ctx.stroke();
 
+            // Build zone overlays
             for (const zone of terr.buildZones) {
                 ctx.fillStyle = 'rgba(100, 200, 100, 0.05)';
                 ctx.fillRect(zone.x, zone.y - 100, zone.width, 100);
@@ -250,60 +318,81 @@ export const GameCanvas = ({
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
+
+            // Draw center divider line
+            ctx.strokeStyle = 'rgba(255, 100, 100, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([8, 8]);
+            ctx.beginPath();
+            ctx.moveTo(WORLD_WIDTH / 2, 0);
+            ctx.lineTo(WORLD_WIDTH / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
         }
 
-        // Draw cannon (fire mode only)
-        if (mode === 'fire' && terr && terr.points.length > 0) {
-            const cannonX = 20;
-            const cannonY = interpolateTerrainY(terr.points, cannonX) - 20;
+        // Draw BOTH cannons
+        if (terr && terr.points.length > 0) {
+            const drawCannon = (cannonX: number, facingRight: boolean, isActive: boolean) => {
+                const cannonY = interpolateTerrainY(terr.points, cannonX) - 20;
+                const currentAngle = isActive ? aim.angle : Math.PI / 4;
 
-            // Barrel
-            ctx.save();
-            ctx.translate(cannonX, cannonY);
-            ctx.rotate(-aim.angle);
-            ctx.fillStyle = '#333';
-            ctx.fillRect(0, -4, 24, 8);
-            ctx.strokeStyle = '#555';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(0, -4, 24, 8);
-            ctx.restore();
+                // Barrel
+                ctx.save();
+                ctx.translate(cannonX, cannonY);
+                const barrelAngle = facingRight ? -currentAngle : -(Math.PI - currentAngle);
+                ctx.rotate(barrelAngle);
+                ctx.fillStyle = isActive ? '#555' : '#333';
+                ctx.fillRect(0, -4, 24, 8);
+                ctx.strokeStyle = isActive ? '#777' : '#555';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(0, -4, 24, 8);
+                ctx.restore();
 
-            // Base
-            ctx.beginPath();
-            ctx.arc(cannonX, cannonY, 6, 0, Math.PI * 2);
-            ctx.fillStyle = '#444';
-            ctx.fill();
-            ctx.strokeStyle = '#666';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+                // Base
+                ctx.beginPath();
+                ctx.arc(cannonX, cannonY, 6, 0, Math.PI * 2);
+                ctx.fillStyle = isActive ? '#555' : '#444';
+                ctx.fill();
+                ctx.strokeStyle = isActive ? '#888' : '#666';
+                ctx.lineWidth = 1;
+                ctx.stroke();
 
-            // Trajectory preview (while aiming)
-            if (aim.active || aim.useKeyboard) {
-                const dt = 1000 / 60 / 1000; // seconds per tick
-                const gravity = 2;
-                let px = cannonX + Math.cos(aim.angle) * 24;
-                let py = cannonY - Math.sin(aim.angle) * 24;
-                let vx = aim.power * Math.cos(aim.angle);
-                let vy = -aim.power * Math.sin(aim.angle);
+                // Trajectory preview (only for active cannon during fire mode)
+                if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
+                    const gravity = 2;
+                    const dirMult = facingRight ? 1 : -1;
+                    let px = cannonX + dirMult * Math.cos(currentAngle) * 24;
+                    let py = cannonY - Math.sin(currentAngle) * 24;
+                    let vx = dirMult * aim.power * Math.cos(currentAngle);
+                    let vy = -aim.power * Math.sin(currentAngle);
 
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                for (let step = 0; step < 15; step++) {
-                    px += vx;
-                    py += vy;
-                    vy += gravity * (1000 / 60 / 1000) * 60;
-                    ctx.beginPath();
-                    ctx.arc(px, py, 2, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    for (let step = 0; step < 15; step++) {
+                        px += vx;
+                        py += vy;
+                        vy += gravity * (1000 / 60 / 1000) * 60;
+                        ctx.beginPath();
+                        ctx.arc(px, py, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
-            }
 
-            // Keyboard readout
-            if (aim.useKeyboard) {
-                ctx.font = 'bold 10px monospace';
-                ctx.fillStyle = '#fff';
-                ctx.textAlign = 'left';
-                ctx.fillText(`${(aim.angle * 180 / Math.PI).toFixed(0)}° P:${aim.power.toFixed(0)}`, cannonX + 12, cannonY - 18);
-            }
+                // Keyboard readout
+                if (isActive && aim.useKeyboard && currentPhase === 'combat') {
+                    ctx.font = 'bold 10px monospace';
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`${(currentAngle * 180 / Math.PI).toFixed(0)}° P:${aim.power.toFixed(0)}`, cannonX + 12, cannonY - 18);
+                }
+            };
+
+            // Left cannon (fires right)
+            const leftActive = currentPhase === 'combat' && currentTurn === 'left' && side === 'left';
+            drawCannon(LEFT_CANNON_X, true, leftActive);
+
+            // Right cannon (fires left)
+            const rightActive = currentPhase === 'combat' && currentTurn === 'right' && side === 'right';
+            drawCannon(RIGHT_CANNON_X, false, rightActive);
         }
 
         // Draw projectile trails
@@ -409,19 +498,25 @@ export const GameCanvas = ({
                 ctx.restore();
 
                 // Floating HP bar above King
-                if (body.label === 'king' && kMaxHp > 0) {
-                    const barWidth = 30;
-                    const barHeight = 4;
-                    const barX = body.position.x - barWidth / 2;
-                    const barY = body.position.y - (body.circleRadius || 12) - 10;
-                    const hpRatio = Math.max(0, kHp / kMaxHp);
+                if (body.label === 'king') {
+                    // Determine which king this is based on position
+                    const kingSide: Side = body.position.x < WORLD_WIDTH / 2 ? 'left' : 'right';
+                    const kHp = kings[kingSide].hp;
+                    const kMaxHp = kings[kingSide].maxHp;
+                    if (kMaxHp > 0) {
+                        const barWidth = 30;
+                        const barHeight = 4;
+                        const barX = body.position.x - barWidth / 2;
+                        const barY = body.position.y - (body.circleRadius || 12) - 10;
+                        const hpRatio = Math.max(0, kHp / kMaxHp);
 
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                    ctx.fillStyle = '#333';
-                    ctx.fillRect(barX, barY, barWidth, barHeight);
-                    ctx.fillStyle = getHpColor(hpRatio);
-                    ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                        ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+                        ctx.fillStyle = '#333';
+                        ctx.fillRect(barX, barY, barWidth, barHeight);
+                        ctx.fillStyle = getHpColor(hpRatio);
+                        ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+                    }
                 }
 
                 // Block HP bar (only show if damaged)
@@ -442,97 +537,127 @@ export const GameCanvas = ({
             }
         }
 
-        // Draw particles (after bodies, before HUD)
+        // Draw particles (in world space)
         particles.draw(ctx);
 
-        // HUD: King HP bar (top-left corner)
-        if (kMaxHp > 0) {
-            const hudX = 12;
-            const hudY = 12;
-            const hudWidth = 120;
-            const hudHeight = 14;
-            const hpRatio = Math.max(0, kHp / kMaxHp);
+        // === End world drawing ===
+        ctx.restore();
 
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
+        // === HUD (fixed to screen, not affected by camera) ===
 
-            ctx.font = 'bold 10px monospace';
-            ctx.fillStyle = '#FFD700';
-            ctx.textAlign = 'left';
-            ctx.fillText('\u265A KING', hudX, hudY + 10);
+        // Left King HP bar (top-left)
+        drawKingHud(ctx, 12, 12, kings.left, side === 'left' ? 'YOU' : 'ENEMY');
 
-            const barY = hudY + 14;
-            ctx.fillStyle = '#333';
-            ctx.fillRect(hudX, barY, hudWidth, hudHeight);
-            ctx.fillStyle = getHpColor(hpRatio);
-            ctx.fillRect(hudX, barY, hudWidth * hpRatio, hudHeight);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(hudX, barY, hudWidth, hudHeight);
+        // Right King HP bar (top-right)
+        drawKingHud(ctx, canvas.width - 132, 12, kings.right, side === 'right' ? 'YOU' : 'ENEMY');
 
-            ctx.font = 'bold 9px monospace';
-            ctx.fillStyle = '#fff';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${Math.ceil(kHp)} / ${kMaxHp}`, hudX + hudWidth / 2, barY + 11);
-        }
-
-        // HUD: Mode indicator (top-right)
+        // Mode indicator (top-center)
         {
-            const modeLabel = mode === 'fire' ? 'FIRE MODE' : 'BUILD MODE';
-            const modeColor = mode === 'fire' ? '#ef4444' : '#22c55e';
-            ctx.font = 'bold 10px monospace';
-            ctx.fillStyle = modeColor;
-            ctx.textAlign = 'right';
-            ctx.fillText(modeLabel, canvas.width - 12, 22);
+            let modeLabel = '';
+            let modeColor = '#888';
+            if (currentPhase === 'build') {
+                modeLabel = 'BUILD PHASE';
+                modeColor = '#22c55e';
+            } else if (currentPhase === 'combat') {
+                modeLabel = currentTurn === side ? 'YOUR TURN' : "OPPONENT'S TURN";
+                modeColor = currentTurn === side ? '#ef4444' : '#888';
+            } else if (currentPhase === 'reveal') {
+                modeLabel = 'REVEALING';
+                modeColor = '#a78bfa';
+            } else if (currentPhase === 'result') {
+                modeLabel = 'MATCH OVER';
+                modeColor = '#fbbf24';
+            }
+            if (modeLabel) {
+                ctx.font = 'bold 12px monospace';
+                ctx.fillStyle = modeColor;
+                ctx.textAlign = 'center';
+                ctx.fillText(modeLabel, canvas.width / 2, 22);
+            }
         }
 
         ctx.restore();
     };
 
-    // Mouse coordinate helper
-    const getCanvasCoords = (e: React.MouseEvent): { x: number; y: number } => {
+    function drawKingHud(ctx: CanvasRenderingContext2D, hudX: number, hudY: number, king: KingHpState, label: string) {
+        const hudWidth = 120;
+        const hudHeight = 14;
+        const hpRatio = king.maxHp > 0 ? Math.max(0, king.hp / king.maxHp) : 0;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
+
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = '#FFD700';
+        ctx.textAlign = 'left';
+        ctx.fillText(`\u265A ${label}`, hudX, hudY + 10);
+
+        const barY = hudY + 14;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(hudX, barY, hudWidth, hudHeight);
+        ctx.fillStyle = getHpColor(hpRatio);
+        ctx.fillRect(hudX, barY, hudWidth * hpRatio, hudHeight);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(hudX, barY, hudWidth, hudHeight);
+
+        ctx.font = 'bold 9px monospace';
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${Math.ceil(king.hp)} / ${king.maxHp}`, hudX + hudWidth / 2, barY + 11);
+    }
+
+    // Mouse coordinate helper — converts screen coords to world coords
+    const getWorldCoords = (e: React.MouseEvent): { x: number; y: number } => {
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         return {
-            x: (e.clientX - rect.left) * scaleX,
+            x: (e.clientX - rect.left) * scaleX + cameraRef.current.x,
             y: (e.clientY - rect.top) * scaleY,
         };
     };
 
     // Cannon position helper
-    const getCannonPos = (): { x: number; y: number } => {
+    const getMyCannonPos = (): { x: number; y: number } => {
         const terr = terrainRef.current;
-        if (!terr || terr.points.length === 0) return { x: 20, y: 480 };
-        return { x: 20, y: interpolateTerrainY(terr.points, 20) - 20 };
+        const side = mySideRef.current;
+        const cannonX = side === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+        if (!terr || terr.points.length === 0) return { x: cannonX, y: 480 };
+        return { x: cannonX, y: interpolateTerrainY(terr.points, cannonX) - 20 };
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (gameModeRef.current === 'build') {
-            const { x, y } = getCanvasCoords(e);
+        const currentPhase = phaseRef.current;
+        const side = mySideRef.current;
+
+        if (currentPhase === 'build' && gameModeRef.current === 'build') {
+            const { x, y } = getWorldCoords(e);
             onSpawnRef.current(x, y);
             return;
         }
 
-        // Fire mode: start aiming
-        const aim = aimRef.current;
-        aim.active = true;
-        aim.useKeyboard = false;
-        const { x: mx, y: my } = getCanvasCoords(e);
-        const cannon = getCannonPos();
-        aim.angle = Math.atan2(cannon.y - my, mx - cannon.x);
-        aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
-        const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        aim.power = Math.max(5, Math.min(30, dist / 10));
+        // Fire mode: start aiming (only during own combat turn)
+        if (currentPhase === 'combat' && turnPlayerRef.current === side) {
+            const aim = aimRef.current;
+            aim.active = true;
+            aim.useKeyboard = false;
+            const { x: mx, y: my } = getWorldCoords(e);
+            const cannon = getMyCannonPos();
+            aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
+            aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
+            const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
+            aim.power = Math.max(5, Math.min(30, dist / 10));
+        }
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (!aimRef.current.active) return;
-        const { x: mx, y: my } = getCanvasCoords(e);
-        const cannon = getCannonPos();
+        const { x: mx, y: my } = getWorldCoords(e);
+        const cannon = getMyCannonPos();
         const aim = aimRef.current;
-        aim.angle = Math.atan2(cannon.y - my, mx - cannon.x);
+        aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
         const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
         aim.power = Math.max(5, Math.min(30, dist / 10));
@@ -545,53 +670,69 @@ export const GameCanvas = ({
         onFireRef.current(aim.angle, aim.power);
     };
 
-    // Keyboard controls for fire mode
+    // Keyboard controls for camera + fire mode
     useEffect(() => {
-        const handleKey = (e: KeyboardEvent) => {
-            if (gameModeRef.current !== 'fire') return;
+        const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-            const aim = aimRef.current;
-            const degStep = (2 * Math.PI) / 180;
+            // Camera pan keys
+            if (e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D') {
+                keysRef.current.add(e.key);
+            }
 
-            switch (e.key) {
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    aim.angle = Math.min((170 * Math.PI) / 180, aim.angle + degStep);
-                    aim.useKeyboard = true;
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    aim.angle = Math.max((10 * Math.PI) / 180, aim.angle - degStep);
-                    aim.useKeyboard = true;
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    aim.power = Math.min(30, aim.power + 1);
-                    aim.useKeyboard = true;
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    aim.power = Math.max(5, aim.power - 1);
-                    aim.useKeyboard = true;
-                    break;
-                case ' ':
-                    e.preventDefault();
-                    onFireRef.current(aim.angle, aim.power);
-                    break;
+            // Fire mode controls
+            if (phaseRef.current === 'combat' && turnPlayerRef.current === mySideRef.current) {
+                const aim = aimRef.current;
+                const degStep = (2 * Math.PI) / 180;
+
+                switch (e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        aim.angle = Math.min((170 * Math.PI) / 180, aim.angle + degStep);
+                        aim.useKeyboard = true;
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        aim.angle = Math.max((10 * Math.PI) / 180, aim.angle - degStep);
+                        aim.useKeyboard = true;
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        aim.power = Math.min(30, aim.power + 1);
+                        aim.useKeyboard = true;
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        aim.power = Math.max(5, aim.power - 1);
+                        aim.useKeyboard = true;
+                        break;
+                    case ' ':
+                        e.preventDefault();
+                        onFireRef.current(aim.angle, aim.power);
+                        break;
+                }
             }
         };
-        window.addEventListener('keydown', handleKey);
-        return () => window.removeEventListener('keydown', handleKey);
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            keysRef.current.delete(e.key);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
     }, []);
 
-    const cursorClass = gameMode === 'fire' ? 'cursor-default' : 'cursor-crosshair';
+    const cursorClass = (phase === 'build' && gameMode === 'build') ? 'cursor-crosshair' : 'cursor-default';
 
     return (
         <canvas
             ref={canvasRef}
-            width={800}
-            height={600}
+            width={CANVAS_WIDTH}
+            height={CANVAS_HEIGHT}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}

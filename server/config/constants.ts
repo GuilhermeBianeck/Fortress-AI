@@ -1,6 +1,22 @@
-// === Canvas ===
-export const CANVAS_WIDTH = 800;
+// === Canvas / World ===
+export const CANVAS_WIDTH = 800;   // viewport size (client canvas)
 export const CANVAS_HEIGHT = 600;
+export const WORLD_WIDTH = 1600;   // full world width (2 players)
+
+// === Side bounds ===
+export const LEFT_SIDE = { min: 0, max: 800 };
+export const RIGHT_SIDE = { min: 800, max: 1600 };
+export const LEFT_CANNON_X = 20;
+export const RIGHT_CANNON_X = 1580;
+
+// === Phase timers ===
+export const BUILD_PHASE_DURATION_MS = 90_000;
+export const COMBAT_TURN_DURATION_MS = 15_000;
+export const REVEAL_DURATION_MS = 5_000;
+export const SETTLE_TIMEOUT_MS = 3_000;
+export const SETTLE_MAX_TIMEOUT_MS = 8_000;
+export const SETTLE_POLL_INTERVAL_MS = 200;
+export const SETTLE_SPEED_THRESHOLD = 0.5;
 
 // === Materials ===
 export const MATERIAL_PROPS: Record<string, { density: number; friction: number; restitution: number }> = {

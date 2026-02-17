@@ -5,15 +5,17 @@ import { GameLoop } from '../physics/loop';
 import { generateFortress } from '../ai/gemini';
 import type { TerrainContext } from '../ai/prompts';
 import { safeSpawn } from '../ai/overlap';
-import type { KingState } from '../types';
+import type { KingState, PlayerInfo, PlayerState, Side, KingHpState, MatchPhase } from '../types';
 import type { TerrainResult } from '../physics/terrain';
+import { MatchStateMachine } from './MatchStateMachine';
 import {
     MATERIAL_PROPS, DAMAGE_MULTIPLIERS, MATERIAL_BLOCK_HP,
     KING_MAX_HP, IMPACT_THRESHOLD, DAMAGE_SCALE,
     PROJECTILE_RADIUS, PROJECTILE_DENSITY, PROJECTILE_RESTITUTION,
     PROJECTILE_FRICTION, PROJECTILE_LIFESPAN_MS,
     PROJECTILE_BLOCK_DAMAGE_MULT, PROJECTILE_MIN_IMPACT,
-    CANVAS_WIDTH, CANVAS_HEIGHT,
+    WORLD_WIDTH, CANVAS_HEIGHT,
+    LEFT_SIDE, RIGHT_SIDE, LEFT_CANNON_X, RIGHT_CANNON_X,
 } from '../config/constants';
 
 export class GameSession {
@@ -21,35 +23,70 @@ export class GameSession {
     private engine: Matter.Engine;
     private world: Matter.World;
     private terrain: TerrainResult & { seed: number };
-    private kingBody: Matter.Body;
-    private kingState: KingState;
+    private players: Map<string, PlayerState> = new Map(); // socketId → PlayerState
     private gameLoop: GameLoop;
     private io: Server;
+    private roomId: string;
     private projectileTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
+    private stateMachine: MatchStateMachine;
+    private onPhaseChangeCallback?: (phase: MatchPhase) => void;
 
-    constructor(io: Server, seed?: number) {
+    constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void) {
+        this.onPhaseChangeCallback = onPhaseChange;
         this.io = io;
-        this.id = Math.random().toString(36).slice(2, 10);
+        this.roomId = roomId;
+        this.id = roomId;
 
         const ws = createWorld(seed);
         this.engine = ws.engine;
         this.world = ws.world;
         this.terrain = { ...ws.terrain, seed: ws.seed };
 
-        const king = this.spawnKing();
-        this.kingBody = king.body;
-        this.kingState = king.state;
+        // Spawn kings for each player
+        for (const info of playerInfos) {
+            const sideBounds = info.side === 'left' ? LEFT_SIDE : RIGHT_SIDE;
+            const cannonX = info.side === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+
+            const king = this.spawnKing(info.side, sideBounds);
+
+            const playerState: PlayerState = {
+                socketId: info.socketId,
+                side: info.side,
+                kingBody: king.body,
+                kingState: king.state,
+                cannonX,
+                buildZone: { xMin: sideBounds.min, xMax: sideBounds.max },
+            };
+
+            this.players.set(info.socketId, playerState);
+        }
 
         this.setupCollisionHandlers();
 
-        this.gameLoop = new GameLoop(this.engine, io, this.kingState);
+        this.gameLoop = new GameLoop(this.engine, io, roomId);
+        for (const ps of this.players.values()) {
+            this.gameLoop.setKingState(ps.side, ps.kingState);
+        }
         this.gameLoop.setOnTick(() => this.checkProjectileBounds());
         this.gameLoop.start();
 
-        console.log(`GameSession created (seed: ${ws.seed})`);
+        // Create state machine
+        this.stateMachine = new MatchStateMachine(io, roomId, {
+            onPhaseChange: (phase) => { this.onPhaseChangeCallback?.(phase); },
+            onTurnStart: (_side) => { /* UI updates via socket events */ },
+            onMatchResult: (_winner, _reason) => { /* Room manager handles result */ },
+            getKingState: (side: Side) => this.getKingStateBySide(side),
+            getWorld: () => this.world,
+        });
+
+        console.log(`GameSession created for room ${roomId} (seed: ${ws.seed})`);
     }
 
-    // --- Public API (called by socket handlers) ---
+    // --- Public API ---
+
+    getStateMachine(): MatchStateMachine {
+        return this.stateMachine;
+    }
 
     getTerrainData() {
         return {
@@ -59,9 +96,40 @@ export class GameSession {
         };
     }
 
-    handleSpawn(data: { x: number; y: number; material?: string; shape?: string; dimensions?: number[] }) {
+    getKingsHp(): { left: KingHpState; right: KingHpState } {
+        let left: KingHpState = { hp: 0, maxHp: 0 };
+        let right: KingHpState = { hp: 0, maxHp: 0 };
+        for (const ps of this.players.values()) {
+            if (ps.side === 'left') left = { hp: ps.kingState.hp, maxHp: ps.kingState.maxHp };
+            if (ps.side === 'right') right = { hp: ps.kingState.hp, maxHp: ps.kingState.maxHp };
+        }
+        return { left, right };
+    }
+
+    getPlayerState(socketId: string): PlayerState | undefined {
+        return this.players.get(socketId);
+    }
+
+    getPlayerBySide(side: Side): PlayerState | undefined {
+        for (const ps of this.players.values()) {
+            if (ps.side === side) return ps;
+        }
+        return undefined;
+    }
+
+    handleSpawn(socketId: string, data: { x: number; y: number; material?: string; shape?: string; dimensions?: number[] }) {
+        const phase = this.stateMachine.getPhase();
+        if (phase !== 'build') return;
+
+        const player = this.players.get(socketId);
+        if (!player) return;
+
         const { x, y, material = 'wood', shape = 'rectangle', dimensions = [30, 30] } = data;
-        console.log(`Spawn: ${shape} ${material} at (${x.toFixed(0)}, ${y.toFixed(0)})`);
+
+        // Validate within player's half
+        if (x < player.buildZone.xMin || x > player.buildZone.xMax) return;
+
+        console.log(`Spawn: ${shape} ${material} at (${x.toFixed(0)}, ${y.toFixed(0)}) by ${player.side}`);
 
         if (shape === 'circle') {
             const radius = dimensions[0] || 15;
@@ -74,8 +142,16 @@ export class GameSession {
     }
 
     async handleRequestBuild(socket: Socket, data: { apiKey: string; prompt: string }) {
-        const { apiKey, prompt } = data;
+        const phase = this.stateMachine.getPhase();
+        if (phase !== 'build') {
+            socket.emit('build_error', { message: 'Building is only allowed during the build phase.' });
+            return;
+        }
 
+        const player = this.players.get(socket.id);
+        if (!player) return;
+
+        const { apiKey, prompt } = data;
         if (!apiKey || !prompt) {
             socket.emit('build_error', { message: "Missing API Key or Prompt" });
             return;
@@ -84,17 +160,27 @@ export class GameSession {
         try {
             socket.emit('build_status', { status: 'generating', message: 'Architect is thinking...' });
 
+            // Filter terrain context to player's half
             const terrainCtx: TerrainContext = {
                 surfacePoints: this.terrain.points,
                 buildZones: this.terrain.buildZones,
-                kingPosition: { x: this.kingBody.position.x, y: this.kingBody.position.y },
+                kingPosition: { x: player.kingBody.position.x, y: player.kingBody.position.y },
+                side: player.side,
+                sideXMin: player.buildZone.xMin,
+                sideXMax: player.buildZone.xMax,
             };
 
             const plan = await generateFortress(apiKey, prompt, terrainCtx);
 
             socket.emit('build_status', { status: 'building', message: plan.thought_chain });
 
-            const { adjustedBodies, adjustmentCount } = safeSpawn(plan.bodies, this.world);
+            // Clamp AI bodies to player's half
+            const clampedPlans = plan.bodies.map(b => ({
+                ...b,
+                x: Math.max(player.buildZone.xMin + 5, Math.min(player.buildZone.xMax - 5, b.x)),
+            }));
+
+            const { adjustedBodies, adjustmentCount } = safeSpawn(clampedPlans, this.world);
             if (adjustmentCount > 0) {
                 console.log(`Safe spawn adjusted ${adjustmentCount} bodies to avoid overlaps`);
             }
@@ -122,49 +208,25 @@ export class GameSession {
         }
     }
 
-    handleClearWorld() {
-        // Clear all projectile timers
-        for (const timer of this.projectileTimers.values()) {
-            clearTimeout(timer);
-        }
-        this.projectileTimers.clear();
+    handleFireProjectile(socketId: string, data: { angle: number; power: number }) {
+        const phase = this.stateMachine.getPhase();
+        if (phase !== 'combat') return;
 
-        // Remove all dynamic bodies except King
-        const allBodies = Matter.Composite.allBodies(this.world);
-        const dynamicBodies = allBodies.filter(b => !b.isStatic && b.id !== this.kingState.bodyId);
-        Matter.Composite.remove(this.world, dynamicBodies);
+        const player = this.players.get(socketId);
+        if (!player) return;
 
-        // Reset King HP and position
-        this.kingState.hp = this.kingState.maxHp;
+        // Only the current turn's player can fire
+        if (player.side !== this.stateMachine.getCurrentTurn()) return;
 
-        const kingRadius = 12;
-        const gap = 2;
-        let resetX: number;
-
-        if (this.terrain.buildZones.length > 0) {
-            const zone = this.terrain.buildZones[0];
-            resetX = zone.x + zone.width / 2;
-        } else {
-            resetX = 400;
-        }
-
-        const resetY = this.interpolateTerrainY(resetX) - kingRadius - gap;
-        Matter.Body.setPosition(this.kingBody, { x: resetX, y: resetY });
-        Matter.Body.setVelocity(this.kingBody, { x: 0, y: 0 });
-        Matter.Body.setAngularVelocity(this.kingBody, 0);
-        this.kingState.position = { x: this.kingBody.position.x, y: this.kingBody.position.y };
-    }
-
-    handleFireProjectile(data: { angle: number; power: number }) {
         // Clamp angle to [10deg, 170deg] in radians, power to [5, 30]
         const minAngle = (10 * Math.PI) / 180;
         const maxAngle = (170 * Math.PI) / 180;
         const angle = Math.max(minAngle, Math.min(maxAngle, data.angle));
         const power = Math.max(5, Math.min(30, data.power));
 
-        // Cannon at x=20, interpolated terrain Y - 20
-        const cannonY = this.interpolateTerrainY(20) - 20;
-        const cannonX = 20;
+        // Cannon position based on player's side
+        const cannonX = player.cannonX;
+        const cannonY = this.interpolateTerrainY(cannonX) - 20;
 
         const body = Matter.Bodies.circle(cannonX, cannonY, PROJECTILE_RADIUS, {
             density: PROJECTILE_DENSITY,
@@ -174,8 +236,11 @@ export class GameSession {
         });
 
         Matter.World.add(this.world, body);
+
+        // Right player fires leftward (mirror velocity)
+        const directionMultiplier = player.side === 'right' ? -1 : 1;
         Matter.Body.setVelocity(body, {
-            x: power * Math.cos(angle),
+            x: directionMultiplier * power * Math.cos(angle),
             y: -power * Math.sin(angle),
         });
 
@@ -183,11 +248,25 @@ export class GameSession {
         const timer = setTimeout(() => this.removeProjectile(body), PROJECTILE_LIFESPAN_MS);
         this.projectileTimers.set(body.id, timer);
 
-        console.log(`Projectile fired: angle=${(angle * 180 / Math.PI).toFixed(1)}deg power=${power.toFixed(1)}`);
+        console.log(`Projectile fired by ${player.side}: angle=${(angle * 180 / Math.PI).toFixed(1)}deg power=${power.toFixed(1)}`);
+
+        // Tell state machine a projectile was fired, wait for settle
+        this.stateMachine.onProjectileFired();
+        this.stateMachine.waitForSettle();
+    }
+
+    handlePlayerBuildReady(socketId: string): void {
+        this.stateMachine.handlePlayerBuildReady(socketId);
+    }
+
+    handleForfeit(disconnectedSocketId: string): void {
+        // Stop the game loop and state machine
+        this.stateMachine.destroy();
     }
 
     destroy() {
         this.gameLoop.stop();
+        this.stateMachine.destroy();
         for (const timer of this.projectileTimers.values()) {
             clearTimeout(timer);
         }
@@ -196,16 +275,30 @@ export class GameSession {
 
     // --- Private ---
 
-    private spawnKing(): { body: Matter.Body; state: KingState } {
+    private getKingStateBySide(side: Side): KingState {
+        for (const ps of this.players.values()) {
+            if (ps.side === side) return ps.kingState;
+        }
+        // Fallback (shouldn't happen)
+        return { bodyId: -1, hp: 0, maxHp: 0, position: { x: 0, y: 0 } };
+    }
+
+    private spawnKing(side: Side, sideBounds: { min: number; max: number }): { body: Matter.Body; state: KingState } {
         const kingRadius = 12;
         const gap = 2;
-        let spawnX: number;
 
-        if (this.terrain.buildZones.length > 0) {
-            const zone = this.terrain.buildZones[0];
+        // Find a build zone within this side
+        const sideZones = this.terrain.buildZones.filter(
+            z => z.x >= sideBounds.min && z.x + z.width <= sideBounds.max
+        );
+
+        let spawnX: number;
+        if (sideZones.length > 0) {
+            const zone = sideZones[0];
             spawnX = zone.x + zone.width / 2;
         } else {
-            spawnX = 400;
+            // Fallback: center of side
+            spawnX = (sideBounds.min + sideBounds.max) / 2;
         }
 
         const spawnY = this.interpolateTerrainY(spawnX) - kingRadius - gap;
@@ -216,6 +309,9 @@ export class GameSession {
             friction: 0.5,
             label: 'king',
         });
+
+        // Tag with side for collision identification
+        (body as any).side = side;
 
         Matter.World.add(this.world, body);
 
@@ -291,33 +387,37 @@ export class GameSession {
             for (const pair of event.pairs) {
                 const { bodyA, bodyB } = pair;
 
-                // --- King damage from any collision ---
-                let kingHit = false;
-                let otherBody: Matter.Body | null = null;
-                if (bodyA.id === this.kingState.bodyId) { otherBody = bodyB; kingHit = true; }
-                else if (bodyB.id === this.kingState.bodyId) { otherBody = bodyA; kingHit = true; }
+                // --- King damage from any collision (check BOTH kings) ---
+                for (const ps of this.players.values()) {
+                    let kingHit = false;
+                    let otherBody: Matter.Body | null = null;
 
-                if (kingHit && otherBody && this.kingState.hp > 0) {
-                    const getMomentum = (b: Matter.Body) => b.isStatic ? 0 : b.speed * b.mass;
-                    const impactForce = getMomentum(bodyA) + getMomentum(bodyB);
-                    if (impactForce >= IMPACT_THRESHOLD && !isNaN(impactForce)) {
-                        const multiplier = DAMAGE_MULTIPLIERS[otherBody.label] ?? 1.0;
-                        const damage = ((impactForce - IMPACT_THRESHOLD) * multiplier) * DAMAGE_SCALE;
-                        this.kingState.hp = Math.max(0, this.kingState.hp - damage);
-                        this.kingState.position = { x: this.kingBody.position.x, y: this.kingBody.position.y };
+                    if (bodyA.id === ps.kingState.bodyId) { otherBody = bodyB; kingHit = true; }
+                    else if (bodyB.id === ps.kingState.bodyId) { otherBody = bodyA; kingHit = true; }
 
-                        console.log(`King hit by ${otherBody.label} | force=${impactForce.toFixed(1)} | damage=${damage.toFixed(1)} | HP=${this.kingState.hp.toFixed(1)}/${this.kingState.maxHp}`);
+                    if (kingHit && otherBody && ps.kingState.hp > 0) {
+                        const getMomentum = (b: Matter.Body) => b.isStatic ? 0 : b.speed * b.mass;
+                        const impactForce = getMomentum(bodyA) + getMomentum(bodyB);
+                        if (impactForce >= IMPACT_THRESHOLD && !isNaN(impactForce)) {
+                            const multiplier = DAMAGE_MULTIPLIERS[otherBody.label] ?? 1.0;
+                            const damage = ((impactForce - IMPACT_THRESHOLD) * multiplier) * DAMAGE_SCALE;
+                            ps.kingState.hp = Math.max(0, ps.kingState.hp - damage);
+                            ps.kingState.position = { x: ps.kingBody.position.x, y: ps.kingBody.position.y };
 
-                        this.io.emit('king_damage', {
-                            hp: this.kingState.hp,
-                            maxHp: this.kingState.maxHp,
-                            damage,
-                            source: otherBody.label,
-                        });
+                            console.log(`${ps.side} King hit by ${otherBody.label} | force=${impactForce.toFixed(1)} | damage=${damage.toFixed(1)} | HP=${ps.kingState.hp.toFixed(1)}/${ps.kingState.maxHp}`);
 
-                        if (this.kingState.hp <= 0) {
-                            console.log('King is dead!');
-                            this.io.emit('king_dead');
+                            this.io.to(this.roomId).emit('king_damage', {
+                                side: ps.side,
+                                hp: ps.kingState.hp,
+                                maxHp: ps.kingState.maxHp,
+                                damage,
+                                source: otherBody.label,
+                            });
+
+                            if (ps.kingState.hp <= 0) {
+                                console.log(`${ps.side} King is dead!`);
+                                this.io.to(this.roomId).emit('king_dead', { side: ps.side });
+                            }
                         }
                     }
                 }
@@ -337,7 +437,7 @@ export class GameSession {
                 if (projectile && block) {
                     // Emit impact for any non-terrain hit
                     if (block.label !== 'Terrain') {
-                        this.io.emit('projectile_impact', {
+                        this.io.to(this.roomId).emit('projectile_impact', {
                             position: { x: projectile.position.x, y: projectile.position.y },
                         });
                     }
@@ -351,7 +451,7 @@ export class GameSession {
                             (block as any).blockHp = Math.max(0, blockHp - blockDamage);
 
                             if ((block as any).blockHp <= 0) {
-                                this.io.emit('block_destroyed', {
+                                this.io.to(this.roomId).emit('block_destroyed', {
                                     bodyId: block.id,
                                     position: { x: block.position.x, y: block.position.y },
                                     material: block.label,
@@ -383,7 +483,7 @@ export class GameSession {
             if (body.label !== 'projectile') continue;
             if (body.position.y > CANVAS_HEIGHT + 50 ||
                 body.position.x < -50 ||
-                body.position.x > CANVAS_WIDTH + 50) {
+                body.position.x > WORLD_WIDTH + 50) {
                 this.removeProjectile(body);
             }
         }
@@ -402,6 +502,6 @@ export class GameSession {
             this.projectileTimers.delete(body.id);
         }
 
-        this.io.emit('projectile_removed', { bodyId: body.id });
+        this.io.to(this.roomId).emit('projectile_removed', { bodyId: body.id });
     }
 }

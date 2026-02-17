@@ -1,17 +1,32 @@
+import type { Side } from '../types';
+
 export interface TerrainContext {
     surfacePoints: { x: number; y: number }[];
     buildZones: { x: number; width: number; y: number }[];
     kingPosition: { x: number; y: number };
+    side?: Side;
+    sideXMin?: number;
+    sideXMax?: number;
 }
 
 export function buildSystemPrompt(ctx?: TerrainContext): string {
     let terrainSection = '';
     let kingSection = '';
+    let sideSection = '';
     let groundRule = '3. **Stability:** Objects must rest on the ground (Y~585 for a 30px high block) or on other objects.';
 
+    const canvasDesc = ctx?.sideXMin != null && ctx.sideXMax
+        ? `Canvas runs from X=${ctx.sideXMin} to X=${ctx.sideXMax} (your half of a ${ctx.sideXMax * 2}px world).`
+        : 'Canvas height is 600, width is 800.';
+
     if (ctx) {
+        // Filter surface points to this player's half
+        const filteredPoints = ctx.sideXMin != null && ctx.sideXMax
+            ? ctx.surfacePoints.filter(p => p.x >= ctx.sideXMin! && p.x <= ctx.sideXMax!)
+            : ctx.surfacePoints;
+
         // Simplify terrain: every other point to keep token count low
-        const simplified = ctx.surfacePoints.filter((_, i) => i % 2 === 0);
+        const simplified = filteredPoints.filter((_, i) => i % 2 === 0);
         const pointsStr = simplified.map(p => `(${Math.round(p.x)},${Math.round(p.y)})`).join(' ');
 
         terrainSection = `
@@ -21,7 +36,12 @@ ${pointsStr}
 Place blocks so their bottom edge touches the terrain surface at that X coordinate.
 `;
 
-        const zonesStr = ctx.buildZones.map(z =>
+        // Filter build zones to this player's half
+        const filteredZones = ctx.sideXMin != null && ctx.sideXMax
+            ? ctx.buildZones.filter(z => z.x >= ctx.sideXMin! && z.x + z.width <= ctx.sideXMax!)
+            : ctx.buildZones;
+
+        const zonesStr = filteredZones.map(z =>
             `  - x=${Math.round(z.x)} to x=${Math.round(z.x + z.width)}, surface Y~${Math.round(z.y)}`
         ).join('\n');
 
@@ -36,6 +56,14 @@ The King unit is at (${Math.round(ctx.kingPosition.x)}, ${Math.round(ctx.kingPos
 Build your fortress around or near the King to protect it. Do NOT place blocks on top of the King.
 `;
 
+        if (ctx.side && ctx.sideXMin != null && ctx.sideXMax) {
+            sideSection = `
+### YOUR SIDE
+You are the **${ctx.side}** player. You may ONLY place blocks within X=${ctx.sideXMin} to X=${ctx.sideXMax}.
+Do NOT place any blocks outside this range.
+`;
+        }
+
         // Override ground rule with terrain-aware version
         groundRule = `3. **Stability:** The terrain is uneven. Check the TERRAIN SURFACE points to find the correct Y for each X. Place blocks so they rest on the terrain surface or on other blocks. Do NOT assume Y=575 for ground level.`;
     }
@@ -48,12 +76,12 @@ Your goal is to design stable, defensive structures to protect a 'King' unit bas
 1. **Gravity:** Acts downwards (Y+ direction).
 2. **Coordinates:**
    - Origin (0,0) is Top-Left.
-   - Canvas height is 600, width is 800.
+   - ${canvasDesc}
    - Sky is Y = 0.
 ${groundRule}
    - Do not spawn objects in the air unless requested (they will fall).
    - Do not overlap objects (they will explode).
-${terrainSection}${kingSection}
+${sideSection}${terrainSection}${kingSection}
 ### MATERIALS
 - **wood**: Light, medium friction. Good for height.
 - **stone**: Heavy, high friction. Good for base.
