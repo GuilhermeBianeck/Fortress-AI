@@ -65,3 +65,39 @@ export interface PlayerState {
     cannonX: number;
     buildZone: { xMin: number; xMax: number };
 }
+
+// === Scoring ===
+
+export interface MatchScoreBreakdown {
+    damageDealt: number;
+    resourcesUsed: number;
+    combatTimeMs: number;
+    damagePoints: number;
+    resourceBonus: number;
+    timeBonus: number;
+    winBonus: number;
+    totalScore: number;
+}
+
+export interface MatchScores {
+    left: MatchScoreBreakdown;
+    right: MatchScoreBreakdown;
+}
+
+export interface MatchHistoryEntry {
+    matchId: string;
+    timestamp: number;
+    opponentName: string;
+    side: Side;
+    won: boolean;
+    score: MatchScoreBreakdown;
+    rounds: { left: number; right: number };
+}
+
+export interface PlayerProfile {
+    name: string;
+    totalScore: number;
+    matchesPlayed: number;
+    matchesWon: number;
+    history: MatchHistoryEntry[];
+}

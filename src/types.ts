@@ -81,3 +81,39 @@ export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
 export const LEFT_CANNON_X = 20;
 export const RIGHT_CANNON_X = 1580;
+
+// === Scoring ===
+
+export interface MatchScoreBreakdown {
+    damageDealt: number;
+    resourcesUsed: number;
+    combatTimeMs: number;
+    damagePoints: number;
+    resourceBonus: number;
+    timeBonus: number;
+    winBonus: number;
+    totalScore: number;
+}
+
+export interface MatchScores {
+    left: MatchScoreBreakdown;
+    right: MatchScoreBreakdown;
+}
+
+export interface MatchHistoryEntry {
+    matchId: string;
+    timestamp: number;
+    opponentName: string;
+    side: Side;
+    won: boolean;
+    score: MatchScoreBreakdown;
+    rounds: { left: number; right: number };
+}
+
+export interface PlayerProfile {
+    name: string;
+    totalScore: number;
+    matchesPlayed: number;
+    matchesWon: number;
+    history: MatchHistoryEntry[];
+}

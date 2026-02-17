@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { MatchPhase, Side } from '../types';
+import type { MatchPhase, Side, MatchScores } from '../types';
 
 interface PhaseOverlayProps {
     phase: MatchPhase;
@@ -13,9 +13,10 @@ interface PhaseOverlayProps {
     rematchState?: 'none' | 'requested' | 'opponent_requested';
     onRequestRematch?: () => void;
     hazards?: { type: string; id: string; windDirection?: number; windStrength?: number }[];
+    matchScores?: MatchScores | null;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards, matchScores }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
     useEffect(() => {
@@ -124,6 +125,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                 ? '(King destroyed)'
                 : '';
         const winnerName = playerNames?.[matchResult.winner] || (isWinner ? 'You' : 'Opponent');
+        const myScore = matchScores?.[mySide];
 
         return (
             <div className="flex items-center justify-center w-full w-full">
@@ -138,11 +140,37 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     <p className="text-xs sm:text-sm text-neutral-300 mb-1">{winnerName} wins!</p>
                     {roundScore && (
                         <p className="text-xs sm:text-sm text-neutral-400 mb-1">
-                            Score: {roundScore.left} - {roundScore.right}
+                            Rounds: {roundScore.left} - {roundScore.right}
                         </p>
                     )}
                     {reasonText && (
                         <p className="text-[10px] sm:text-sm text-neutral-400">{reasonText}</p>
+                    )}
+
+                    {/* Score breakdown */}
+                    {myScore && (
+                        <div className="mt-2 sm:mt-3 border-t border-white/10 pt-2 sm:pt-3">
+                            <p className="text-xs sm:text-sm font-bold text-amber-400 mb-1.5">
+                                YOUR SCORE: {myScore.totalScore}
+                            </p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-neutral-400">
+                                <span className="text-right">Damage dealt:</span>
+                                <span className="text-left text-neutral-300">+{myScore.damagePoints}</span>
+                                <span className="text-right">Resource bonus:</span>
+                                <span className="text-left text-neutral-300">+{myScore.resourceBonus}</span>
+                                <span className="text-right">Time bonus:</span>
+                                <span className="text-left text-neutral-300">+{myScore.timeBonus}</span>
+                                {myScore.winBonus > 0 && (
+                                    <>
+                                        <span className="text-right">Win bonus:</span>
+                                        <span className="text-left text-emerald-400">+{myScore.winBonus}</span>
+                                    </>
+                                )}
+                            </div>
+                            <p className="text-[10px] sm:text-xs text-neutral-500 mt-1">
+                                {myScore.resourcesUsed} blocks · {Math.round(myScore.combatTimeMs / 1000)}s combat · {myScore.damageDealt.toFixed(1)} dmg
+                            </p>
+                        </div>
                     )}
 
                     {/* Rematch button */}
