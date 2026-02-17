@@ -58,6 +58,18 @@ export const KING_MAX_HP = 100;
 export const IMPACT_THRESHOLD = 5;
 export const DAMAGE_SCALE = 0.3;
 
+// === Rounds ===
+export const ROUNDS_TO_WIN = 2;
+export const MAX_ROUNDS = 3;
+export const ROUND_INTERSTITIAL_MS = 4000;
+
+// === Hazards ===
+export const WIND_STRENGTH = 0.0003;
+export const LAVA_DAMAGE_PER_TICK = 0.5;
+export const FALLING_ROCK_INTERVAL_MS = 3000;
+export const FALLING_ROCK_RADIUS = 12;
+export const FALLING_ROCK_DAMAGE = 15;
+
 // === Projectiles ===
 export const PROJECTILE_RADIUS = 8;
 export const PROJECTILE_DENSITY = 0.05;

@@ -42,12 +42,22 @@ export interface RoomState {
     side: Side;
     phase: MatchPhase;
     opponentConnected: boolean;
+    myName: string;
+    opponentName: string;
 }
 
 export interface TerrainData {
     points: { x: number; y: number }[];
     buildZones: { x: number; width: number; y: number }[];
     seed: number;
+}
+
+export interface ChatMessage {
+    id: string;
+    sender: string;
+    side: Side;
+    text: string;
+    timestamp: number;
 }
 
 export interface BuildStatus {

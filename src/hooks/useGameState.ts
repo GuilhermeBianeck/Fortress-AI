@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState } from '../types';
+import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage } from '../types';
 
 const SERVER_URL = 'http://localhost:3001';
 
@@ -20,8 +20,14 @@ export const useGameState = () => {
     const [turnPlayer, setTurnPlayer] = useState<Side | null>(null);
     const [matchResult, setMatchResult] = useState<{ winner: Side; reason: string } | null>(null);
     const [queuePosition, setQueuePosition] = useState<number | null>(null);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [rematchState, setRematchState] = useState<'none' | 'requested' | 'opponent_requested'>('none');
+    const [roundScore, setRoundScore] = useState<{ left: number; right: number }>({ left: 0, right: 0 });
+    const [currentRound, setCurrentRound] = useState(1);
+    const [hazards, setHazards] = useState<{ type: string; id: string; position: { x: number; y: number }; width: number; height: number; windDirection?: number; windStrength?: number }[]>([]);
 
     const socketRef = useRef<Socket | null>(null);
+    const mySideRef = useRef<Side>('left');
 
     // Callback refs for canvas effects
     const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
@@ -43,9 +49,12 @@ export const useGameState = () => {
             }
         });
 
-        socketRef.current.on('terrain', (data: TerrainData) => {
+        socketRef.current.on('terrain', (data: TerrainData & { hazards?: any[] }) => {
             console.log('Terrain received:', data.seed);
             setTerrain(data);
+            if (data.hazards) {
+                setHazards(data.hazards);
+            }
         });
 
         // --- Build status ---
@@ -87,20 +96,27 @@ export const useGameState = () => {
         // --- Room/lobby events ---
 
         socketRef.current.on('room_created', (data: { roomId: string }) => {
-            setRoomState({
+            setRoomState(prev => ({
                 roomId: data.roomId,
                 side: 'left',
                 phase: 'lobby',
                 opponentConnected: false,
-            });
+                myName: prev?.myName || 'Player 1',
+                opponentName: '',
+            }));
         });
 
-        socketRef.current.on('room_joined', (data: { roomId: string; side: Side; players: { side: Side; ready: boolean }[] }) => {
+        socketRef.current.on('room_joined', (data: { roomId: string; side: Side; players: { side: Side; ready: boolean; name: string }[] }) => {
+            const me = data.players.find(p => p.side === data.side);
+            const opponent = data.players.find(p => p.side !== data.side);
+            mySideRef.current = data.side;
             setRoomState({
                 roomId: data.roomId,
                 side: data.side,
                 phase: 'lobby',
                 opponentConnected: data.players.length >= 2,
+                myName: me?.name || 'Player',
+                opponentName: opponent?.name || '',
             });
         });
 
@@ -110,8 +126,8 @@ export const useGameState = () => {
             setTimeout(() => setBuildStatus({ status: 'idle', message: '' }), 3000);
         });
 
-        socketRef.current.on('player_joined', (_data: { side: Side }) => {
-            setRoomState(prev => prev ? { ...prev, opponentConnected: true } : prev);
+        socketRef.current.on('player_joined', (data: { side: Side; name?: string }) => {
+            setRoomState(prev => prev ? { ...prev, opponentConnected: true, opponentName: data.name || 'Player' } : prev);
         });
 
         socketRef.current.on('player_left', (data: { side: Side; reason: string }) => {
@@ -165,6 +181,40 @@ export const useGameState = () => {
             projectileImpactCbRef.current?.(data);
         });
 
+        // --- Chat ---
+        socketRef.current.on('chat_message', (msg: ChatMessage) => {
+            setChatMessages(prev => {
+                const next = [...prev, msg];
+                return next.length > 100 ? next.slice(-100) : next;
+            });
+        });
+
+        // --- Rematch ---
+        socketRef.current.on('rematch_requested', (data: { side: Side }) => {
+            setRematchState(prev => {
+                if (prev === 'requested') return prev; // I already requested
+                // Opponent requested
+                return data.side !== mySideRef.current ? 'opponent_requested' : prev;
+            });
+        });
+
+        socketRef.current.on('rematch_start', () => {
+            setRematchState('none');
+            setMatchResult(null);
+            setGameState(null);
+            setBuildStatus({ status: 'idle', message: '' });
+        });
+
+        // --- Rounds ---
+        socketRef.current.on('round_result', (data: { winner: Side; reason: string; roundScore: { left: number; right: number }; currentRound: number; isFinalRound: boolean }) => {
+            setRoundScore(data.roundScore);
+            setCurrentRound(data.currentRound);
+            if (data.isFinalRound) {
+                setMatchResult({ winner: data.winner, reason: data.reason });
+                setPhase('result');
+            }
+        });
+
         socketRef.current.on('disconnect', () => {
             console.log('Disconnected from Game Server');
         });
@@ -176,16 +226,16 @@ export const useGameState = () => {
 
     // --- Actions ---
 
-    const createRoom = useCallback(() => {
-        socketRef.current?.emit('create_room');
+    const createRoom = useCallback((name?: string) => {
+        socketRef.current?.emit('create_room', { name });
     }, []);
 
-    const joinRoom = useCallback((roomId: string) => {
-        socketRef.current?.emit('join_room', { roomId });
+    const joinRoom = useCallback((roomId: string, name?: string) => {
+        socketRef.current?.emit('join_room', { roomId, name });
     }, []);
 
-    const joinQueue = useCallback(() => {
-        socketRef.current?.emit('join_queue');
+    const joinQueue = useCallback((name?: string) => {
+        socketRef.current?.emit('join_queue', { name });
     }, []);
 
     const leaveQueue = useCallback(() => {
@@ -217,6 +267,15 @@ export const useGameState = () => {
         socketRef.current?.emit('fire_projectile', { angle, power });
     }, []);
 
+    const sendChatMessage = useCallback((text: string) => {
+        socketRef.current?.emit('chat_message', { text });
+    }, []);
+
+    const requestRematch = useCallback(() => {
+        socketRef.current?.emit('request_rematch');
+        setRematchState('requested');
+    }, []);
+
     const setBlockDestroyedCallback = useCallback((cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => {
         blockDestroyedCbRef.current = cb;
     }, []);
@@ -228,8 +287,10 @@ export const useGameState = () => {
     return {
         gameState, terrain, buildStatus, kingsHp,
         roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
+        chatMessages, rematchState, roundScore, currentRound, hazards,
         createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
         spawnBox, requestBuild, fireProjectile,
+        sendChatMessage, requestRematch,
         setBlockDestroyedCallback, setProjectileImpactCallback,
     };
 };

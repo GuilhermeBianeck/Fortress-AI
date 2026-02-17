@@ -1,12 +1,16 @@
 import { Server, Socket } from 'socket.io';
 import { GameSession } from './GameSession';
-import type { PlayerInfo, MatchPhase } from '../types';
+import type { PlayerInfo, MatchPhase, Side } from '../types';
+import { ROUNDS_TO_WIN, ROUND_INTERSTITIAL_MS } from '../config/constants';
 
 export interface Room {
     id: string;
     players: Map<string, PlayerInfo>;
     session: GameSession | null;
     phase: MatchPhase;
+    rematchRequests: Set<string>;
+    roundScore: { left: number; right: number };
+    currentRound: number;
 }
 
 function generateRoomId(): string {
@@ -22,6 +26,7 @@ export class RoomManager {
     rooms: Map<string, Room> = new Map();
     playerRoomMap: Map<string, string> = new Map(); // socketId → roomId
     private matchmakingQueue: string[] = [];
+    private queueNames: Map<string, string> = new Map(); // socketId → name
     private io: Server;
     private cleanupInterval: ReturnType<typeof setInterval>;
 
@@ -32,7 +37,7 @@ export class RoomManager {
         this.cleanupInterval = setInterval(() => this.cleanupStaleRooms(), 60_000);
     }
 
-    createRoom(hostSocketId: string): Room {
+    createRoom(hostSocketId: string, name?: string): Room {
         let roomId: string;
         do {
             roomId = generateRoomId();
@@ -43,12 +48,16 @@ export class RoomManager {
             players: new Map(),
             session: null,
             phase: 'lobby',
+            rematchRequests: new Set(),
+            roundScore: { left: 0, right: 0 },
+            currentRound: 1,
         };
 
         const playerInfo: PlayerInfo = {
             socketId: hostSocketId,
             side: 'left',
             ready: false,
+            name: (name?.trim()) || 'Player 1',
         };
 
         room.players.set(hostSocketId, playerInfo);
@@ -58,7 +67,7 @@ export class RoomManager {
         return room;
     }
 
-    joinRoom(roomId: string, socketId: string): Room | null {
+    joinRoom(roomId: string, socketId: string, name?: string): Room | null {
         const room = this.rooms.get(roomId);
         if (!room) return null;
         if (room.players.size >= 2) return null;
@@ -68,6 +77,7 @@ export class RoomManager {
             socketId,
             side: 'right',
             ready: false,
+            name: (name?.trim()) || 'Player 2',
         };
 
         room.players.set(socketId, playerInfo);
@@ -76,14 +86,16 @@ export class RoomManager {
         return room;
     }
 
-    joinQueue(socketId: string): void {
+    joinQueue(socketId: string, name?: string): void {
         if (!this.matchmakingQueue.includes(socketId)) {
             this.matchmakingQueue.push(socketId);
+            this.queueNames.set(socketId, (name?.trim()) || 'Player');
         }
     }
 
     leaveQueue(socketId: string): void {
         this.matchmakingQueue = this.matchmakingQueue.filter(id => id !== socketId);
+        this.queueNames.delete(socketId);
     }
 
     tryMatchFromQueue(): Room | null {
@@ -91,15 +103,19 @@ export class RoomManager {
 
         const player1 = this.matchmakingQueue.shift()!;
         const player2 = this.matchmakingQueue.shift()!;
+        const name1 = this.queueNames.get(player1) || 'Player 1';
+        const name2 = this.queueNames.get(player2) || 'Player 2';
+        this.queueNames.delete(player1);
+        this.queueNames.delete(player2);
 
-        const room = this.createRoom(player1);
-        this.joinRoom(room.id, player2);
+        const room = this.createRoom(player1, name1);
+        this.joinRoom(room.id, player2, name2);
 
         return room;
     }
 
     handleDisconnect(socketId: string): void {
-        // Remove from queue
+        // Remove from queue (also cleans up queueNames)
         this.leaveQueue(socketId);
 
         const roomId = this.playerRoomMap.get(socketId);
@@ -177,14 +193,127 @@ export class RoomManager {
         const room = this.rooms.get(roomId);
         if (!room || room.players.size !== 2) return null;
 
+        room.roundScore = { left: 0, right: 0 };
+        room.currentRound = 1;
+
         const playerInfos = Array.from(room.players.values());
         const session = new GameSession(this.io, roomId, playerInfos, undefined, (phase) => {
             room.phase = phase;
+        }, (winner: Side, reason: string) => {
+            return this.handleRoundEnd(room, winner, reason);
         });
         room.session = session;
         room.phase = 'build';
 
         return session;
+    }
+
+    private handleRoundEnd(room: Room, winner: Side, reason: string): 'continue' | 'match_over' {
+        room.roundScore[winner]++;
+
+        const isFinalRound = room.roundScore[winner] >= ROUNDS_TO_WIN;
+
+        this.io.to(room.id).emit('round_result', {
+            winner,
+            reason,
+            roundScore: room.roundScore,
+            currentRound: room.currentRound,
+            isFinalRound,
+        });
+
+        if (isFinalRound) {
+            return 'match_over';
+        }
+
+        // Start next round after interstitial
+        room.currentRound++;
+        setTimeout(() => {
+            this.startNextRound(room);
+        }, ROUND_INTERSTITIAL_MS);
+
+        return 'continue';
+    }
+
+    private startNextRound(room: Room): void {
+        if (!room.session || room.players.size !== 2) return;
+
+        // Destroy old session
+        room.session.destroy();
+
+        const playerInfos = Array.from(room.players.values());
+        const session = new GameSession(this.io, room.id, playerInfos, undefined, (phase) => {
+            room.phase = phase;
+        }, (winner: Side, reason: string) => {
+            return this.handleRoundEnd(room, winner, reason);
+        });
+        room.session = session;
+        room.phase = 'build';
+
+        this.io.to(room.id).emit('terrain', session.getTerrainData());
+
+        for (const [sid, pInfo] of room.players.entries()) {
+            const playerSocket = this.io.sockets.sockets.get(sid);
+            playerSocket?.emit('match_started', { side: pInfo.side });
+        }
+
+        session.getStateMachine().startBuildPhase();
+        console.log(`Round ${room.currentRound} started in room ${room.id}`);
+    }
+
+    requestRematch(socketId: string): 'waiting' | 'starting' | null {
+        const room = this.getRoom(socketId);
+        if (!room || room.phase !== 'result') return null;
+
+        const player = room.players.get(socketId);
+        if (!player) return null;
+
+        room.rematchRequests.add(socketId);
+
+        // Notify everyone about the request
+        this.io.to(room.id).emit('rematch_requested', { side: player.side });
+
+        // Check if both players requested
+        if (room.rematchRequests.size >= 2) {
+            // Start new match
+            this.startNewSession(room);
+            return 'starting';
+        }
+
+        return 'waiting';
+    }
+
+    startNewSession(room: Room): void {
+        // Destroy old session
+        room.session?.destroy();
+
+        // Reset state
+        room.rematchRequests.clear();
+        room.roundScore = { left: 0, right: 0 };
+        room.currentRound = 1;
+        for (const p of room.players.values()) {
+            p.ready = true;
+        }
+
+        const playerInfos = Array.from(room.players.values());
+        const session = new GameSession(this.io, room.id, playerInfos, undefined, (phase) => {
+            room.phase = phase;
+        }, (winner: Side, reason: string) => {
+            return this.handleRoundEnd(room, winner, reason);
+        });
+        room.session = session;
+        room.phase = 'build';
+
+        // Send events
+        this.io.to(room.id).emit('rematch_start', {});
+        this.io.to(room.id).emit('terrain', session.getTerrainData());
+
+        for (const [sid, pInfo] of room.players.entries()) {
+            const playerSocket = this.io.sockets.sockets.get(sid);
+            playerSocket?.emit('match_started', { side: pInfo.side });
+        }
+
+        session.getStateMachine().startBuildPhase();
+        console.log(`Rematch started in room ${room.id}`);
     }
 
     getQueuePosition(socketId: string): number {

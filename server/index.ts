@@ -27,21 +27,21 @@ io.on('connection', (socket) => {
 
     // --- Lobby events ---
 
-    socket.on('create_room', () => {
-        const room = roomManager.createRoom(socket.id);
+    socket.on('create_room', (data?: { name?: string }) => {
+        const room = roomManager.createRoom(socket.id, data?.name);
         socket.join(room.id);
         socket.emit('room_created', { roomId: room.id });
         console.log(`Room ${room.id} created by ${socket.id}`);
     });
 
-    socket.on('join_room', (data: { roomId: string }) => {
+    socket.on('join_room', (data: { roomId: string; name?: string }) => {
         const roomId = data.roomId?.toUpperCase();
         if (!roomId) {
             socket.emit('room_error', { message: 'Room code is required.' });
             return;
         }
 
-        const room = roomManager.joinRoom(roomId, socket.id);
+        const room = roomManager.joinRoom(roomId, socket.id, data.name);
         if (!room) {
             socket.emit('room_error', { message: 'Room not found, full, or already started.' });
             return;
@@ -53,6 +53,7 @@ io.on('connection', (socket) => {
         const players = Array.from(room.players.values()).map(p => ({
             side: p.side,
             ready: p.ready,
+            name: p.name,
         }));
 
         socket.emit('room_joined', {
@@ -62,12 +63,12 @@ io.on('connection', (socket) => {
         });
 
         // Notify existing players
-        socket.to(room.id).emit('player_joined', { side: playerInfo.side });
+        socket.to(room.id).emit('player_joined', { side: playerInfo.side, name: playerInfo.name });
         console.log(`${socket.id} joined room ${room.id} as ${playerInfo.side}`);
     });
 
-    socket.on('join_queue', () => {
-        roomManager.joinQueue(socket.id);
+    socket.on('join_queue', (data?: { name?: string }) => {
+        roomManager.joinQueue(socket.id, data?.name);
 
         const position = roomManager.getQueuePosition(socket.id);
         socket.emit('queue_status', { position });
@@ -84,6 +85,7 @@ io.on('connection', (socket) => {
                     const players = Array.from(room.players.values()).map(p => ({
                         side: p.side,
                         ready: p.ready,
+                        name: p.name,
                     }));
 
                     playerSocket.emit('match_found', { roomId: room.id });
@@ -157,6 +159,33 @@ io.on('connection', (socket) => {
         const room = roomManager.getRoom(socket.id);
         if (!room?.session) return;
         room.session.handleFireProjectile(socket.id, data);
+    });
+
+    // --- Rematch ---
+
+    socket.on('request_rematch', () => {
+        roomManager.requestRematch(socket.id);
+    });
+
+    // --- Chat ---
+
+    socket.on('chat_message', (data: { text: string }) => {
+        const room = roomManager.getRoom(socket.id);
+        if (!room) return;
+
+        const player = room.players.get(socket.id);
+        if (!player) return;
+
+        const text = (data.text || '').trim().slice(0, 200);
+        if (!text) return;
+
+        io.to(room.id).emit('chat_message', {
+            id: `${socket.id}-${Date.now()}`,
+            sender: player.name,
+            side: player.side,
+            text,
+            timestamp: Date.now(),
+        });
     });
 
     // --- Disconnect ---

@@ -41,6 +41,20 @@ export interface PlayerInfo {
     socketId: string;
     side: Side;
     ready: boolean;
+    name: string;
+}
+
+export type HazardType = 'wind_zone' | 'lava_pool' | 'falling_rocks';
+
+export interface HazardData {
+    type: HazardType;
+    id: string;
+    position: Vector;
+    width: number;
+    height: number;
+    windDirection?: number;
+    windStrength?: number;
+    damage?: number;
 }
 
 export interface PlayerState {

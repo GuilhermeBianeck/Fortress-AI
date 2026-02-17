@@ -15,6 +15,7 @@ export interface MatchCallbacks {
     onPhaseChange: (phase: MatchPhase) => void;
     onTurnStart: (side: Side) => void;
     onMatchResult: (winner: Side, reason: string) => void;
+    onRoundEnd: (winner: Side, reason: string) => 'continue' | 'match_over';
     getKingState: (side: Side) => KingState;
     getWorld: () => Matter.World;
 }
@@ -185,6 +186,15 @@ export class MatchStateMachine {
     }
 
     private endMatch(winner: Side, reason: string): void {
+        // Delegate to round handler first
+        const result = this.callbacks.onRoundEnd(winner, reason);
+
+        if (result === 'continue') {
+            // RoomManager will handle interstitial + next round
+            return;
+        }
+
+        // Match is truly over
         this.setPhase('result');
 
         this.io.to(this.roomId).emit('phase_change', { phase: 'result' });

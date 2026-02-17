@@ -6,15 +6,18 @@ import { Bot } from 'lucide-react';
 interface LobbyProps {
     roomState: RoomState | null;
     queuePosition: number | null;
-    onCreateRoom: () => void;
-    onJoinRoom: (code: string) => void;
-    onJoinQueue: () => void;
+    playerName: string;
+    onPlayerNameChange: (name: string) => void;
+    onCreateRoom: (name?: string) => void;
+    onJoinRoom: (code: string, name?: string) => void;
+    onJoinQueue: (name?: string) => void;
     onLeaveQueue: () => void;
     onReady: () => void;
 }
 
 export const Lobby = ({
     roomState, queuePosition,
+    playerName, onPlayerNameChange,
     onCreateRoom, onJoinRoom, onJoinQueue, onLeaveQueue, onReady,
 }: LobbyProps) => {
     const [joinCode, setJoinCode] = useState('');
@@ -22,7 +25,7 @@ export const Lobby = ({
     const handleJoinSubmit = (e: FormEvent) => {
         e.preventDefault();
         if (joinCode.trim().length >= 4) {
-            onJoinRoom(joinCode.trim());
+            onJoinRoom(joinCode.trim(), playerName);
         }
     };
 
@@ -97,9 +100,19 @@ export const Lobby = ({
             </div>
 
             <div className="flex flex-col gap-4 w-full max-w-sm">
+                {/* Player Name */}
+                <input
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => onPlayerNameChange(e.target.value)}
+                    placeholder="Your name..."
+                    maxLength={20}
+                    className="w-full bg-neutral-900/80 border border-white/10 rounded-xl px-4 py-3 text-center text-lg font-medium text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 transition-all"
+                />
+
                 {/* Create Room */}
                 <button
-                    onClick={onCreateRoom}
+                    onClick={() => onCreateRoom(playerName)}
                     className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-colors text-lg shadow-lg shadow-rose-600/20"
                 >
                     Create Room
@@ -132,7 +145,7 @@ export const Lobby = ({
 
                 {/* Quick Match */}
                 <button
-                    onClick={onJoinQueue}
+                    onClick={() => onJoinQueue(playerName)}
                     className="w-full py-4 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold rounded-xl transition-colors border border-white/5"
                 >
                     Quick Match

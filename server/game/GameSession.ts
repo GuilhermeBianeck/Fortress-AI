@@ -5,7 +5,7 @@ import { GameLoop } from '../physics/loop';
 import { generateFortress } from '../ai/gemini';
 import type { TerrainContext } from '../ai/prompts';
 import { safeSpawn } from '../ai/overlap';
-import type { KingState, PlayerInfo, PlayerState, Side, KingHpState, MatchPhase } from '../types';
+import type { KingState, PlayerInfo, PlayerState, Side, KingHpState, MatchPhase, HazardData } from '../types';
 import type { TerrainResult } from '../physics/terrain';
 import { MatchStateMachine } from './MatchStateMachine';
 import {
@@ -16,7 +16,9 @@ import {
     PROJECTILE_BLOCK_DAMAGE_MULT, PROJECTILE_MIN_IMPACT,
     WORLD_WIDTH, CANVAS_HEIGHT,
     LEFT_SIDE, RIGHT_SIDE, LEFT_CANNON_X, RIGHT_CANNON_X,
+    FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS,
 } from '../config/constants';
+import { generateHazards, applyWindForce, checkLavaDamage } from '../physics/hazards';
 
 export class GameSession {
     readonly id: string;
@@ -30,9 +32,13 @@ export class GameSession {
     private projectileTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
     private stateMachine: MatchStateMachine;
     private onPhaseChangeCallback?: (phase: MatchPhase) => void;
+    private onRoundEndCallback?: (winner: Side, reason: string) => 'continue' | 'match_over';
+    private hazards: HazardData[] = [];
+    private hazardTimers: ReturnType<typeof setInterval>[] = [];
 
-    constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void) {
+    constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void, onRoundEnd?: (winner: Side, reason: string) => 'continue' | 'match_over') {
         this.onPhaseChangeCallback = onPhaseChange;
+        this.onRoundEndCallback = onRoundEnd;
         this.io = io;
         this.roomId = roomId;
         this.id = roomId;
@@ -67,17 +73,34 @@ export class GameSession {
         for (const ps of this.players.values()) {
             this.gameLoop.setKingState(ps.side, ps.kingState);
         }
-        this.gameLoop.setOnTick(() => this.checkProjectileBounds());
+        this.gameLoop.setOnTick(() => {
+            this.checkProjectileBounds();
+            this.tickHazards();
+        });
         this.gameLoop.start();
 
         // Create state machine
         this.stateMachine = new MatchStateMachine(io, roomId, {
-            onPhaseChange: (phase) => { this.onPhaseChangeCallback?.(phase); },
+            onPhaseChange: (phase) => {
+                this.onPhaseChangeCallback?.(phase);
+                if (phase === 'combat') {
+                    this.startFallingRocks();
+                }
+            },
             onTurnStart: (_side) => { /* UI updates via socket events */ },
             onMatchResult: (_winner, _reason) => { /* Room manager handles result */ },
+            onRoundEnd: (winner, reason) => {
+                return this.onRoundEndCallback?.(winner, reason) ?? 'match_over';
+            },
             getKingState: (side: Side) => this.getKingStateBySide(side),
             getWorld: () => this.world,
         });
+
+        // Generate hazards
+        this.hazards = generateHazards(this.terrain, ws.seed);
+        if (this.hazards.length > 0) {
+            console.log(`Hazards: ${this.hazards.map(h => h.type).join(', ')}`);
+        }
 
         console.log(`GameSession created for room ${roomId} (seed: ${ws.seed})`);
     }
@@ -93,7 +116,20 @@ export class GameSession {
             points: this.terrain.points,
             buildZones: this.terrain.buildZones,
             seed: this.terrain.seed,
+            hazards: this.hazards,
         };
+    }
+
+    setHazards(hazards: HazardData[]): void {
+        this.hazards = hazards;
+    }
+
+    getWorld(): Matter.World {
+        return this.world;
+    }
+
+    getTerrain() {
+        return this.terrain;
     }
 
     getKingsHp(): { left: KingHpState; right: KingHpState } {
@@ -271,6 +307,61 @@ export class GameSession {
             clearTimeout(timer);
         }
         this.projectileTimers.clear();
+        for (const timer of this.hazardTimers) {
+            clearInterval(timer);
+        }
+        this.hazardTimers = [];
+    }
+
+    startFallingRocks(): void {
+        const rockHazards = this.hazards.filter(h => h.type === 'falling_rocks');
+        if (rockHazards.length === 0) return;
+
+        const interval = setInterval(() => {
+            if (this.stateMachine.getPhase() !== 'combat') return;
+
+            for (const hazard of rockHazards) {
+                const rx = hazard.position.x + Math.random() * hazard.width;
+                const ry = 0;
+
+                const rock = Matter.Bodies.circle(rx, ry, FALLING_ROCK_RADIUS, {
+                    density: 0.03,
+                    restitution: 0.2,
+                    friction: 0.5,
+                    label: 'stone',
+                });
+                this.stampBlockProps(rock, 'stone', FALLING_ROCK_RADIUS * 2, FALLING_ROCK_RADIUS * 2);
+
+                Matter.World.add(this.world, rock);
+                Matter.Body.setVelocity(rock, { x: 0, y: 3 });
+            }
+        }, FALLING_ROCK_INTERVAL_MS);
+        this.hazardTimers.push(interval);
+    }
+
+    private tickHazards(): void {
+        if (this.hazards.length === 0) return;
+
+        // Wind
+        applyWindForce(this.world, this.hazards);
+
+        // Lava
+        const kingsMap = new Map<Side, KingState>();
+        for (const ps of this.players.values()) {
+            kingsMap.set(ps.side, ps.kingState);
+        }
+        checkLavaDamage(this.world, this.hazards, kingsMap, (side, damage) => {
+            const ps = this.getPlayerBySide(side);
+            if (ps) {
+                this.io.to(this.roomId).emit('king_damage', {
+                    side,
+                    hp: ps.kingState.hp,
+                    maxHp: ps.kingState.maxHp,
+                    damage,
+                    source: 'lava',
+                });
+            }
+        });
     }
 
     // --- Private ---

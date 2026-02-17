@@ -15,6 +15,20 @@ interface GameCanvasProps {
     onFire: (angle: number, power: number) => void;
     setBlockDestroyedCallback: (cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => void;
     setProjectileImpactCallback: (cb: ((data: { position: Vector }) => void) | null) => void;
+    playerNames?: { left: string; right: string };
+    hazards?: HazardData[];
+    roundScore?: { left: number; right: number };
+    currentRound?: number;
+}
+
+export interface HazardData {
+    type: string;
+    id: string;
+    position: { x: number; y: number };
+    width: number;
+    height: number;
+    windDirection?: number;
+    windStrength?: number;
 }
 
 // Material color map (fallback if server doesn't send color)
@@ -57,6 +71,7 @@ export const GameCanvas = ({
     gameState, terrain, onSpawn, kingsHp, mySide,
     gameMode, phase, turnPlayer, onFire,
     setBlockDestroyedCallback, setProjectileImpactCallback,
+    playerNames, hazards, roundScore, currentRound,
 }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -70,6 +85,10 @@ export const GameCanvas = ({
     const turnPlayerRef = useRef(turnPlayer);
     const onSpawnRef = useRef(onSpawn);
     const onFireRef = useRef(onFire);
+    const playerNamesRef = useRef(playerNames);
+    const hazardsRef = useRef(hazards);
+    const roundScoreRef = useRef(roundScore);
+    const currentRoundRef = useRef(currentRound);
 
     // Camera state
     const cameraRef = useRef({ x: 0, targetX: 0 });
@@ -107,6 +126,10 @@ export const GameCanvas = ({
     useEffect(() => { turnPlayerRef.current = turnPlayer; }, [turnPlayer]);
     useEffect(() => { onSpawnRef.current = onSpawn; }, [onSpawn]);
     useEffect(() => { onFireRef.current = onFire; }, [onFire]);
+    useEffect(() => { playerNamesRef.current = playerNames; }, [playerNames]);
+    useEffect(() => { hazardsRef.current = hazards; }, [hazards]);
+    useEffect(() => { roundScoreRef.current = roundScore; }, [roundScore]);
+    useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
 
     // Set initial camera to own side
     useEffect(() => {
@@ -330,6 +353,59 @@ export const GameCanvas = ({
             ctx.setLineDash([]);
         }
 
+        // Draw hazard zones
+        const hzds = hazardsRef.current;
+        if (hzds) {
+            const animPhase = Date.now() / 1000;
+            for (const h of hzds) {
+                if (h.type === 'wind_zone') {
+                    // Semi-transparent blue
+                    ctx.fillStyle = 'rgba(100, 150, 255, 0.08)';
+                    ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
+                    ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([6, 4]);
+                    ctx.strokeRect(h.position.x, h.position.y, h.width, h.height);
+                    ctx.setLineDash([]);
+
+                    // Animated wind lines
+                    const dir = h.windDirection ?? 1;
+                    const lineCount = 5;
+                    for (let i = 0; i < lineCount; i++) {
+                        const ly = h.position.y + (i + 0.5) * (h.height / lineCount);
+                        const offset = ((animPhase * 60 * dir + i * 40) % h.width);
+                        const lx = h.position.x + (dir > 0 ? offset : h.width - offset);
+                        ctx.beginPath();
+                        ctx.moveTo(lx, ly);
+                        ctx.lineTo(lx + dir * 20, ly);
+                        ctx.strokeStyle = 'rgba(150, 200, 255, 0.4)';
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+                    }
+                } else if (h.type === 'lava_pool') {
+                    // Glowing orange/red
+                    const glow = 0.4 + 0.1 * Math.sin(animPhase * 3);
+                    ctx.fillStyle = `rgba(255, 80, 20, ${glow})`;
+                    ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
+                    ctx.fillStyle = `rgba(255, 200, 50, ${glow * 0.5})`;
+                    ctx.fillRect(h.position.x + 2, h.position.y + 2, h.width - 4, h.height - 4);
+                } else if (h.type === 'falling_rocks') {
+                    // Dashed danger column
+                    ctx.strokeStyle = 'rgba(255, 200, 50, 0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 6]);
+                    ctx.strokeRect(h.position.x, h.position.y, h.width, h.height);
+                    ctx.setLineDash([]);
+
+                    // Danger label
+                    ctx.font = 'bold 9px monospace';
+                    ctx.fillStyle = 'rgba(255, 200, 50, 0.5)';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('DANGER', h.position.x + h.width / 2, h.position.y + 15);
+                }
+            }
+        }
+
         // Draw BOTH cannons
         if (terr && terr.points.length > 0) {
             const drawCannon = (cannonX: number, facingRight: boolean, isActive: boolean) => {
@@ -546,10 +622,13 @@ export const GameCanvas = ({
         // === HUD (fixed to screen, not affected by camera) ===
 
         // Left King HP bar (top-left)
-        drawKingHud(ctx, 12, 12, kings.left, side === 'left' ? 'YOU' : 'ENEMY');
+        const names = playerNamesRef.current;
+        const leftLabel = names?.left || (side === 'left' ? 'YOU' : 'ENEMY');
+        const rightLabel = names?.right || (side === 'right' ? 'YOU' : 'ENEMY');
+        drawKingHud(ctx, 12, 12, kings.left, leftLabel);
 
         // Right King HP bar (top-right)
-        drawKingHud(ctx, canvas.width - 132, 12, kings.right, side === 'right' ? 'YOU' : 'ENEMY');
+        drawKingHud(ctx, canvas.width - 132, 12, kings.right, rightLabel);
 
         // Mode indicator (top-center)
         {
@@ -574,10 +653,105 @@ export const GameCanvas = ({
                 ctx.textAlign = 'center';
                 ctx.fillText(modeLabel, canvas.width / 2, 22);
             }
+
+            // Round score
+            const rs = roundScoreRef.current;
+            const cr = currentRoundRef.current;
+            if (rs && (rs.left > 0 || rs.right > 0 || (cr && cr > 1))) {
+                ctx.font = 'bold 11px monospace';
+                ctx.fillStyle = '#fbbf24';
+                ctx.textAlign = 'center';
+                ctx.fillText(`R${cr || 1}  [${rs.left} - ${rs.right}]`, canvas.width / 2, 38);
+            }
         }
+
+        // === Minimap ===
+        drawMinimap(ctx, canvas, terr, gs, cam, hazardsRef.current);
 
         ctx.restore();
     };
+
+    function drawMinimap(
+        ctx: CanvasRenderingContext2D,
+        canvas: HTMLCanvasElement,
+        terr: TerrainData | null,
+        gs: GameState | null,
+        cam: { x: number; targetX: number },
+        hzds?: HazardData[],
+    ) {
+        const mmW = 200;
+        const mmH = 75;
+        const mmX = canvas.width - mmW - 10;
+        const mmY = canvas.height - mmH - 10;
+        const scaleX = mmW / WORLD_WIDTH;
+        const scaleY = mmH / CANVAS_HEIGHT;
+
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(mmX, mmY, mmW, mmH);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(mmX, mmY, mmW, mmH);
+
+        // Terrain silhouette
+        if (terr && terr.points.length > 0) {
+            ctx.beginPath();
+            ctx.moveTo(mmX, mmY + mmH);
+            for (const pt of terr.points) {
+                ctx.lineTo(mmX + pt.x * scaleX, mmY + pt.y * scaleY);
+            }
+            ctx.lineTo(mmX + mmW, mmY + mmH);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(100, 200, 100, 0.4)';
+            ctx.fill();
+        }
+
+        // Hazard zones
+        if (hzds) {
+            for (const h of hzds) {
+                const hx = mmX + h.position.x * scaleX;
+                const hy = mmY + h.position.y * scaleY;
+                const hw = h.width * scaleX;
+                const hh = h.height * scaleY;
+                if (h.type === 'wind_zone') {
+                    ctx.fillStyle = 'rgba(100, 150, 255, 0.3)';
+                } else if (h.type === 'lava_pool') {
+                    ctx.fillStyle = 'rgba(255, 100, 50, 0.4)';
+                } else {
+                    ctx.fillStyle = 'rgba(255, 200, 50, 0.3)';
+                }
+                ctx.fillRect(hx, hy, hw, hh);
+            }
+        }
+
+        // Bodies: kings and projectiles
+        if (gs) {
+            for (const body of gs.bodies) {
+                if (body.label === 'king') {
+                    const kx = mmX + body.position.x * scaleX;
+                    const ky = mmY + body.position.y * scaleY;
+                    ctx.beginPath();
+                    ctx.arc(kx, ky, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = body.position.x < WORLD_WIDTH / 2 ? '#22c55e' : '#ef4444';
+                    ctx.fill();
+                } else if (body.label === 'projectile') {
+                    const px = mmX + body.position.x * scaleX;
+                    const py = mmY + body.position.y * scaleY;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Viewport rectangle
+        const vpX = mmX + cam.x * scaleX;
+        const vpW = CANVAS_WIDTH * scaleX;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(vpX, mmY, vpW, mmH);
+    }
 
     function drawKingHud(ctx: CanvasRenderingContext2D, hudX: number, hudY: number, king: KingHpState, label: string) {
         const hudWidth = 120;
@@ -629,6 +803,25 @@ export const GameCanvas = ({
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        const canvas = canvasRef.current!;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const screenX = (e.clientX - rect.left) * scaleX;
+        const screenY = (e.clientY - rect.top) * scaleY;
+
+        // Minimap click detection
+        const mmW = 200;
+        const mmH = 75;
+        const mmX = canvas.width - mmW - 10;
+        const mmY = canvas.height - mmH - 10;
+        if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
+            const clickRatioX = (screenX - mmX) / mmW;
+            const worldX = clickRatioX * WORLD_WIDTH;
+            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, worldX - CANVAS_WIDTH / 2));
+            return;
+        }
+
         const currentPhase = phaseRef.current;
         const side = mySideRef.current;
 

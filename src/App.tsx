@@ -5,6 +5,7 @@ import { GameCanvas } from './components/GameCanvas';
 import { GodTools } from './components/GodTools';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
+import { ChatPanel } from './components/ChatPanel';
 import { Bot, Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 
@@ -12,8 +13,10 @@ function App() {
   const {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
+    chatMessages, rematchState, roundScore, currentRound, hazards,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
+    sendChatMessage, requestRematch,
     setBlockDestroyedCallback, setProjectileImpactCallback,
   } = useGameState();
 
@@ -21,6 +24,13 @@ function App() {
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>('wood');
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
   const [gameMode, setGameMode] = useState<GameMode>('build');
+
+  // Player name state (persisted)
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem('fortress_player_name') || '');
+  const handlePlayerNameChange = (name: string) => {
+    setPlayerName(name);
+    localStorage.setItem('fortress_player_name', name);
+  };
 
   // AI Architect state
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('fortress_api_key') || '');
@@ -68,6 +78,12 @@ function App() {
 
   const isBuilding = buildStatus.status === 'generating' || buildStatus.status === 'building';
   const mySide = roomState?.side ?? 'left';
+
+  // Build name map: left/right → name
+  const playerNamesMap = roomState ? {
+    [roomState.side]: roomState.myName || playerName || 'You',
+    [roomState.side === 'left' ? 'right' : 'left']: roomState.opponentName || 'Opponent',
+  } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white font-sans selection:bg-rose-500/30">
@@ -128,6 +144,8 @@ function App() {
           <Lobby
             roomState={roomState}
             queuePosition={queuePosition}
+            playerName={playerName}
+            onPlayerNameChange={handlePlayerNameChange}
             onCreateRoom={createRoom}
             onJoinRoom={joinRoom}
             onJoinQueue={joinQueue}
@@ -160,6 +178,12 @@ function App() {
               turnPlayer={turnPlayer}
               mySide={mySide}
               matchResult={matchResult}
+              playerNames={playerNamesMap}
+              roundScore={roundScore}
+              currentRound={currentRound}
+              rematchState={rematchState}
+              onRequestRematch={requestRematch}
+              hazards={hazards}
             />
 
             {/* God Tools (build phase only) */}
@@ -174,21 +198,32 @@ function App() {
               onReady={playerReady}
             />
 
-            {/* Game Canvas */}
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
-              <GameCanvas
-                gameState={gameState}
-                terrain={terrain}
-                onSpawn={handleSpawn}
-                kingsHp={kingsHp}
+            {/* Game Canvas + Chat */}
+            <div className="flex gap-4 items-start">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
+                <GameCanvas
+                  gameState={gameState}
+                  terrain={terrain}
+                  onSpawn={handleSpawn}
+                  kingsHp={kingsHp}
+                  mySide={mySide}
+                  gameMode={gameMode}
+                  phase={phase}
+                  turnPlayer={turnPlayer}
+                  onFire={fireProjectile}
+                  setBlockDestroyedCallback={setBlockDestroyedCallback}
+                  setProjectileImpactCallback={setProjectileImpactCallback}
+                  playerNames={playerNamesMap}
+                  hazards={hazards}
+                  roundScore={roundScore}
+                  currentRound={currentRound}
+                />
+              </div>
+              <ChatPanel
+                messages={chatMessages}
+                onSend={sendChatMessage}
                 mySide={mySide}
-                gameMode={gameMode}
-                phase={phase}
-                turnPlayer={turnPlayer}
-                onFire={fireProjectile}
-                setBlockDestroyedCallback={setBlockDestroyedCallback}
-                setProjectileImpactCallback={setProjectileImpactCallback}
               />
             </div>
 

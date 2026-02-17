@@ -7,9 +7,15 @@ interface PhaseOverlayProps {
     turnPlayer: Side | null;
     mySide: Side;
     matchResult: { winner: Side; reason: string } | null;
+    playerNames?: { left: string; right: string };
+    roundScore?: { left: number; right: number };
+    currentRound?: number;
+    rematchState?: 'none' | 'requested' | 'opponent_requested';
+    onRequestRematch?: () => void;
+    hazards?: { type: string; id: string }[];
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
     useEffect(() => {
@@ -35,7 +41,14 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         return (
             <div className="flex items-center justify-between w-full max-w-[800px]">
                 <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2 backdrop-blur-sm">
-                    <span className="text-emerald-400 font-bold text-sm">BUILD YOUR FORTRESS</span>
+                    <span className="text-emerald-400 font-bold text-sm">
+                        {currentRound ? `ROUND ${currentRound} — ` : ''}BUILD YOUR FORTRESS
+                    </span>
+                    {roundScore && (
+                        <span className="text-neutral-400 text-xs ml-2">
+                            [{roundScore.left} - {roundScore.right}]
+                        </span>
+                    )}
                 </div>
                 {timeLeft !== null && (
                     <div className={`font-mono font-bold text-lg ${timeLeft <= 10 ? 'text-red-400 animate-pulse' : 'text-neutral-300'}`}>
@@ -48,11 +61,21 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
     // Reveal phase banner
     if (phase === 'reveal') {
+        const hazardNames: Record<string, string> = {
+            wind_zone: 'Wind Zone',
+            lava_pool: 'Lava Pool',
+            falling_rocks: 'Falling Rocks',
+        };
         return (
             <div className="flex items-center justify-center w-full max-w-[800px]">
                 <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg px-6 py-3 backdrop-blur-sm text-center">
                     <span className="text-violet-400 font-bold">REVEALING FORTRESSES</span>
                     <p className="text-xs text-violet-300/60 mt-0.5">Camera is panning across the battlefield...</p>
+                    {hazards && hazards.length > 0 && (
+                        <p className="text-xs text-amber-400/80 mt-1">
+                            Hazards: {hazards.map(h => hazardNames[h.type] || h.type).join(', ')}
+                        </p>
+                    )}
                 </div>
             </div>
         );
@@ -89,6 +112,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
             : matchResult.reason === 'king_destroyed'
                 ? '(King destroyed)'
                 : '';
+        const winnerName = playerNames?.[matchResult.winner] || (isWinner ? 'You' : 'Opponent');
 
         return (
             <div className="flex items-center justify-center w-full max-w-[800px]">
@@ -100,8 +124,42 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     <div className={`text-3xl font-bold mb-1 ${isWinner ? 'text-emerald-400' : 'text-red-400'}`}>
                         {isWinner ? 'VICTORY' : 'DEFEAT'}
                     </div>
+                    <p className="text-sm text-neutral-300 mb-1">{winnerName} wins!</p>
+                    {roundScore && (
+                        <p className="text-sm text-neutral-400 mb-1">
+                            Final Score: {roundScore.left} - {roundScore.right}
+                        </p>
+                    )}
                     {reasonText && (
                         <p className="text-sm text-neutral-400">{reasonText}</p>
+                    )}
+
+                    {/* Rematch button */}
+                    {onRequestRematch && (
+                        <div className="mt-4">
+                            {rematchState === 'none' && (
+                                <button
+                                    onClick={onRequestRematch}
+                                    className="px-6 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-colors"
+                                >
+                                    REMATCH
+                                </button>
+                            )}
+                            {rematchState === 'requested' && (
+                                <p className="text-sm text-amber-400">Waiting for opponent...</p>
+                            )}
+                            {rematchState === 'opponent_requested' && (
+                                <div>
+                                    <p className="text-sm text-emerald-400 mb-2">Opponent wants a rematch!</p>
+                                    <button
+                                        onClick={onRequestRematch}
+                                        className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors"
+                                    >
+                                        ACCEPT
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
