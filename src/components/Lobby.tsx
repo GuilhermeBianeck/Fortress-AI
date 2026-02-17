@@ -66,7 +66,7 @@ export const Lobby = ({
                             <button
                                 onClick={handleReady}
                                 disabled={isReady}
-                                className={`mt-8 w-full py-4 font-bold rounded-xl text-xl touch-manipulation
+                                className={`mt-6 sm:mt-8 w-full min-h-[48px] py-3.5 sm:py-4 font-bold rounded-xl text-lg sm:text-xl touch-manipulation
                                     transition-colors duration-200
                                     ${isReady
                                         ? 'bg-emerald-700 text-emerald-200 ring-2 ring-emerald-400/50 cursor-default'
@@ -96,7 +96,7 @@ export const Lobby = ({
                     <p className="text-base text-neutral-400">Queue position: {queuePosition + 1}</p>
                     <button
                         onClick={onLeaveQueue}
-                        className="mt-8 px-8 py-3 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-300 rounded-xl
+                        className="mt-6 sm:mt-8 min-h-[48px] px-8 py-3 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-300 rounded-xl
                             transition-colors duration-200 touch-manipulation text-base"
                     >
                         Cancel
@@ -110,14 +110,15 @@ export const Lobby = ({
     return (
         <div className="flex-1 w-full flex flex-col lg:flex-row items-stretch bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 overflow-hidden">
             {/* Left side — Branding */}
-            <div className="flex flex-col items-center justify-center lg:flex-1 p-8 lg:p-12">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="bg-rose-600 p-3 rounded-2xl shadow-lg shadow-rose-600/20">
-                        <Bot size={40} className="text-white" />
+            <div className="flex flex-col items-center justify-center lg:flex-1 p-6 sm:p-8 lg:p-12">
+                <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                    <div className="bg-rose-600 p-2.5 sm:p-3 rounded-2xl shadow-lg shadow-rose-600/20">
+                        <Bot size={32} className="text-white sm:hidden" />
+                        <Bot size={40} className="text-white hidden sm:block" />
                     </div>
                     <div>
-                        <h1 className="text-4xl lg:text-5xl font-bold tracking-tight">FORTRESS AI</h1>
-                        <p className="text-base text-neutral-400 mt-1">2-Player AI Battle</p>
+                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">FORTRESS AI</h1>
+                        <p className="text-sm sm:text-base text-neutral-400 mt-1">2-Player AI Battle</p>
                     </div>
                 </div>
                 <div className="hidden lg:flex flex-col gap-4 text-neutral-500 text-sm">
@@ -137,8 +138,8 @@ export const Lobby = ({
             <div className="lg:hidden w-2/3 h-px bg-white/10 mx-auto" />
 
             {/* Right side — Actions: fills all available width */}
-            <div className="flex flex-col items-center justify-center lg:flex-1 p-8 lg:p-12">
-                <div className="flex flex-col gap-4 w-full">
+            <div className="flex flex-col items-center justify-center lg:flex-1 p-6 sm:p-8 lg:p-12">
+                <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-md">
                     {/* Player Name */}
                     <input
                         type="text"
@@ -146,13 +147,13 @@ export const Lobby = ({
                         onChange={(e) => onPlayerNameChange(e.target.value)}
                         placeholder="Your name..."
                         maxLength={20}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-center text-lg font-medium text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 transition-all touch-manipulation"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 sm:py-4 text-center text-base sm:text-lg font-medium text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 transition-all touch-manipulation"
                     />
 
                     {/* Create Room */}
                     <button
                         onClick={() => onCreateRoom(playerName)}
-                        className="w-full py-5 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-xl text-xl shadow-lg shadow-rose-600/20
+                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-xl text-lg sm:text-xl shadow-lg shadow-rose-600/20
                             transition-colors duration-200 touch-manipulation"
                     >
                         Create Room
@@ -166,12 +167,12 @@ export const Lobby = ({
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                             placeholder="CODE"
                             maxLength={6}
-                            className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-4 text-center text-lg font-mono font-bold text-white placeholder:text-neutral-600 uppercase tracking-[0.15em] outline-none focus:border-rose-500/50 touch-manipulation"
+                            className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-3 sm:py-4 text-center text-base sm:text-lg font-mono font-bold text-white placeholder:text-neutral-600 uppercase tracking-[0.15em] outline-none focus:border-rose-500/50 touch-manipulation"
                         />
                         <button
                             type="submit"
                             disabled={joinCode.trim().length < 4}
-                            className="shrink-0 px-8 py-4 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white font-bold rounded-xl text-lg
+                            className="shrink-0 min-h-[48px] px-6 sm:px-8 py-3 sm:py-4 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white font-bold rounded-xl text-base sm:text-lg
                                 transition-colors duration-200 touch-manipulation
                                 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
@@ -179,7 +180,7 @@ export const Lobby = ({
                         </button>
                     </form>
 
-                    <div className="flex items-center gap-3 my-1">
+                    <div className="flex items-center gap-3 my-0.5 sm:my-1">
                         <div className="flex-1 h-px bg-white/10" />
                         <span className="text-xs text-neutral-500">or</span>
                         <div className="flex-1 h-px bg-white/10" />
@@ -188,7 +189,7 @@ export const Lobby = ({
                     {/* Quick Match */}
                     <button
                         onClick={() => onJoinQueue(playerName)}
-                        className="w-full py-5 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-200 font-bold rounded-xl text-lg border border-white/5
+                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-200 font-bold rounded-xl text-base sm:text-lg border border-white/5
                             transition-colors duration-200 touch-manipulation"
                     >
                         Quick Match

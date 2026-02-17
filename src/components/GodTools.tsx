@@ -57,13 +57,13 @@ export const GodTools = ({
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-1 sm:gap-3 w-full">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full">
             {/* Mode Toggle */}
-            <div className="flex items-center bg-black/40 border border-white/10 rounded-lg p-0.5 sm:p-1 backdrop-blur-sm">
+            <div className="flex items-center bg-black/60 border border-white/10 rounded-lg p-0.5 sm:p-1 backdrop-blur-sm">
                 <button
                     onClick={() => onModeChange('build')}
                     className={`
-                        px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-bold
+                        min-h-[36px] sm:min-h-0 px-3 sm:px-3 py-1.5 sm:py-1.5 rounded-md text-xs sm:text-xs font-bold
                         transition-colors duration-200 touch-manipulation
                         ${gameMode === 'build'
                             ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30'
@@ -76,7 +76,7 @@ export const GodTools = ({
                 <button
                     onClick={() => onModeChange('fire')}
                     className={`
-                        px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-bold
+                        min-h-[36px] sm:min-h-0 px-3 sm:px-3 py-1.5 sm:py-1.5 rounded-md text-xs sm:text-xs font-bold
                         transition-colors duration-200 touch-manipulation
                         ${gameMode === 'fire'
                             ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/30'
@@ -91,13 +91,13 @@ export const GodTools = ({
             {gameMode === 'build' ? (
                 <>
                     {/* Material Selector */}
-                    <div className="flex items-center gap-0.5 sm:gap-1.5 bg-black/40 border border-white/10 rounded-lg p-0.5 sm:p-1.5 backdrop-blur-sm">
+                    <div className="flex items-center gap-0.5 sm:gap-1.5 bg-black/60 border border-white/10 rounded-lg p-0.5 sm:p-1.5 backdrop-blur-sm">
                         {MATERIALS.map(mat => (
                             <button
                                 key={mat.key}
                                 onClick={() => onMaterialChange(mat.key)}
                                 className={`
-                                    flex items-center gap-0.5 sm:gap-1.5 px-1 sm:px-2.5 py-0.5 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium
+                                    flex items-center gap-1 sm:gap-1.5 min-h-[36px] sm:min-h-0 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-xs font-medium
                                     transition-colors duration-150 touch-manipulation
                                     ${selectedMaterial === mat.key
                                         ? 'bg-white/15 text-white shadow-inner ring-1 ring-white/20'
@@ -106,10 +106,10 @@ export const GodTools = ({
                                 `}
                                 title={mat.label}
                             >
-                                <span className="text-xs sm:text-sm">{mat.icon}</span>
+                                <span className="text-sm">{mat.icon}</span>
                                 <span className="hidden sm:inline">{mat.label}</span>
                                 <span
-                                    className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border transition-colors duration-150 ${
+                                    className={`w-2.5 h-2.5 rounded-full border transition-colors duration-150 ${
                                         selectedMaterial === mat.key ? 'border-white/40 ring-1 ring-white/20' : 'border-white/20'
                                     }`}
                                     style={{ backgroundColor: MATERIAL_COLORS[mat.key] }}
@@ -119,13 +119,13 @@ export const GodTools = ({
                     </div>
 
                     {/* Shape Selector */}
-                    <div className="flex items-center gap-0.5 sm:gap-1.5 bg-black/40 border border-white/10 rounded-lg p-0.5 sm:p-1.5 backdrop-blur-sm">
+                    <div className="flex items-center gap-0.5 sm:gap-1.5 bg-black/60 border border-white/10 rounded-lg p-0.5 sm:p-1.5 backdrop-blur-sm">
                         {SHAPES.map(shape => (
                             <button
                                 key={shape.key}
                                 onClick={() => onShapeChange(shape.key)}
                                 className={`
-                                    flex items-center gap-0.5 sm:gap-1.5 px-1 sm:px-2.5 py-0.5 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium
+                                    flex items-center gap-1 sm:gap-1.5 min-h-[36px] sm:min-h-0 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-xs font-medium
                                     transition-colors duration-150 touch-manipulation
                                     ${selectedShape === shape.key
                                         ? 'bg-white/15 text-white shadow-inner ring-1 ring-white/20'
@@ -134,15 +134,15 @@ export const GodTools = ({
                                 `}
                                 title={shape.label}
                             >
-                                <span className="text-xs sm:text-sm">{shape.icon}</span>
+                                <span className="text-sm">{shape.icon}</span>
                                 <span className="hidden sm:inline">{shape.label}</span>
                             </button>
                         ))}
                     </div>
                 </>
             ) : (
-                <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-2 sm:px-3 py-0.5 sm:py-1.5 backdrop-blur-sm">
-                    <span className="text-[10px] sm:text-xs font-medium text-neutral-400">Preview mode</span>
+                <div className="flex items-center gap-2 bg-black/60 border border-white/10 rounded-lg px-3 sm:px-3 py-1.5 sm:py-1.5 backdrop-blur-sm">
+                    <span className="text-xs sm:text-xs font-medium text-neutral-400">Preview mode</span>
                 </div>
             )}
 
@@ -186,14 +186,14 @@ export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onRead
         <button
             onClick={handleReady}
             disabled={isReady}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold
+            className={`flex items-center gap-1.5 min-h-[40px] px-4 py-1.5 rounded-lg text-xs font-bold
                 transition-colors duration-200 touch-manipulation border
                 ${isReady
                     ? 'bg-emerald-600/40 text-emerald-200 border-emerald-400/50 ring-1 ring-emerald-400/30 cursor-default'
                     : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 active:bg-emerald-500/40 cursor-pointer'
                 }`}
         >
-            {isReady ? <Check size={10} /> : null}
+            {isReady ? <Check size={12} /> : null}
             {isReady ? 'READY!' : 'DONE'}
         </button>
     );

@@ -151,7 +151,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             {rematchState === 'none' && (
                                 <button
                                     onClick={onRequestRematch}
-                                    className="px-4 sm:px-6 py-1.5 sm:py-2 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-lg text-sm
+                                    className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-lg text-sm
                                         transition-colors duration-200 touch-manipulation"
                                 >
                                     REMATCH
@@ -168,7 +168,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                     <p className="text-xs sm:text-sm text-emerald-400 mb-2 animate-pulse">Opponent wants a rematch!</p>
                                     <button
                                         onClick={onRequestRematch}
-                                        className="px-4 sm:px-6 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-lg text-sm
+                                        className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-lg text-sm
                                             transition-colors duration-200 touch-manipulation"
                                     >
                                         ACCEPT

@@ -87,7 +87,7 @@ function App() {
   } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
-    <div className="h-screen bg-neutral-950 text-white font-sans selection:bg-rose-500/30 flex flex-col overflow-hidden">
+    <div className="h-[100dvh] bg-neutral-950 text-white font-sans selection:bg-rose-500/30 flex flex-col overflow-hidden safe-area-top">
       {/* Header — hidden on mobile when in-game */}
       <header className={`px-4 py-2 border-b border-white/10 flex justify-between items-center bg-black/20 backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`}>
         <div className="flex items-center gap-2">
@@ -108,14 +108,14 @@ function App() {
           {inGame && (
             <button
               onClick={() => setShowChat(!showChat)}
-              className={`xl:hidden px-2 py-1.5 text-sm rounded-lg transition-colors duration-200 touch-manipulation
-                border flex items-center gap-1.5
+              className={`xl:hidden min-w-[44px] min-h-[44px] px-2 py-1.5 text-sm rounded-lg transition-colors duration-200 touch-manipulation
+                border flex items-center justify-center gap-1.5
                 ${showChat
                   ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
                   : 'bg-neutral-800 border-white/10 hover:bg-neutral-700 active:bg-neutral-900 text-white'
                 }`}
             >
-              <MessageCircle size={14} />
+              <MessageCircle size={16} />
               <span className="hidden sm:inline text-xs">Chat</span>
               {chatMessages.length > 0 && (
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
@@ -125,7 +125,7 @@ function App() {
           {/* API Key toggle */}
           <button
             onClick={() => setShowApiKey(!showApiKey)}
-            className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors duration-200 touch-manipulation flex items-center gap-1.5
+            className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors duration-200 touch-manipulation flex items-center justify-center gap-1.5
                        ${apiKey ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'}
                        hover:bg-white/10 active:bg-white/15`}
           >
@@ -150,7 +150,7 @@ function App() {
               />
               <button
                 onClick={() => setShowApiKey(false)}
-                className="shrink-0 px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-500 active:bg-rose-700
+                className="shrink-0 min-h-[44px] px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-500 active:bg-rose-700
                     transition-colors duration-200 touch-manipulation"
               >
                 Save
@@ -173,8 +173,8 @@ function App() {
             onReady={playerReady}
           />
         ) : (
-          /* Desktop: constrained 4:3. Mobile: full width. */
-          <div className="flex flex-col items-center flex-1 w-full sm:gap-3 game-container">
+          /* Desktop: constrained 4:3. Mobile: full width, fills available height. */
+          <div className="flex flex-col items-center flex-1 w-full sm:gap-3 game-container safe-area-bottom">
 
             {/* Canvas + Chat row */}
             <div className="flex gap-4 items-start w-full justify-center">
@@ -202,9 +202,9 @@ function App() {
                   {/* Phase overlay — on top of canvas */}
                   {phase && (
                     <div className={`absolute inset-x-0 z-10 flex justify-center pointer-events-none ${
-                      phase === 'result' ? 'inset-0 items-center' : 'top-0 pt-2'
+                      phase === 'result' ? 'inset-0 items-center' : 'top-0 pt-1 sm:pt-2'
                     }`}>
-                      <div className="pointer-events-auto">
+                      <div className="pointer-events-auto max-w-[calc(100%-5rem)] sm:max-w-none">
                         <PhaseOverlay
                           phase={phase}
                           phaseEndsAt={phaseEndsAt}
@@ -222,17 +222,24 @@ function App() {
                     </div>
                   )}
 
-                  {/* Mobile: Chat button top-right (clear of HP bars) */}
-                  <div className="absolute top-1 right-1 z-10 sm:hidden">
+                  {/* Mobile: Chat button — top-right, clear of HP bars, min 44px touch target */}
+                  <div className="absolute top-1 right-1 z-20 sm:hidden">
                     <button
                       onClick={() => setShowChat(!showChat)}
-                      className="p-1.5 bg-black/60 border border-white/10 rounded-lg touch-manipulation"
+                      className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation border
+                        ${showChat
+                          ? 'bg-rose-500/30 border-rose-500/40'
+                          : 'bg-black/60 border-white/10 active:bg-black/80'
+                        }`}
                     >
-                      <MessageCircle size={14} className="text-white" />
+                      <MessageCircle size={18} className="text-white" />
+                      {chatMessages.length > 0 && (
+                        <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-rose-500"></span>
+                      )}
                     </button>
                   </div>
 
-                  {/* Mobile: Done button — top-center, below phase overlay */}
+                  {/* Mobile: Done button — top-center, below phase overlay, properly sized for touch */}
                   {phase === 'build' && (
                     <div className="absolute top-10 inset-x-0 z-10 flex justify-center sm:hidden pointer-events-none">
                       <div className="pointer-events-auto">
@@ -241,9 +248,9 @@ function App() {
                     </div>
                   )}
 
-                  {/* Mobile: God Tools overlaid at bottom of canvas */}
+                  {/* Mobile: God Tools overlaid at bottom of canvas — above minimap */}
                   {phase === 'build' && (
-                    <div className="absolute bottom-0 inset-x-0 z-10 p-1 sm:hidden pointer-events-auto">
+                    <div className="absolute bottom-0 inset-x-0 z-10 p-1.5 sm:hidden pointer-events-auto safe-area-bottom">
                       <GodTools
                         selectedMaterial={selectedMaterial}
                         selectedShape={selectedShape}
@@ -305,7 +312,7 @@ function App() {
             {/* Mobile chat overlay */}
             {showChat && (
               <div className="fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
-                <div className="w-full max-w-md mb-0 sm:mb-4">
+                <div className="w-full max-w-md mb-0 sm:mb-4 safe-area-bottom">
                   <ChatPanel
                     messages={chatMessages}
                     onSend={sendChatMessage}
