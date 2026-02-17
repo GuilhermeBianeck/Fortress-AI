@@ -1,13 +1,13 @@
 <p align="center">
   <img src="https://img.shields.io/badge/status-playable-brightgreen" alt="Status: Playable" />
   <img src="https://img.shields.io/badge/players-2-blue" alt="Players: 2" />
-  <img src="https://img.shields.io/badge/platform-web-orange" alt="Platform: Web" />
+  <img src="https://img.shields.io/badge/platform-web%20%7C%20mobile-orange" alt="Platform: Web | Mobile" />
   <img src="https://img.shields.io/badge/license-MIT-yellow" alt="License: MIT" />
 </p>
 
 # FORTRESS AI
 
-**A real-time multiplayer fortress-building strategy game where human creativity meets AI architecture.**
+**A real-time multiplayer fortress-building strategy game where human creativity meets AI architecture.** Playable on desktop and mobile browsers.
 
 Design impenetrable fortresses with natural language prompts powered by Google Gemini, then destroy your opponent's creation in physics-based turn-based combat. Every match features procedurally generated terrain, environmental hazards, and best-of-3 rounds where strategy, engineering, and a little chaos collide.
 
@@ -226,6 +226,7 @@ npm run start
 ```
 fortress-ai/
 ├── src/                            # Frontend (React + Vite)
+│   ├── main.tsx                    # React entry point
 │   ├── App.tsx                     # Root layout, routing, prompt input
 │   ├── types.ts                    # Shared types and game constants
 │   ├── index.css                   # Global styles and responsive rules
@@ -260,6 +261,7 @@ fortress-ai/
 │       ├── schema.ts               # Zod schema for AI response validation
 │       └── overlap.ts              # Spatial collision avoidance for spawns
 │
+├── Fortress-AI.md                  # Full game design & technical specification
 ├── CLAUDE.md                       # Development guide for AI assistants
 ├── package.json                    # Frontend dependencies and scripts
 └── vite.config.ts                  # Vite configuration

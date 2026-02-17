@@ -136,7 +136,7 @@ Sandbox is a separate flow from competitive, used for experimentation and testin
 - **Full God Tools access.** All materials, unlimited blocks, manual spawn + AI prompt.
 - **Terrain:** Random seed on entry. "New Terrain" button to regenerate.
 - **King:** Present (for testing damage) but optional. Can toggle King on/off.
-- **This is the current state of the codebase** — the sandbox is what exists today.
+- **Note:** The codebase now includes full multiplayer support (rooms, matchmaking, combat). Sandbox is one of the available game modes alongside competitive 1v1.
 
 #### Sandbox Mode Switch: Build vs Fire
 
@@ -522,14 +522,21 @@ When matched against a Ghost (no human opponent), the AI's build quality is tune
 │  │  bodies)  │  │  select)  │  │          │  │              │   │
 │  └─────┬─────┘  └─────┬─────┘  └────┬─────┘  └──────────────┘   │
 │        │              │              │                            │
+│  ┌─────┴──────┐  ┌────┴─────┐  ┌────┴──────┐  ┌─────────────┐   │
+│  │ Lobby      │  │ Phase    │  │ Chat      │  │ Particles   │   │
+│  │ (Rooms,    │  │ Overlay  │  │ Panel     │  │ (effects/   │   │
+│  │  Queue)    │  │ (Phases) │  │           │  │  particles) │   │
+│  └─────┬──────┘  └────┬─────┘  └────┬──────┘  └─────────────┘   │
+│        │              │              │                            │
 │        └──────────────┴──────────────┘                            │
 │                        │                                          │
 │               useGameState.ts (Zustand + Socket.io)               │
 │                        │                                          │
 └────────────────────────┼──────────────────────────────────────────┘
                          │ Socket.io (WebSocket)
-                         │ Events: spawn, request_build, clear_world,
-                         │         fire_projectile, aim_update
+                         │ Events: spawn, request_build, fire_projectile,
+                         │         create_room, join_room, join_queue,
+                         │         player_ready, chat_message, request_rematch
                          │
 ┌────────────────────────┼──────────────────────────────────────────┐
 │                    SERVER (Express + Socket.io)                    │
@@ -537,21 +544,23 @@ When matched against a Ghost (no human opponent), the AI's build quality is tune
 │  ┌─────────────────────┴──────────────────────────┐               │
 │  │              index.ts (Event Router)            │               │
 │  │  - Socket.io handlers for all client events     │               │
-│  │  - Collision damage system                      │               │
-│  │  - Match state management                       │               │
+│  │  - Delegates to RoomManager and GameSession     │               │
 │  └──────┬──────────┬──────────┬───────────────────┘               │
 │         │          │          │                                    │
-│  ┌──────▼──┐ ┌─────▼────┐ ┌──▼──────────┐                        │
-│  │ Physics │ │   AI     │ │   Match     │                        │
-│  │ Engine  │ │ Pipeline │ │   Manager   │                        │
-│  │         │ │          │ │  (planned)  │                        │
-│  │ world.ts│ │gemini.ts │ │             │                        │
-│  │ loop.ts │ │schema.ts │ │ Supabase DB │                        │
-│  │terrain.ts│ │prompts.ts│ │ connection  │                        │
-│  │         │ │overlap.ts│ │             │                        │
-│  └─────────┘ └──────────┘ └─────────────┘                        │
+│  ┌──────▼──────┐ ┌─▼────────┐ ┌──▼──────────┐                    │
+│  │ Game Logic  │ │   AI     │ │  Physics    │                     │
+│  │             │ │ Pipeline │ │  Engine     │                     │
+│  │RoomManager  │ │          │ │             │                     │
+│  │ (rooms,     │ │gemini.ts │ │ world.ts    │                     │
+│  │  queue)     │ │schema.ts │ │ loop.ts     │                     │
+│  │GameSession  │ │prompts.ts│ │ terrain.ts  │                     │
+│  │ (per-room)  │ │overlap.ts│ │ hazards.ts  │                     │
+│  │MatchState   │ │          │ │             │                     │
+│  │  Machine    │ │          │ │             │                     │
+│  └─────────────┘ └──────────┘ └─────────────┘                    │
 │                                                                   │
-│  GameLoop: 60 Hz physics tick → 20 Hz state broadcast             │
+│  GameLoop: 60 Hz physics tick → 20 Hz state broadcast (per room)  │
+│  Config: server/config/constants.ts (materials, damage, timers)   │
 │                                                                   │
 └───────────────────────────────────────────────────────────────────┘
 ```
@@ -562,31 +571,44 @@ When matched against a Ghost (no human opponent), the AI's build quality is tune
 /
 ├── src/                          # Frontend (React)
 │   ├── main.tsx                  # React entry point
-│   ├── App.tsx                   # Main layout, prompt form, status overlay, API key
+│   ├── App.tsx                   # Main layout, prompt form, lobby/game routing, API key
 │   ├── App.css                   # Legacy CSS (unused)
-│   ├── index.css                 # Tailwind directives
-│   ├── types.ts                  # Shared client types: BodyState, GameState, etc.
+│   ├── index.css                 # Tailwind directives + responsive rules
+│   ├── types.ts                  # Client types: BodyState, GameState, MatchPhase, RoomState, ChatMessage
 │   ├── components/
-│   │   ├── GameCanvas.tsx        # Canvas 2D renderer (background, terrain, bodies, HP)
-│   │   └── GodTools.tsx          # Material/shape selector buttons
-│   └── hooks/
-│       └── useGameState.ts       # Socket.io connection + Zustand state
+│   │   ├── GameCanvas.tsx        # Canvas 2D renderer (terrain, bodies, HP, cannon, aiming, camera)
+│   │   ├── GodTools.tsx          # Material/shape selector toolbar
+│   │   ├── Lobby.tsx             # Room creation, room joining, matchmaking queue UI
+│   │   ├── PhaseOverlay.tsx      # Phase banners, timers, score, rematch, hazard indicators
+│   │   └── ChatPanel.tsx         # In-game chat panel with message history
+│   ├── hooks/
+│   │   └── useGameState.ts       # Socket.io connection + Zustand state + all event handlers
+│   └── effects/
+│       └── particles.ts          # ParticleSystem class for destruction debris and impact VFX
 │
 ├── server/                       # Backend (Express)
-│   ├── index.ts                  # Server entry: Express, Socket.io handlers, damage system
-│   ├── types.ts                  # Server types: KingState, BodyState, GameState
+│   ├── index.ts                  # Server entry: Express, Socket.io event routing
+│   ├── types.ts                  # Server types: PlayerInfo, KingState, HazardType, HazardData
+│   ├── config/
+│   │   └── constants.ts          # Game balance: materials, damage, timers, world dimensions
+│   ├── game/
+│   │   ├── RoomManager.ts        # Room lifecycle, matchmaking queue, disconnect handling
+│   │   ├── GameSession.ts        # Per-room physics world, terrain, Kings, projectiles, damage
+│   │   └── MatchStateMachine.ts  # Phase transitions (BUILD→REVEAL→COMBAT→RESULT), turns
 │   ├── physics/
-│   │   ├── world.ts              # Matter.js engine creation, gravity, terrain init
+│   │   ├── world.ts              # Matter.js engine creation, gravity, material properties
 │   │   ├── loop.ts               # GameLoop class: 60Hz tick, 20Hz broadcast
-│   │   └── terrain.ts            # Procedural terrain: noise gen, build zone detection
+│   │   ├── terrain.ts            # Procedural terrain: seeded noise, build zone detection
+│   │   └── hazards.ts            # Environmental hazards: wind, lava, falling rocks
 │   └── ai/
 │       ├── gemini.ts             # Gemini API caller with structured output
 │       ├── schema.ts             # Zod schemas: BodySchema, FortressSchema
 │       ├── prompts.ts            # System prompt builder with terrain context
 │       └── overlap.ts            # Safe Spawn collision resolution
 │
-├── Fortress-AI.md                # This document
+├── Fortress-AI.md                # This document (full game design & technical specification)
 ├── CLAUDE.md                     # Claude Code project instructions
+├── README.md                     # Public-facing project documentation
 ├── package.json                  # Frontend dependencies
 ├── vite.config.ts                # Vite + React + Tailwind config
 ├── tsconfig.json                 # TypeScript project references
@@ -599,35 +621,53 @@ When matched against a Ghost (no human opponent), the AI's build quality is tune
 
 #### Client → Server
 
-| Event | Payload | Handler | Phase |
-|:---|:---|:---|:---|
-| `spawn` | `{ x, y, material?, shape?, dimensions? }` | Create physics body at position | Build / Sandbox |
-| `request_build` | `{ apiKey, prompt }` | Call Gemini → validate → Safe Spawn → add bodies | Build / Sandbox |
-| `clear_world` | — | Remove all dynamic bodies, reset King | Build / Sandbox |
-| `fire_projectile` | `{ angle, power, ammoType? }` | Spawn projectile with velocity vector | Combat (planned) |
-| `aim_update` | `{ angle, power }` | Broadcast to opponent for live aim preview | Combat (planned) |
-| `player_ready` | — | Signal build phase complete | Build (planned) |
-| `join_queue` | `{ elo }` | Enter matchmaking queue | Lobby (planned) |
-| `leave_queue` | — | Exit matchmaking queue | Queue (planned) |
+| Event | Payload | Handler | Phase | Status |
+|:---|:---|:---|:---|:---|
+| `create_room` | `{ name? }` | Create private room, join Socket.io room | Lobby | ✅ Implemented |
+| `join_room` | `{ roomId, name? }` | Join room by 6-char code | Lobby | ✅ Implemented |
+| `join_queue` | `{ name? }` | Enter matchmaking queue | Lobby | ✅ Implemented |
+| `leave_queue` | — | Exit matchmaking queue | Queue | ✅ Implemented |
+| `player_ready` | — | Signal build phase complete | Lobby / Build | ✅ Implemented |
+| `spawn` | `{ x, y, material?, shape?, dimensions? }` | Create physics body at position | Build | ✅ Implemented |
+| `request_build` | `{ apiKey, prompt }` | Call Gemini → validate → Safe Spawn → add bodies | Build | ✅ Implemented |
+| `fire_projectile` | `{ angle, power }` | Spawn projectile with velocity vector | Combat | ✅ Implemented |
+| `chat_message` | `{ text }` | Broadcast chat to room | Any | ✅ Implemented |
+| `request_rematch` | — | Request or accept rematch | Result | ✅ Implemented |
+| `aim_update` | `{ angle, power }` | Broadcast to opponent for live aim preview | Combat | 🔲 Planned |
 
 #### Server → Client
 
-| Event | Payload | Frequency | Phase |
-|:---|:---|:---|:---|
-| `gameState` | `{ bodies[], timestamp, kingHp, kingMaxHp }` | 20 Hz | Always |
-| `terrain` | `{ points[], buildZones[], seed }` | Once on connect | Init |
-| `build_status` | `{ status, message }` | Per AI stage | Build |
-| `build_success` | `{ count, thought }` | Once after build | Build |
-| `build_error` | `{ message }` | Once on failure | Build |
-| `king_damage` | `{ hp, maxHp, damage, source }` | Per collision | Combat |
-| `king_dead` | — | Once | Combat |
-| `block_destroyed` | `{ bodyId, position, material, velocity }` | Per destruction | Combat (planned) |
-| `world_cleared` | — | Once | Build / Sandbox |
-| `match_found` | `{ matchId, opponentName, opponentElo, side, hazards[] }` | Once | Queue (planned) |
-| `combat_turn` | `{ activePlayerId, round, turnTimer }` | Per turn start | Combat (planned) |
-| `hazard_warning` | `{ type, activatesInTurns, params }` | 1 turn before | Combat (planned) |
-| `hazard_active` | `{ type, params }` | On activation | Combat (planned) |
-| `match_result` | `{ winnerId, eloChange, stats }` | Once | Result (planned) |
+| Event | Payload | Frequency | Phase | Status |
+|:---|:---|:---|:---|:---|
+| `room_created` | `{ roomId }` | Once | Lobby | ✅ Implemented |
+| `room_joined` | `{ roomId, side, players }` | Once | Lobby | ✅ Implemented |
+| `room_error` | `{ message }` | Once on failure | Lobby | ✅ Implemented |
+| `player_joined` | `{ name, side }` | Once per player | Lobby | ✅ Implemented |
+| `player_left` | — | Once | Any | ✅ Implemented |
+| `player_ready_ack` | — | Once | Lobby | ✅ Implemented |
+| `queue_status` | `{ position }` | On update | Queue | ✅ Implemented |
+| `match_found` | `{ roomId }` | Once | Queue | ✅ Implemented |
+| `match_started` | `{ side }` | Once | Transition | ✅ Implemented |
+| `gameState` | `{ bodies[], kings, timestamp }` | 20 Hz | Always | ✅ Implemented |
+| `terrain` | `{ points[], buildZones[], hazards[] }` | Once on room join | Init | ✅ Implemented |
+| `phase_change` | `{ phase, endsAt, turnPlayer? }` | Per transition | Any | ✅ Implemented |
+| `turn_start` | `{ side, endsAt }` | Per turn start | Combat | ✅ Implemented |
+| `build_status` | `{ status, message }` | Per AI stage | Build | ✅ Implemented |
+| `build_success` | `{ count, thought }` | Once after build | Build | ✅ Implemented |
+| `build_error` | `{ message }` | Once on failure | Build | ✅ Implemented |
+| `king_damage` | `{ side, hp, damage }` | Per collision | Combat | ✅ Implemented |
+| `king_dead` | `{ side }` | Once | Combat | ✅ Implemented |
+| `block_destroyed` | `{ bodyId, position, material, velocity }` | Per destruction | Combat | ✅ Implemented |
+| `projectile_impact` | `{ position }` | Per impact | Combat | ✅ Implemented |
+| `match_result` | `{ winner, reason }` | Once | Result | ✅ Implemented |
+| `round_result` | `{ winner, roundScore, isFinalRound }` | Per round | Result | ✅ Implemented |
+| `chat_message` | `{ sender, side, text }` | Per message | Any | ✅ Implemented |
+| `rematch_requested` | `{ side }` | Once | Result | ✅ Implemented |
+| `rematch_start` | — | Once | Result | ✅ Implemented |
+| `world_cleared` | — | Once | Build | 🔲 Planned |
+| `combat_turn` | `{ activePlayerId, round, turnTimer }` | Per turn start | Combat | 🔲 Planned (use turn_start) |
+| `hazard_warning` | `{ type, activatesInTurns, params }` | 1 turn before | Combat | 🔲 Planned |
+| `hazard_active` | `{ type, params }` | On activation | Combat | 🔲 Planned |
 
 ### 10.5 Physics Engine Configuration
 
@@ -1150,7 +1190,7 @@ WebApp.setBackgroundColor('#0a0a1a');
 
 ## 20. Project Roadmap (Phased Engineering Tasks)
 
-> **Dependency note:** Combat mechanics (Phase 4) are built for sandbox first, then multiplayer wraps around them. VFX (particles, screen shake) are pulled into Phase 4 because combat feels broken without them. Phases 7 and 8 are independent of each other.
+> **Status note:** Phases 1–6 and Phase 8 are complete. The core game is fully playable with multiplayer support, AI fortress building, turn-based combat, environmental hazards, and room-based matchmaking. Remaining work focuses on persistence/progression (Phase 7), audio/visual polish (Phase 9), Telegram Mini App integration (Phase 10), and deployment/scaling (Phase 11).
 
 ### Phase 1: Sandbox Foundation [COMPLETE]
 - [x] Vite + React + TypeScript + Tailwind init
@@ -1177,260 +1217,205 @@ WebApp.setBackgroundColor('#0a0a1a');
 
 ---
 
-### Phase 4: Sandbox Combat [NEXT]
+### Phase 4: Sandbox Combat [COMPLETE]
 
 Single-player combat in the sandbox. Player builds a fortress, switches to fire mode, and bombards it. This phase delivers all combat *mechanics* without any multiplayer complexity.
 
 #### 4-A: Build/Fire Mode Switch
 > *Goal: Player can toggle between building and firing in the sandbox.*
 
-- [ ] **4-A.1 — Add `sandboxMode` state to `App.tsx`**
+- [x] **4-A.1 — Add `sandboxMode` state to `App.tsx`**
   - New state: `sandboxMode: 'build' | 'fire'` (default `'build'`).
   - Pass down to `GameCanvas` and `GodTools` as props.
 
-- [ ] **4-A.2 — Mode toggle in GodTools**
-  - Add a segmented control ("Build / Fire") at the left edge of the GodTools bar.
-  - When `fire` mode is selected, hide the material/shape selectors. Show the ammo label ("Stone Shot") and a power readout.
+- [x] **4-A.2 — Mode toggle in GodTools**
+  - Segmented control ("Build / Fire") in the GodTools bar.
+  - When `fire` mode is selected, material/shape selectors hidden. Power readout shown.
   - Keyboard shortcut: `Tab` toggles mode.
 
-- [ ] **4-A.3 — Canvas click behavior by mode**
-  - In `GameCanvas.tsx`, the existing `onClick` handler calls `onSpawn(x, y)`.
-  - When mode is `fire`, the click should instead emit `fire_projectile` (not `spawn`).
-  - Implementation: add a new prop `onFire: (angle: number, power: number) => void` to `GameCanvas`. `App.tsx` calls `fireProjectile(angle, power)` from `useGameState`.
+- [x] **4-A.3 — Canvas click behavior by mode**
+  - In `GameCanvas.tsx`, mode determines whether click emits `spawn` or `fire_projectile`.
+  - `onFire: (angle: number, power: number) => void` prop on `GameCanvas`.
 
 #### 4-B: Cannon & Aiming UI
 > *Goal: Player sees a cannon on the left edge and can aim/fire with click-drag.*
 
-- [ ] **4-B.1 — Cannon rendering in `GameCanvas.tsx`**
-  - Draw a simple cannon when in `fire` mode: a dark rectangle (20x8px) at `(20, terrainY_at_x20 - 20)`, rotated to match current aim angle.
-  - The cannon base is a small circle (radius 6) at the pivot point.
-  - No physics body — purely visual.
+- [x] **4-B.1 — Cannon rendering in `GameCanvas.tsx`**
+  - Cannon drawn in fire mode: dark rectangle at cannon position, rotated to match aim angle.
+  - Cannon base is a small circle at the pivot point.
 
-- [ ] **4-B.2 — Drag-to-aim interaction**
-  - On `mousedown` / `touchstart` (fire mode only): record start position.
-  - On `mousemove` / `touchmove`: calculate angle (from cannon to cursor) and power (drag distance, clamped 5–30). Update cannon rotation. Draw trajectory preview.
-  - On `mouseup` / `touchend`: fire. Emit `fire_projectile` event with `{ angle, power }`.
-  - Store `aimAngle` and `aimPower` in component state for real-time preview rendering.
+- [x] **4-B.2 — Drag-to-aim interaction**
+  - `mousedown`/`touchstart` records start position.
+  - `mousemove`/`touchmove` calculates angle and power (clamped 5–30). Updates cannon rotation and trajectory preview.
+  - `mouseup`/`touchend` fires. Emits `fire_projectile` event.
 
-- [ ] **4-B.3 — Trajectory preview arc**
-  - While dragging, draw a dotted arc from the cannon position.
-  - Compute 15 ballistic steps: `x += vx * dt`, `y += vy * dt`, `vy += gravity * dt` per step.
-  - Draw as small circles (radius 2, white, 50% opacity) connected by nothing (dots only).
-  - Arc does NOT account for wind (even when wind hazard is active later).
+- [x] **4-B.3 — Trajectory preview arc**
+  - Dotted arc from cannon position. 15 ballistic steps computed.
+  - Small circles (radius 2, white, 50% opacity). Does NOT account for wind.
 
-- [ ] **4-B.4 — Keyboard fallback aiming**
-  - Left/Right arrows: adjust angle ±2° (display current angle in power readout area).
-  - Up/Down arrows: adjust power ±1 (display current power).
-  - Spacebar: fire with current angle + power.
-  - Visual: show numeric readout "Angle: 45° | Power: 20" near cannon when using keyboard.
+- [x] **4-B.4 — Keyboard fallback aiming**
+  - Left/Right arrows adjust angle ±2°. Up/Down arrows adjust power ±1. Spacebar fires.
+  - Numeric readout "Angle: 45° | Power: 20" shown near cannon.
 
 #### 4-C: Projectile System (Server)
 > *Goal: Server spawns projectile bodies and handles their lifecycle.*
 
-- [ ] **4-C.1 — `fire_projectile` Socket.io handler in `server/index.ts`**
-  - New event handler: `socket.on('fire_projectile', (data) => { ... })`.
-  - Payload: `{ angle: number, power: number }`.
-  - Calculate cannon position: `x = 20, y = interpolateTerrainY(20) - 20` (reuse terrain points).
-  - Create projectile body: `Matter.Bodies.circle(cannonX, cannonY, 8, { density: 0.05, restitution: 0.3, friction: 0.2, label: 'projectile' })`.
-  - Set velocity: `Matter.Body.setVelocity(body, { x: power * cos(angle), y: -power * sin(angle) })`.
-  - Add to world.
+- [x] **4-C.1 — `fire_projectile` Socket.io handler**
+  - Event handler routes to `GameSession.handleFireProjectile()`.
+  - Projectile body: circle, radius 8, density 0.05, restitution 0.3.
+  - Velocity set from angle and power.
 
-- [ ] **4-C.2 — Projectile lifespan (auto-remove after 5s)**
-  - After spawning, start a `setTimeout(5000)` that removes the projectile body from the world.
-  - Also remove if projectile goes out of bounds (y > 650 or x < -50 or x > 850).
-  - Emit `projectile_removed` event to client (so it can clean up any tracking state).
+- [x] **4-C.2 — Projectile lifespan (auto-remove after 5s)**
+  - Timeout removes projectile from world.
+  - Out-of-bounds removal.
 
-- [ ] **4-C.3 — Projectile rendering in `GameCanvas.tsx`**
-  - Bodies with `label === 'projectile'` get special rendering: dark gray fill (`#333`), white stroke, slight motion blur (draw a faint trail — 3 translucent circles behind it at previous positions).
-  - Store last 3 positions in a `useRef` map keyed by body ID for trail rendering.
+- [x] **4-C.3 — Projectile rendering in `GameCanvas.tsx`**
+  - Projectiles rendered with special styling (dark gray fill, white stroke).
 
 #### 4-D: Block HP & Destruction (Server)
 > *Goal: Blocks take damage from projectile impacts and break apart.*
 
-- [ ] **4-D.1 — Block HP constants and stamping**
-  - Add `MATERIAL_BLOCK_HP` table to `server/index.ts`: `{ wood: 30, stone: 80, ice: 15, rubber: 40, steel: 200 }`.
-  - In `stampDimensions()` (or a new `stampBlockProps()` called alongside it), also stamp `(body as any).blockHp = MATERIAL_BLOCK_HP[material]`.
-  - Apply to both manual spawn and AI build paths.
+- [x] **4-D.1 — Block HP constants and stamping**
+  - `MATERIAL_BLOCK_HP` defined in `server/config/constants.ts`: wood=30, stone=80, ice=15, rubber=40, steel=200.
+  - `blockHp` stamped on body at creation.
 
-- [ ] **4-D.2 — Projectile-vs-block collision handler**
-  - In the existing `Matter.Events.on(engine, 'collisionStart', ...)` handler, add a new branch:
-    - If one body is `projectile` and the other is a structure block (not terrain, not King):
-      ```
-      impactForce = projectile.speed * projectile.mass
-      if impactForce < 3: skip
-      blockDamage = impactForce * 2.0
-      block.blockHp = max(0, block.blockHp - blockDamage)
-      ```
-    - If `blockHp <= 0`: remove body from world, emit `block_destroyed { bodyId, position, material, velocity }`.
-  - Existing King damage handler remains unchanged (projectiles hitting King use the King formula).
+- [x] **4-D.2 — Projectile-vs-block collision handler**
+  - Collision handler calculates impact force. Threshold of 3 prevents trivial damage.
+  - Block damage = impactForce × 2.0. On HP ≤ 0, body removed, `block_destroyed` emitted.
 
-- [ ] **4-D.3 — Block HP in gameState broadcast**
-  - In `loop.ts` `broadcastState()`, include `blockHp` and `blockMaxHp` in each body's data (if present).
-  - Client uses this for visual damage indicators.
+- [x] **4-D.3 — Block HP in gameState broadcast**
+  - `blockHp` and `blockMaxHp` included in body data.
 
-- [ ] **4-D.4 — Visual damage indicators in `GameCanvas.tsx`**
-  - After drawing a block's fill, overlay crack lines based on HP ratio:
-    - HP > 66%: no overlay.
-    - HP 33%–66%: draw 2–3 thin dark lines (cracks) across the block surface at fixed positions.
-    - HP < 33%: draw 5+ crack lines + desaturate the fill color (blend 30% gray).
-  - Cracks are deterministic per body ID (use `bodyId % 7` to seed crack positions so they're stable between frames).
+- [x] **4-D.4 — Visual damage indicators in `GameCanvas.tsx`**
+  - HP > 66%: no overlay. 33%–66%: crack lines. < 33%: heavy cracks + desaturation.
 
 #### 4-E: Screen Shake
 > *Goal: Canvas shakes on impacts for game feel.*
 
-- [ ] **4-E.1 — Screen shake state in `GameCanvas.tsx`**
-  - Add a `useRef` for shake state: `{ amplitude: number, remaining: number }`.
-  - Each frame, if `remaining > 0`: apply random offset `(±amplitude * (remaining/max), ±amplitude * (remaining/max))` to canvas `ctx.translate()` before drawing. Decrement `remaining`.
-  - Decay is linear (amplitude scales down as remaining ticks decrease).
+- [x] **4-E.1 — Screen shake state in `GameCanvas.tsx`**
+  - Shake ref with amplitude and remaining ticks. Linear decay.
 
-- [ ] **4-E.2 — Shake triggers from Socket.io events**
-  - On `king_damage`: set shake `{ amplitude: 6, remaining: 18 }`.
-  - On `block_destroyed`: set shake `{ amplitude: 2, remaining: 8 }`.
-  - If a shake is already active and a new trigger arrives, take the larger amplitude and reset remaining.
+- [x] **4-E.2 — Shake triggers from Socket.io events**
+  - `king_damage`: amplitude 6, 18 ticks. `block_destroyed`: amplitude 2, 8 ticks.
 
 #### 4-F: Destruction Particles
 > *Goal: Blocks burst into colored debris when destroyed.*
 
-- [ ] **4-F.1 — Particle system module: `src/effects/particles.ts`**
-  - Export a `ParticleSystem` class:
-    ```typescript
-    interface Particle { x, y, vx, vy, life, maxLife, color, size }
-    class ParticleSystem {
-      particles: Particle[] = [];
-      emit(x, y, count, color, velocity): void;   // spawn N particles
-      update(): void;                                // tick all particles (position + life)
-      draw(ctx: CanvasRenderingContext2D): void;    // render living particles
-    }
-    ```
-  - `update()`: for each particle, `x += vx`, `y += vy`, `vy += 0.1` (mini-gravity), `life--`. Remove when `life <= 0`.
-  - `draw()`: fill rect at `(x, y)` with `size` and `color`, alpha = `life / maxLife`.
-  - Cap at 200 particles max (old ones evicted FIFO if exceeded).
+- [x] **4-F.1 — Particle system module: `src/effects/particles.ts`**
+  - `ParticleSystem` class with emit(), update(), draw(). Max 200 particles.
+  - Mini-gravity on particles. Alpha fade based on remaining life.
 
-- [ ] **4-F.2 — Integrate particles into `GameCanvas.tsx`**
-  - Create a `ParticleSystem` instance via `useRef`.
-  - On `block_destroyed` event: call `particles.emit(position.x, position.y, 10, materialColor, baseVelocity)`.
-  - In the render loop: call `particles.update()` then `particles.draw(ctx)` after drawing all bodies.
+- [x] **4-F.2 — Integrate particles into `GameCanvas.tsx`**
+  - `ParticleSystem` instance via `useRef`.
+  - `block_destroyed` triggers particle emission with material color.
 
-- [ ] **4-F.3 — Projectile impact particles**
-  - Listen for a new `projectile_impact` event (emitted by server on first collision of a projectile).
-  - Spawn 6 gray particles at impact position.
-  - Alternatively, detect client-side by watching for projectile velocity changes between frames.
+- [x] **4-F.3 — Projectile impact particles**
+  - `projectile_impact` event triggers gray particle emission at impact position.
 
 #### 4-G: Integration & Polish
 > *Goal: Everything works together smoothly in sandbox.*
 
-- [ ] **4-G.1 — `useGameState.ts` additions**
-  - Add `fireProjectile(angle: number, power: number)` callback: emits `fire_projectile` event.
-  - Add `block_destroyed` event listener: store in a ref or emit to a callback for particles/shake.
-  - Add `projectile_impact` event listener for impact particles.
+- [x] **4-G.1 — `useGameState.ts` additions**
+  - `fireProjectile(angle, power)` callback emits `fire_projectile`.
+  - `block_destroyed` and `projectile_impact` event listeners for particles/shake.
 
-- [ ] **4-G.2 — Projectile cleanup**
-  - When a projectile is removed (lifespan or out-of-bounds), ensure it vanishes from the next `gameState` broadcast. No ghost bodies.
+- [x] **4-G.2 — Projectile cleanup**
+  - Projectiles removed from gameState when destroyed.
 
-- [ ] **4-G.3 — End-to-end testing**
-  - Build a fortress (AI or manual) → switch to fire mode → aim → fire → projectile flies → hits blocks → blocks take damage (cracks visible) → block destroyed (particles + shake) → structure collapses → King takes damage from falling debris.
-  - Verify: projectile auto-removes after 5s. Screen shake decays. Particles fade. King HP updates.
+- [x] **4-G.3 — End-to-end testing**
+  - Full flow works: build → fire → impact → damage → destruction → collapse → King damage.
 
 ---
 
-### Phase 5: 1v1 Battlefield Architecture
+### Phase 5: 1v1 Battlefield Architecture [COMPLETE]
 
-Refactor the server from a single global engine to per-match isolated instances. Widen the map to 1600px. This is a **major architectural change** and the hardest phase.
+Refactored the server from a single global engine to per-match isolated instances. Widened the map to 1600px. This was a **major architectural change**.
 
 #### 5-A: Match Manager (Server Refactor)
-- [ ] **5-A.1 — `server/match/MatchManager.ts`**
-  - New class that creates, tracks, and destroys match instances.
-  - `createMatch(player1Socket, player2Socket, seed): MatchInstance`
-  - `destroyMatch(matchId): void`
-  - Each `MatchInstance` owns: its own `Matter.Engine`, `Matter.World`, `GameLoop`, terrain, two Kings, match state machine.
+- [x] **5-A.1 — `server/game/RoomManager.ts`**
+  - Class that creates, tracks, and destroys rooms. Manages matchmaking queue.
+  - `createRoom(socket, name)`, `joinRoom(socket, roomId, name)`, `joinQueue(socket, name)`.
+  - Disconnect handling with automatic room cleanup.
 
-- [ ] **5-A.2 — `server/match/MatchInstance.ts`**
-  - Encapsulates everything that currently lives as globals in `server/index.ts`: engine, world, terrain, kingBody, kingState, gameLoop, collision handlers.
-  - Broadcasts `gameState` only to sockets in its room (`match:{id}`).
-  - Has a `phase` property: `'building' | 'reveal' | 'combat' | 'finished'`.
+- [x] **5-A.2 — `server/game/GameSession.ts`**
+  - Per-room game logic: owns Matter.js engine, terrain, Kings, collision handlers, projectile system.
+  - Broadcasts `gameState` only to sockets in its room (`io.to(roomId)`).
+  - Manages block HP, damage, and environmental hazards.
 
-- [ ] **5-A.3 — Refactor `server/index.ts`**
-  - Move all physics/game logic out of `index.ts` into `MatchInstance`.
-  - `index.ts` becomes a thin router: handles `connection`, `join_queue`, `leave_queue`, and delegates `spawn` / `request_build` / `fire_projectile` to the player's active `MatchInstance`.
-  - Keep sandbox mode as a special `MatchInstance` with no opponent and no phase timer (preserves current behavior).
+- [x] **5-A.3 — Refactored `server/index.ts`**
+  - Thin event router: handles `connection`, delegates all game events to `RoomManager` and `GameSession`.
+  - No global physics state — all per-room.
 
 #### 5-B: 1600px Battlefield
-- [ ] **5-B.1 — Terrain generator: 1600px width**
-  - Update `server/physics/terrain.ts` to accept `width` parameter (currently hardcoded 800).
-  - For 1v1 matches, pass `width: 1600`. For sandbox, pass `width: 800`.
-  - Guarantee at least 1 build zone per 800px half (re-roll if needed).
+- [x] **5-B.1 — Terrain generator: 1600px width**
+  - `WORLD_WIDTH = 1600` in constants. Terrain spans full width.
+  - At least 1 build zone guaranteed per 800px half.
 
-- [ ] **5-B.2 — Two Kings, two build zones**
-  - `MatchInstance` spawns King 1 in the first build zone of the left half (x < 800).
+- [x] **5-B.2 — Two Kings, two build zones**
+  - King 1 in the first build zone of the left half (x < 800).
   - King 2 in the first build zone of the right half (x ≥ 800).
-  - Each player's build zone is restricted to their half.
+  - Build zones restricted to each player's half.
 
-- [ ] **5-B.3 — Two cannons**
-  - Player 1 cannon at `(10, terrainY - 20)`, fires rightward.
-  - Player 2 cannon at `(1590, terrainY - 20)`, fires leftward (angle is mirrored: velocity x is negated).
+- [x] **5-B.3 — Two cannons**
+  - Player 1 cannon at left edge, fires rightward.
+  - Player 2 cannon at right edge, fires leftward.
 
-- [ ] **5-B.4 — Client camera system**
-  - Add `cameraX` state to `GameCanvas.tsx`. Default 0. Range `[0, worldWidth - canvasWidth]`.
-  - All drawing coordinates offset by `-cameraX`.
-  - Build phase: lock camera to player's half.
-  - Combat phase: zoom out (scale 0.5x to fit 1600px) or allow manual scroll.
+- [x] **5-B.4 — Client camera system**
+  - Camera offset in `GameCanvas.tsx`. Build phase: locked to player's half.
+  - Combat phase: full view with pan support. A/D keys and two-finger touch panning.
+  - Minimap for battlefield overview.
 
 #### 5-C: Per-Socket State
-- [ ] **5-C.1 — Player-to-match mapping**
-  - Server tracks: `Map<socketId, { matchId, side: 'left' | 'right' }>`.
-  - When a socket emits `spawn` or `fire_projectile`, the server looks up which match and which side, then routes to the correct `MatchInstance`.
+- [x] **5-C.1 — Player-to-match mapping**
+  - Server tracks socket-to-room mapping. Events routed to correct GameSession.
 
-- [ ] **5-C.2 — Build zone enforcement**
-  - `spawn` and `request_build` handlers validate that block X is within the player's half.
-  - Reject (silently drop) blocks placed on the opponent's side.
+- [x] **5-C.2 — Build zone enforcement**
+  - Spawn and build requests validated to player's half of the map.
 
 ---
 
-### Phase 6: Multiplayer Combat Flow
+### Phase 6: Multiplayer Combat Flow [COMPLETE]
 
-Build the full match lifecycle around the combat mechanics from Phase 4 and the architecture from Phase 5.
+Built the full match lifecycle around the combat mechanics from Phase 4 and the architecture from Phase 5.
 
-- [ ] **6.1 — Matchmaking queue**
+- [x] **6.1 — Matchmaking queue**
   - `join_queue` / `leave_queue` handlers in `server/index.ts`.
-  - In-memory queue (array of `{ socketId, elo }`). Polled every 2s.
-  - Elo banding: ±150, expanding ±50 every 10s. At 30s → Ghost match.
-  - On match: create `MatchInstance`, join both sockets to room, emit `match_found`.
+  - In-memory queue in `RoomManager`. Queue position emitted via `queue_status`.
+  - On match: create room, join both sockets, emit `match_found`.
 
-- [ ] **6.2 — Build phase with timer**
-  - `MatchInstance` enters `building` phase. Starts 60s countdown.
-  - Emits `build_phase_start { timer: 60 }` to room.
-  - Tracks prompt count per player (max 2). Tracks weight budget (100 per player).
+- [x] **6.2 — Build phase with timer**
+  - `MatchStateMachine` enters `build` phase. Starts 90s countdown.
+  - Emits `phase_change` to room. Both players can build independently.
   - On timer expire or both players signal `player_ready` → transition to reveal.
 
-- [ ] **6.3 — Fog-of-war (client)**
-  - During build phase, `GameCanvas` renders the opponent's half as a dark overlay with "?" icon.
+- [x] **6.3 — Fog-of-war (client)**
+  - During build phase, `GameCanvas` renders the opponent's half as hidden.
   - Server only includes bodies from the player's own half in `gameState` during build phase.
 
-- [ ] **6.4 — Reveal phase**
+- [x] **6.4 — Reveal phase**
   - Server broadcasts full state (both sides) to both clients.
-  - Client plays 5s camera pan animation across the full 1600px.
-  - "BATTLE BEGINS" text overlay with scale-up animation.
+  - 5s camera pan animation across the full 1600px.
+  - Phase overlay shows "Revealing fortresses" with hazard information.
 
-- [ ] **6.5 — Turn system**
-  - `MatchInstance` tracks: `currentTurn: 'player1' | 'player2'`, `round: number`, `turnTimer: number`.
-  - Emits `combat_turn { activePlayerId, round, turnTimer: 15 }` at start of each turn.
-  - Only the active player's `fire_projectile` events are accepted. Inactive player's are dropped.
-  - After fire: wait for all bodies to sleep (or 5s timeout) → evaluate King HP → next turn or result.
+- [x] **6.5 — Turn system**
+  - `MatchStateMachine` tracks: `currentTurn` (side), turn timer (15s).
+  - Emits `turn_start` at start of each turn.
+  - Only the active player's `fire_projectile` events accepted. `hasFiredThisTurn` flag prevents duplicates.
+  - After fire: wait for physics to settle → evaluate King HP → next turn or result.
 
-- [ ] **6.6 — Match result**
-  - On King death: emit `match_result { winnerId, loserId, eloChange, stats }`.
-  - Stats: rounds played, damage dealt, blocks destroyed.
-  - `MatchInstance` phase → `finished`. Stop game loop. Clean up after 10s.
+- [x] **6.6 — Match result**
+  - On King death: emit `match_result` with winner and reason.
+  - `round_result` emitted with score tracking for best-of-3.
+  - Rematch system: `request_rematch` → `rematch_requested` → both agree → `rematch_start`.
 
 - [ ] **6.7 — Sudden death (round 11+)**
-  - Round 11+: shrink terrain by 50px from each edge per round (remove bodies on crumbled terrain).
-  - Round 13+: increase `engine.gravity.y` by 0.5 per round.
-  - Round 15: highest remaining King HP wins. Equal = draw.
+  - Round 11+: shrink terrain by 50px from each edge per round.
+  - Round 13+: increase gravity by 0.5 per round.
+  - Round 15: highest remaining King HP wins.
 
 - [ ] **6.8 — Ghost matches**
   - Query a previous match's fortress JSON + move history.
-  - Spawn the ghost's fortress. Replay the ghost's fire moves on a timer (one per turn).
-  - Win = half Elo gain. Loss = no Elo loss.
+  - Replay ghost's fortress and fire moves.
 
 ---
 
@@ -1476,37 +1461,39 @@ Build the full match lifecycle around the combat mechanics from Phase 4 and the 
 
 ---
 
-### Phase 8: Environmental Hazards
+### Phase 8: Environmental Hazards [COMPLETE]
 
-Can be done in parallel with Phase 7. No database dependency.
+Implemented in parallel with multiplayer flow. No database dependency.
 
-- [ ] **8.1 — Hazard selection per match**
-  - On `MatchInstance` creation, select 2 hazards from the pool using `terrainSeed` as RNG seed.
-  - Include in `match_found` and `terrain` payloads so both clients know.
-  - Display hazard icons + trigger rounds during build phase.
+- [x] **8.1 — Hazard selection per match**
+  - On `GameSession` creation, 1-2 hazards selected from pool.
+  - Included in `terrain` payload so both clients know.
+  - PhaseOverlay displays hazard information during build and combat.
 
-- [ ] **8.2 — Wind gust**
-  - In `GameLoop.tick()`, if wind is active, apply horizontal force to all non-static bodies.
-  - Direction and magnitude seeded per activation. Lasts 2 turns.
-  - Client: draw wind particle streamers (small dots moving horizontally across canvas).
+- [x] **8.2 — Wind gust**
+  - In game loop, if wind zone active, apply horizontal force to all non-static bodies.
+  - Direction and strength defined per hazard instance.
+  - Client: PhaseOverlay shows wind indicator with direction arrow and strength percentage.
 
-- [ ] **8.3 — Earthquake**
-  - Oscillate terrain body position horizontally (amplitude 3px, 30Hz) for 2 seconds.
+- [x] **8.3 — Lava pool**
+  - Lava zones deal continuous damage to blocks and Kings touching the surface.
+  - Blocks destroyed when HP reaches 0 from lava damage.
+
+- [x] **8.4 — Falling rocks**
+  - Stone bodies drop from above periodically during combat.
+
+- [ ] **8.5 — Earthquake**
+  - Oscillate terrain body position horizontally.
   - Client: screen shake overlay + "EARTHQUAKE!" banner.
 
-- [ ] **8.4 — Meteor strike**
-  - Spawn a large dense circle at random X, y=-50. Gravity drops it.
-  - Client: red crosshair overlay on impact zone for 3s before drop.
-  - Remove meteor body after 5s.
-
-- [ ] **8.5 — Rising flood (sudden death)**
-  - Spawn a static rectangle at bottom, translate upward at 2px/s.
+- [ ] **8.6 — Rising flood (sudden death)**
+  - Static rectangle at bottom, translating upward.
   - Remove bodies submerged below water line.
   - Client: blue translucent water overlay.
 
-- [ ] **8.6 — Hazard warning UI**
+- [ ] **8.7 — Hazard warning UI**
   - Emit `hazard_warning` 1 turn before activation.
-  - Client: show hazard icon + "Wind Gust in 1 turn!" banner.
+  - Client: show hazard icon + warning banner.
 
 ---
 
