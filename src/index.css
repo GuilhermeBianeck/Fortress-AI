@@ -19,11 +19,29 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100dvh;
+  /* Prevent pull-to-refresh and overscroll on mobile */
+  overscroll-behavior: none;
+}
+
+/* Safe area padding for notched devices */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* Desktop: constrain game to 4:3 aspect */
 @media (min-width: 640px) {
   .game-container {
     max-width: calc((100vh - 10rem) * 4 / 3);
+  }
+}
+
+/* Mobile: ensure canvas fills the available width without overflow */
+@media (max-width: 639px) {
+  .game-container {
+    width: 100%;
   }
 }

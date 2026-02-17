@@ -37,7 +37,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
             <div className="px-3 py-2 border-b border-white/10 text-xs text-neutral-400 font-bold flex justify-between items-center">
                 <span>CHAT</span>
                 {mobile && onClose && (
-                    <button onClick={onClose} className="text-neutral-500 hover:text-white active:text-neutral-300 text-sm transition-colors duration-150 touch-manipulation">✕</button>
+                    <button onClick={onClose} className="min-w-[36px] min-h-[36px] flex items-center justify-center text-neutral-500 hover:text-white active:text-neutral-300 text-base transition-colors duration-150 touch-manipulation">✕</button>
                 )}
             </div>
             <div
@@ -63,12 +63,12 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
                     onChange={(e) => setText(e.target.value)}
                     placeholder="Type a message..."
                     maxLength={200}
-                    className="flex-1 bg-transparent px-3 py-2 text-xs text-white placeholder:text-neutral-600 outline-none"
+                    className="flex-1 bg-transparent px-3 py-3 text-xs text-white placeholder:text-neutral-600 outline-none"
                 />
                 <button
                     type="submit"
                     disabled={!text.trim()}
-                    className="px-3 py-2 text-xs text-rose-400 font-bold hover:text-rose-300 active:text-rose-200 transition-colors duration-150 touch-manipulation disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="min-w-[44px] min-h-[44px] px-3 py-2 text-xs text-rose-400 font-bold hover:text-rose-300 active:text-rose-200 transition-colors duration-150 touch-manipulation disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                     Send
                 </button>
