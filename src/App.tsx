@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
-import { GodTools } from './components/GodTools';
+import { GodTools, MobileDoneButton } from './components/GodTools';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
@@ -173,18 +173,15 @@ function App() {
             onReady={playerReady}
           />
         ) : (
-          /* Mobile: fill the entire screen. Desktop: constrained 4:3. */
-          <div className="flex flex-col items-center flex-1 w-full relative
-                          sm:gap-3 sm:max-w-none"
-               style={{ maxWidth: 'calc((100vh - 10rem) * 4 / 3)' }}>
+          /* Desktop: constrained 4:3. Mobile: full width. */
+          <div className="flex flex-col items-center flex-1 w-full sm:gap-3 game-container">
 
-            {/* === Mobile: Canvas fills screen, overlays on top === */}
-            {/* Canvas container */}
-            <div className="flex gap-4 items-start w-full justify-center flex-1 sm:flex-initial">
-              <div className="relative group flex-1 min-w-0 sm:flex-initial sm:w-full">
+            {/* Canvas + Chat row */}
+            <div className="flex gap-4 items-start w-full justify-center">
+              <div className="relative group flex-1 min-w-0">
                 {/* Glow border — desktop only */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none hidden sm:block"></div>
-                <div className="relative h-full">
+                <div className="relative">
                   <GameCanvas
                     gameState={gameState}
                     terrain={terrain}
@@ -225,9 +222,28 @@ function App() {
                     </div>
                   )}
 
+                  {/* Mobile: Chat button top-right (clear of HP bars) */}
+                  <div className="absolute top-1 right-1 z-10 sm:hidden">
+                    <button
+                      onClick={() => setShowChat(!showChat)}
+                      className="p-1.5 bg-black/60 border border-white/10 rounded-lg touch-manipulation"
+                    >
+                      <MessageCircle size={14} className="text-white" />
+                    </button>
+                  </div>
+
+                  {/* Mobile: Done button — top-center, below phase overlay */}
+                  {phase === 'build' && (
+                    <div className="absolute top-10 inset-x-0 z-10 flex justify-center sm:hidden pointer-events-none">
+                      <div className="pointer-events-auto">
+                        <MobileDoneButton phase={phase} onReady={playerReady} />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Mobile: God Tools overlaid at bottom of canvas */}
                   {phase === 'build' && (
-                    <div className="absolute bottom-0 inset-x-0 z-10 p-1.5 sm:hidden pointer-events-auto">
+                    <div className="absolute bottom-0 inset-x-0 z-10 p-1 sm:hidden pointer-events-auto">
                       <GodTools
                         selectedMaterial={selectedMaterial}
                         selectedShape={selectedShape}
@@ -240,16 +256,6 @@ function App() {
                       />
                     </div>
                   )}
-
-                  {/* Mobile: Chat + menu buttons overlay top-right */}
-                  <div className="absolute top-1 right-1 z-10 flex gap-1 sm:hidden">
-                    <button
-                      onClick={() => setShowChat(!showChat)}
-                      className="p-1.5 bg-black/60 border border-white/10 rounded-lg touch-manipulation"
-                    >
-                      <MessageCircle size={14} className="text-white" />
-                    </button>
-                  </div>
                 </div>
               </div>
 

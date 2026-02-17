@@ -18,5 +18,12 @@
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Desktop: constrain game to 4:3 aspect */
+@media (min-width: 640px) {
+  .game-container {
+    max-width: calc((100vh - 10rem) * 4 / 3);
+  }
 }

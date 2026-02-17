@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode, MatchPhase } from '../types';
 import { MATERIAL_COLORS } from '../types';
@@ -17,8 +17,6 @@ interface GodToolsProps {
 const MATERIALS: { key: MaterialType; label: string; icon: string }[] = [
     { key: 'wood', label: 'Wood', icon: '🪵' },
     { key: 'stone', label: 'Stone', icon: '🪨' },
-    { key: 'ice', label: 'Ice', icon: '🧊' },
-    { key: 'rubber', label: 'Rubber', icon: '🎀' },
     { key: 'steel', label: 'Steel', icon: '⚙️' },
 ];
 
@@ -40,6 +38,13 @@ export const GodTools = ({
 }: GodToolsProps) => {
     const [isReady, setIsReady] = useState(false);
 
+    // Reset ready state when a new build phase starts (new match/round)
+    useEffect(() => {
+        if (phase === 'build') {
+            setIsReady(false);
+        }
+    }, [phase]);
+
     // Only show during build phase
     if (phase !== 'build') {
         return null;
@@ -52,7 +57,7 @@ export const GodTools = ({
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full">
+        <div className="flex flex-wrap items-center gap-1 sm:gap-3 w-full">
             {/* Mode Toggle */}
             <div className="flex items-center bg-black/40 border border-white/10 rounded-lg p-0.5 sm:p-1 backdrop-blur-sm">
                 <button
@@ -92,7 +97,7 @@ export const GodTools = ({
                                 key={mat.key}
                                 onClick={() => onMaterialChange(mat.key)}
                                 className={`
-                                    flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium
+                                    flex items-center gap-0.5 sm:gap-1.5 px-1 sm:px-2.5 py-0.5 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium
                                     transition-colors duration-150 touch-manipulation
                                     ${selectedMaterial === mat.key
                                         ? 'bg-white/15 text-white shadow-inner ring-1 ring-white/20'
@@ -120,7 +125,7 @@ export const GodTools = ({
                                 key={shape.key}
                                 onClick={() => onShapeChange(shape.key)}
                                 className={`
-                                    flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium
+                                    flex items-center gap-0.5 sm:gap-1.5 px-1 sm:px-2.5 py-0.5 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium
                                     transition-colors duration-150 touch-manipulation
                                     ${selectedShape === shape.key
                                         ? 'bg-white/15 text-white shadow-inner ring-1 ring-white/20'
@@ -136,16 +141,16 @@ export const GodTools = ({
                     </div>
                 </>
             ) : (
-                <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-sm">
+                <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-2 sm:px-3 py-0.5 sm:py-1.5 backdrop-blur-sm">
                     <span className="text-[10px] sm:text-xs font-medium text-neutral-400">Preview mode</span>
                 </div>
             )}
 
-            {/* Ready / Done Button */}
+            {/* Ready / Done Button — hidden on mobile (shown separately as overlay) */}
             <button
                 onClick={handleReady}
                 disabled={isReady}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-bold
+                className={`hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold
                     transition-colors duration-200 touch-manipulation ml-auto border
                     ${isReady
                         ? 'bg-emerald-600/40 text-emerald-200 border-emerald-400/50 ring-1 ring-emerald-400/30 cursor-default'
@@ -156,5 +161,40 @@ export const GodTools = ({
                 {isReady ? 'READY!' : 'DONE'}
             </button>
         </div>
+    );
+};
+
+// Separate mobile Done button component (rendered as top overlay)
+export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onReady: () => void }) => {
+    const [isReady, setIsReady] = useState(false);
+
+    useEffect(() => {
+        if (phase === 'build') {
+            setIsReady(false);
+        }
+    }, [phase]);
+
+    if (phase !== 'build') return null;
+
+    const handleReady = () => {
+        if (isReady) return;
+        setIsReady(true);
+        onReady();
+    };
+
+    return (
+        <button
+            onClick={handleReady}
+            disabled={isReady}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold
+                transition-colors duration-200 touch-manipulation border
+                ${isReady
+                    ? 'bg-emerald-600/40 text-emerald-200 border-emerald-400/50 ring-1 ring-emerald-400/30 cursor-default'
+                    : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 active:bg-emerald-500/40 cursor-pointer'
+                }`}
+        >
+            {isReady ? <Check size={10} /> : null}
+            {isReady ? 'READY!' : 'DONE'}
+        </button>
     );
 };

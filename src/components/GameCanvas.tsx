@@ -102,6 +102,8 @@ export const GameCanvas = ({
     const lastTouchRef = useRef(0);
     // Touch aiming: store initial touch screen position for drag-relative power
     const touchStartRef = useRef<{ sx: number; sy: number } | null>(null);
+    // Two-finger pan: store initial midpoint and camera position
+    const panTouchRef = useRef<{ startX: number; camStartX: number } | null>(null);
 
     // Screen shake
     const shakeRef = useRef({ amplitude: 0, remaining: 0, max: 0 });
@@ -950,8 +952,20 @@ export const GameCanvas = ({
     };
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (e.touches.length !== 1) return;
         lastTouchRef.current = Date.now();
+
+        // Two-finger: start camera pan
+        if (e.touches.length === 2) {
+            // Cancel any single-finger action in progress
+            aimRef.current.active = false;
+            touchStartRef.current = null;
+            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            panTouchRef.current = { startX: midX, camStartX: cameraRef.current.targetX };
+            e.preventDefault();
+            return;
+        }
+
+        if (e.touches.length !== 1) return;
         const touch = e.touches[0];
         const { x, y, screenX, screenY } = getTouchWorldCoords(touch);
 
@@ -993,6 +1007,22 @@ export const GameCanvas = ({
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
+        // Two-finger pan
+        if (e.touches.length === 2 && panTouchRef.current) {
+            e.preventDefault();
+            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const canvas = canvasRef.current!;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const deltaScreen = panTouchRef.current.startX - midX;
+            const deltaWorld = deltaScreen * scaleX;
+            cameraRef.current.targetX = Math.max(0, Math.min(
+                WORLD_WIDTH - CANVAS_WIDTH,
+                panTouchRef.current.camStartX + deltaWorld
+            ));
+            return;
+        }
+
         if (!aimRef.current.active || e.touches.length !== 1) return;
         e.preventDefault();
         const { x: mx, y: my } = getTouchWorldCoords(e.touches[0]);
@@ -1019,6 +1049,14 @@ export const GameCanvas = ({
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
+        // End two-finger pan when fingers are lifted
+        if (panTouchRef.current) {
+            if (e.touches.length < 2) {
+                panTouchRef.current = null;
+            }
+            return;
+        }
+
         const aim = aimRef.current;
         if (!aim.active) return;
         e.preventDefault();
@@ -1109,8 +1147,8 @@ export const GameCanvas = ({
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
             onWheel={handleWheel}
-            className={`sm:border sm:border-white/20 sm:rounded-lg sm:shadow-2xl w-full h-full sm:h-auto object-contain touch-none ${cursorClass}`}
-            style={{ imageRendering: 'auto' }}
+            className={`w-full sm:border sm:border-white/20 sm:rounded-lg sm:shadow-2xl touch-none ${cursorClass}`}
+            style={{ aspectRatio: '4 / 3' }}
         />
     );
 };
