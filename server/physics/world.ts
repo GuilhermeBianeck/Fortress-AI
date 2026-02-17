@@ -1,10 +1,5 @@
 import Matter from 'matter-js';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const decomp = require('poly-decomp');
 import { generateTerrain, getRandomSeed, TerrainResult } from './terrain';
-
-// Enable poly-decomp for concave body support (terrain)
-Matter.Common.setDecomp(decomp);
 
 export interface WorldResult {
     engine: Matter.Engine;
@@ -17,7 +12,8 @@ export const createWorld = (seed?: number): WorldResult => {
     const engine = Matter.Engine.create();
     const world = engine.world;
 
-    engine.gravity.y = 1;
+    engine.gravity.y = 2;
+    engine.enableSleeping = true;
 
     const terrainSeed = seed ?? getRandomSeed();
 
@@ -32,7 +28,7 @@ export const createWorld = (seed?: number): WorldResult => {
         octaves: 3
     });
 
-    Matter.World.add(world, terrain.body);
+    Matter.World.add(world, terrain.bodies);
 
     return { engine, world, terrain, seed: terrainSeed };
 };

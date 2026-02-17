@@ -53,7 +53,7 @@ const DEFAULT_CONFIG: TerrainConfig = {
 };
 
 export interface TerrainResult {
-    body: Matter.Body;
+    bodies: Matter.Body[];
     points: { x: number; y: number }[];   // Surface points for client rendering
     buildZones: { x: number; width: number; y: number }[];  // Flat-ish areas
 }
@@ -76,35 +76,92 @@ export function generateTerrain(config: Partial<TerrainConfig> = {}): TerrainRes
         surfacePoints.push({ x: width, y: baseHeight + noiseVal * amplitude });
     }
 
-    // Build vertices for a solid terrain body (surface + bottom corners)
-    const vertices: { x: number; y: number }[] = [];
+    // Identify build zones (tighter slope threshold: 5px ≈ 11°)
+    const buildZones = findBuildZones(surfacePoints, 5, 100);
 
-    // Bottom-left corner
-    vertices.push({ x: 0, y: height + 50 });
+    // Flatten terrain points within build zones so they become true platforms
+    flattenBuildZones(surfacePoints, buildZones);
 
-    // Surface points (left to right)
-    for (const pt of surfacePoints) {
-        vertices.push({ x: pt.x, y: pt.y });
+    // Create convex trapezoid segments instead of one concave polygon
+    const bodies = createTerrainSegments(surfacePoints, height + 50);
+
+    return { bodies, points: surfacePoints, buildZones };
+}
+
+/**
+ * Creates an array of convex trapezoid bodies from adjacent surface points.
+ * Each trapezoid has the surface segment as its top edge and extends to bottomY.
+ * Since each segment is a simple convex quad, no poly-decomp is needed
+ * and adjacent segments share exact edge coordinates (no seam gaps).
+ */
+function createTerrainSegments(
+    surfacePoints: { x: number; y: number }[],
+    bottomY: number
+): Matter.Body[] {
+    const bodies: Matter.Body[] = [];
+
+    for (let i = 0; i < surfacePoints.length - 1; i++) {
+        const p1 = surfacePoints[i];
+        const p2 = surfacePoints[i + 1];
+
+        // Convex trapezoid: surface on top, flat bottom below canvas
+        const vertices = [
+            { x: p1.x, y: p1.y },   // top-left (surface)
+            { x: p2.x, y: p2.y },   // top-right (surface)
+            { x: p2.x, y: bottomY }, // bottom-right
+            { x: p1.x, y: bottomY }, // bottom-left
+        ];
+
+        const cx = (p1.x + p2.x) / 2;
+        const cy = (Math.min(p1.y, p2.y) + bottomY) / 2;
+
+        const body = Matter.Bodies.fromVertices(cx, cy, [vertices], {
+            isStatic: true,
+            label: 'Terrain',
+            friction: 0.8,
+            render: { fillStyle: '#2a2a2a' },
+        });
+
+        if (body) {
+            bodies.push(body);
+        }
     }
 
-    // Bottom-right corner
-    vertices.push({ x: width, y: height + 50 });
+    return bodies;
+}
 
-    // Create the terrain body from vertices
-    const centroid = Matter.Vertices.centre(vertices);
-    const body = Matter.Bodies.fromVertices(centroid.x, centroid.y, [vertices], {
-        isStatic: true,
-        label: 'Terrain',
-        friction: 0.8,
-        render: {
-            fillStyle: '#2a2a2a'
+/**
+ * Flattens terrain surface points within build zones.
+ * Sets all points in each zone to the minimum Y (highest terrain point),
+ * creating genuinely flat platforms for stable building.
+ */
+function flattenBuildZones(
+    points: { x: number; y: number }[],
+    zones: BuildZone[]
+): void {
+    for (const zone of zones) {
+        const zoneEndX = zone.x + zone.width;
+
+        // Find the minimum Y (highest point) within the zone
+        let minY = Infinity;
+        for (const pt of points) {
+            if (pt.x >= zone.x && pt.x <= zoneEndX) {
+                minY = Math.min(minY, pt.y);
+            }
         }
-    });
 
-    // Identify build zones (areas where terrain is relatively flat)
-    const buildZones = findBuildZones(surfacePoints, 15, 100);
+        if (minY === Infinity) continue;
 
-    return { body, points: surfacePoints, buildZones };
+        // Set all points in the zone to that Y value
+        for (const pt of points) {
+            if (pt.x >= zone.x && pt.x <= zoneEndX) {
+                pt.y = minY;
+            }
+        }
+
+        // Update the zone's Y to match
+        zone.y = minY;
+    }
 }
 
 interface BuildZone {
@@ -127,19 +184,16 @@ function findBuildZones(
             // End current zone candidate
             const zoneWidth = points[i - 1].x - points[zoneStart].x;
             if (zoneWidth >= minWidth) {
-                // Average Y across the zone
-                let avgY = 0;
-                let count = 0;
+                // Min Y (highest point) across the zone
+                let zoneY = Infinity;
                 for (let j = zoneStart; j < i; j++) {
-                    avgY += points[j].y;
-                    count++;
+                    zoneY = Math.min(zoneY, points[j].y);
                 }
-                avgY /= count;
 
                 zones.push({
                     x: points[zoneStart].x,
                     width: zoneWidth,
-                    y: avgY
+                    y: zoneY
                 });
             }
             zoneStart = i;
@@ -149,17 +203,14 @@ function findBuildZones(
     // Check last zone
     const lastWidth = points[points.length - 1].x - points[zoneStart].x;
     if (lastWidth >= minWidth) {
-        let avgY = 0;
-        let count = 0;
+        let zoneY = Infinity;
         for (let j = zoneStart; j < points.length; j++) {
-            avgY += points[j].y;
-            count++;
+            zoneY = Math.min(zoneY, points[j].y);
         }
-        avgY /= count;
         zones.push({
             x: points[zoneStart].x,
             width: lastWidth,
-            y: avgY
+            y: zoneY
         });
     }
 
