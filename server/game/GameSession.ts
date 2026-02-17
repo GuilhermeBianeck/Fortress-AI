@@ -281,7 +281,7 @@ export class GameSession {
         const vy = -power * Math.sin(angle);
 
         // Cap velocity magnitude to prevent tunneling
-        const maxSpeed = 35;
+        const maxSpeed = 45;
         const speed = Math.sqrt(vx * vx + vy * vy);
         const scale = speed > maxSpeed ? maxSpeed / speed : 1;
         Matter.Body.setVelocity(body, {
@@ -468,7 +468,7 @@ export class GameSession {
 
         // Blocks spawn upright and resist rotation (high inertia)
         Matter.Body.setAngle(body, angle ?? 0);
-        Matter.Body.setInertia(body, body.inertia * 80);
+        Matter.Body.setInertia(body, body.inertia * 200);
 
         Matter.World.add(this.world, body);
         return body;
@@ -579,7 +579,7 @@ export class GameSession {
 
     private checkProjectileBounds() {
         const bodies = Matter.Composite.allBodies(this.world);
-        const tickMaxSpeed = 40;
+        const tickMaxSpeed = 25;
         for (const body of bodies) {
             if (body.label !== 'projectile') continue;
             if (body.position.y > CANVAS_HEIGHT + 50 ||

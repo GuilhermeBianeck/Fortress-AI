@@ -98,6 +98,11 @@ export const GameCanvas = ({
         active: false, angle: Math.PI / 4, power: 15, useKeyboard: false,
     });
 
+    // Touch guard — prevent synthesized mouse events after touch
+    const lastTouchRef = useRef(0);
+    // Touch aiming: store initial touch screen position for drag-relative power
+    const touchStartRef = useRef<{ sx: number; sy: number } | null>(null);
+
     // Screen shake
     const shakeRef = useRef({ amplitude: 0, remaining: 0, max: 0 });
 
@@ -869,6 +874,8 @@ export const GameCanvas = ({
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        // Skip synthesized mouse events from touch
+        if (Date.now() - lastTouchRef.current < 500) return;
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -912,6 +919,7 @@ export const GameCanvas = ({
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        if (Date.now() - lastTouchRef.current < 500) return;
         if (!aimRef.current.active) return;
         const { x: mx, y: my } = getWorldCoords(e);
         const cannon = getMyCannonPos();
@@ -943,6 +951,7 @@ export const GameCanvas = ({
 
     const handleTouchStart = (e: React.TouchEvent) => {
         if (e.touches.length !== 1) return;
+        lastTouchRef.current = Date.now();
         const touch = e.touches[0];
         const { x, y, screenX, screenY } = getTouchWorldCoords(touch);
 
@@ -973,11 +982,13 @@ export const GameCanvas = ({
             const aim = aimRef.current;
             aim.active = true;
             aim.useKeyboard = false;
+            // Store initial screen position for drag-relative power
+            touchStartRef.current = { sx: screenX, sy: screenY };
+            // Set angle from cannon to tap, start with medium power
             const cannon = getMyCannonPos();
             aim.angle = Math.atan2(cannon.y - y, Math.abs(x - cannon.x));
             aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
-            const dist = Math.sqrt((x - cannon.x) ** 2 + (y - cannon.y) ** 2);
-            aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
+            aim.power = 25; // start at medium power
         }
     };
 
@@ -987,10 +998,24 @@ export const GameCanvas = ({
         const { x: mx, y: my } = getTouchWorldCoords(e.touches[0]);
         const cannon = getMyCannonPos();
         const aim = aimRef.current;
+        // Angle always tracks finger-to-cannon direction
         aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
-        const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
+        // Power from drag distance (screen pixels from initial tap)
+        if (touchStartRef.current) {
+            const canvas = canvasRef.current!;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const curSX = (e.touches[0].clientX - rect.left) * scaleX;
+            const curSY = (e.touches[0].clientY - rect.top) * scaleY;
+            const dragDist = Math.sqrt(
+                (curSX - touchStartRef.current.sx) ** 2 +
+                (curSY - touchStartRef.current.sy) ** 2
+            );
+            // 0px drag = 25 power, 300px drag = 50 power
+            aim.power = Math.max(5, Math.min(50, 25 + (dragDist / 300) * 25));
+        }
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
@@ -998,6 +1023,7 @@ export const GameCanvas = ({
         if (!aim.active) return;
         e.preventDefault();
         aim.active = false;
+        touchStartRef.current = null;
         onFireRef.current(aim.angle, aim.power);
     };
 
@@ -1083,7 +1109,7 @@ export const GameCanvas = ({
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
             onWheel={handleWheel}
-            className={`border border-white/20 rounded-lg shadow-2xl w-full h-auto touch-none ${cursorClass}`}
+            className={`sm:border sm:border-white/20 sm:rounded-lg sm:shadow-2xl w-full h-full sm:h-auto object-contain touch-none ${cursorClass}`}
             style={{ imageRendering: 'auto' }}
         />
     );

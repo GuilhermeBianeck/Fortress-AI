@@ -46,10 +46,10 @@ export class GameLoop {
     }
 
     private tick() {
-        // Fixed timestep update
-        Matter.Engine.update(this.engine, TICK_DT);
-
+        // Sub-step: 2 half-updates per tick for better collision detection
+        Matter.Engine.update(this.engine, TICK_DT / 2);
         this.onTickCallback?.();
+        Matter.Engine.update(this.engine, TICK_DT / 2);
 
         // Snapshot broadcast
         const now = Date.now();

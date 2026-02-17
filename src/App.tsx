@@ -88,8 +88,8 @@ function App() {
 
   return (
     <div className="h-screen bg-neutral-950 text-white font-sans selection:bg-rose-500/30 flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="px-4 py-2 border-b border-white/10 flex justify-between items-center bg-black/20 backdrop-blur-md sticky top-0 z-50">
+      {/* Header — hidden on mobile when in-game */}
+      <header className={`px-4 py-2 border-b border-white/10 flex justify-between items-center bg-black/20 backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`}>
         <div className="flex items-center gap-2">
           <div className="bg-rose-600 p-1.5 rounded-lg">
             <Bot size={20} className="text-white" />
@@ -135,7 +135,7 @@ function App() {
         </div>
       </header>
 
-      <main className={`flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto min-h-0 ${inGame ? 'p-3 gap-3' : ''}`}>
+      <main className={`flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto min-h-0 ${inGame ? 'sm:p-3 sm:gap-3' : ''}`}>
         {/* API Key Input (collapsible) */}
         {showApiKey && (
           <div className="w-full bg-black/60 border border-white/10 rounded-xl p-3 sm:p-4 backdrop-blur-sm">
@@ -173,43 +173,18 @@ function App() {
             onReady={playerReady}
           />
         ) : (
-          <div className="flex flex-col items-center gap-3 flex-1 w-full"
+          /* Mobile: fill the entire screen. Desktop: constrained 4:3. */
+          <div className="flex flex-col items-center flex-1 w-full relative
+                          sm:gap-3 sm:max-w-none"
                style={{ maxWidth: 'calc((100vh - 10rem) * 4 / 3)' }}>
-            {/* Build Status Overlay */}
-            {buildStatus.status !== 'idle' && (
-              <div className={`w-full border rounded-xl p-2 sm:p-3 backdrop-blur-sm flex items-center gap-2 sm:gap-3 transition-all
-                ${buildStatus.status === 'error'
-                  ? 'bg-red-500/10 border-red-500/20 text-red-300'
-                  : buildStatus.status === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                    : 'bg-violet-500/10 border-violet-500/20 text-violet-300'
-                }`}
-              >
-                {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" />}
-                {buildStatus.status === 'success' && <CheckCircle2 size={14} className="shrink-0" />}
-                {buildStatus.status === 'error' && <AlertCircle size={14} className="shrink-0" />}
-                <span className="text-xs sm:text-sm font-mono truncate">{buildStatus.message}</span>
-              </div>
-            )}
 
-            {/* God Tools (build phase only) */}
-            <GodTools
-              selectedMaterial={selectedMaterial}
-              selectedShape={selectedShape}
-              onMaterialChange={setSelectedMaterial}
-              onShapeChange={setSelectedShape}
-              gameMode={gameMode}
-              onModeChange={setGameMode}
-              phase={phase}
-              onReady={playerReady}
-            />
-
-            {/* Game Canvas + Chat */}
-            <div className="flex gap-4 items-start w-full justify-center">
-              {/* Canvas container — fluid, maintains 4:3 aspect */}
-              <div className="relative group flex-1 min-w-0">
-                <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
-                <div className="relative">
+            {/* === Mobile: Canvas fills screen, overlays on top === */}
+            {/* Canvas container */}
+            <div className="flex gap-4 items-start w-full justify-center flex-1 sm:flex-initial">
+              <div className="relative group flex-1 min-w-0 sm:flex-initial sm:w-full">
+                {/* Glow border — desktop only */}
+                <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none hidden sm:block"></div>
+                <div className="relative h-full">
                   <GameCanvas
                     gameState={gameState}
                     terrain={terrain}
@@ -249,6 +224,32 @@ function App() {
                       </div>
                     </div>
                   )}
+
+                  {/* Mobile: God Tools overlaid at bottom of canvas */}
+                  {phase === 'build' && (
+                    <div className="absolute bottom-0 inset-x-0 z-10 p-1.5 sm:hidden pointer-events-auto">
+                      <GodTools
+                        selectedMaterial={selectedMaterial}
+                        selectedShape={selectedShape}
+                        onMaterialChange={setSelectedMaterial}
+                        onShapeChange={setSelectedShape}
+                        gameMode={gameMode}
+                        onModeChange={setGameMode}
+                        phase={phase}
+                        onReady={playerReady}
+                      />
+                    </div>
+                  )}
+
+                  {/* Mobile: Chat + menu buttons overlay top-right */}
+                  <div className="absolute top-1 right-1 z-10 flex gap-1 sm:hidden">
+                    <button
+                      onClick={() => setShowChat(!showChat)}
+                      className="p-1.5 bg-black/60 border border-white/10 rounded-lg touch-manipulation"
+                    >
+                      <MessageCircle size={14} className="text-white" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -261,6 +262,39 @@ function App() {
                 />
               </div>
             </div>
+
+            {/* Desktop: God Tools (build phase only) — above canvas on sm+ */}
+            {phase === 'build' && (
+              <div className="hidden sm:block w-full order-first">
+                <GodTools
+                  selectedMaterial={selectedMaterial}
+                  selectedShape={selectedShape}
+                  onMaterialChange={setSelectedMaterial}
+                  onShapeChange={setSelectedShape}
+                  gameMode={gameMode}
+                  onModeChange={setGameMode}
+                  phase={phase}
+                  onReady={playerReady}
+                />
+              </div>
+            )}
+
+            {/* Build Status Overlay */}
+            {buildStatus.status !== 'idle' && (
+              <div className={`w-full border rounded-xl p-2 sm:p-3 backdrop-blur-sm flex items-center gap-2 sm:gap-3 transition-all order-first
+                ${buildStatus.status === 'error'
+                  ? 'bg-red-500/10 border-red-500/20 text-red-300'
+                  : buildStatus.status === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                    : 'bg-violet-500/10 border-violet-500/20 text-violet-300'
+                }`}
+              >
+                {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" />}
+                {buildStatus.status === 'success' && <CheckCircle2 size={14} className="shrink-0" />}
+                {buildStatus.status === 'error' && <AlertCircle size={14} className="shrink-0" />}
+                <span className="text-xs sm:text-sm font-mono truncate">{buildStatus.message}</span>
+              </div>
+            )}
 
             {/* Mobile chat overlay */}
             {showChat && (
@@ -279,7 +313,7 @@ function App() {
 
             {/* Prompt Input — only in build mode during build phase */}
             {phase === 'build' && gameMode === 'build' && (
-              <form onSubmit={handleSubmitPrompt} className="w-full bg-black/40 border border-white/10 rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3 backdrop-blur-sm">
+              <form onSubmit={handleSubmitPrompt} className="w-full bg-black/40 border border-white/10 rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3 backdrop-blur-sm hidden sm:flex">
                 <div className="p-2 sm:p-2.5 bg-neutral-900 rounded-lg shrink-0">
                   <Terminal size={16} className="text-neutral-400" />
                 </div>
@@ -303,9 +337,9 @@ function App() {
               </form>
             )}
 
-            {/* Combat hint */}
+            {/* Combat hint — desktop only */}
             {phase === 'combat' && turnPlayer === mySide && (
-              <div className="text-[10px] sm:text-xs text-neutral-500 font-mono text-center">
+              <div className="hidden sm:block text-[10px] sm:text-xs text-neutral-500 font-mono text-center">
                 Drag to aim &amp; fire &middot; Scroll / &uarr;&darr; to adjust power &middot; &larr;&rarr; to adjust angle &middot; Space to fire &middot; A/D to pan
               </div>
             )}

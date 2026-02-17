@@ -20,11 +20,11 @@ export const SETTLE_SPEED_THRESHOLD = 0.5;
 
 // === Materials ===
 export const MATERIAL_PROPS: Record<string, { density: number; friction: number; frictionStatic: number; restitution: number }> = {
-    wood:   { density: 0.005, friction: 0.8,  frictionStatic: 1.0,  restitution: 0.05 },
-    stone:  { density: 0.02,  friction: 1.0,  frictionStatic: 1.5,  restitution: 0.02 },
-    ice:    { density: 0.008, friction: 0.05, frictionStatic: 0.1,  restitution: 0.05 },
-    rubber: { density: 0.005, friction: 1.0,  frictionStatic: 1.2,  restitution: 0.6  },
-    steel:  { density: 0.04,  friction: 0.6,  frictionStatic: 1.0,  restitution: 0.02 },
+    wood:   { density: 0.005, friction: 1.0,  frictionStatic: 2.0,  restitution: 0.01 },
+    stone:  { density: 0.02,  friction: 1.2,  frictionStatic: 3.0,  restitution: 0.01 },
+    ice:    { density: 0.008, friction: 0.1,  frictionStatic: 0.2,  restitution: 0.03 },
+    rubber: { density: 0.005, friction: 1.2,  frictionStatic: 2.0,  restitution: 0.4  },
+    steel:  { density: 0.04,  friction: 0.8,  frictionStatic: 2.0,  restitution: 0.01 },
 };
 
 export const DAMAGE_MULTIPLIERS: Record<string, number> = {

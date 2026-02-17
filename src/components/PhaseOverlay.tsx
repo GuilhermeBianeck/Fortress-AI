@@ -12,7 +12,7 @@ interface PhaseOverlayProps {
     currentRound?: number;
     rematchState?: 'none' | 'requested' | 'opponent_requested';
     onRequestRematch?: () => void;
-    hazards?: { type: string; id: string }[];
+    hazards?: { type: string; id: string; windDirection?: number; windStrength?: number }[];
 }
 
 export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards }: PhaseOverlayProps) => {
@@ -84,8 +84,9 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
     // Combat phase banner
     if (phase === 'combat') {
         const isMyTurn = turnPlayer === mySide;
+        const windHazard = hazards?.find(h => h.type === 'wind_zone');
         return (
-            <div className="flex items-center justify-between w-full w-full">
+            <div className="flex items-center justify-between w-full w-full gap-2">
                 <div className={`flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm border ${
                     isMyTurn
                         ? 'bg-red-500/10 border-red-500/20'
@@ -95,6 +96,16 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         {isMyTurn ? 'YOUR TURN' : "OPPONENT'S TURN"}
                     </span>
                 </div>
+                {windHazard && (
+                    <div className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/20 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-sm">
+                        <span className="text-cyan-400 text-sm sm:text-base">
+                            {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'}
+                        </span>
+                        <span className="text-cyan-300 text-[10px] sm:text-xs font-bold">
+                            WIND {Math.round(((windHazard.windStrength ?? 0.0003) / 0.0003) * 100)}%
+                        </span>
+                    </div>
+                )}
                 {timeLeft !== null && (
                     <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-neutral-300'}`}>
                         {timeLeft}s
