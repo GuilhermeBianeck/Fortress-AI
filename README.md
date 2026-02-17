@@ -372,7 +372,7 @@ MAX_AI_BODIES           = 50       // AI fortress body limit
 | `spawn` | `{ x, y, material, shape }` | Place a block |
 | `request_build` | `{ apiKey, prompt }` | AI fortress generation |
 | `fire_projectile` | `{ angle, power }` | Fire cannon |
-| `send_chat` | `{ text }` | Send chat message |
+| `chat_message` | `{ text }` | Send chat message |
 | `request_rematch` | - | Request rematch |
 
 </details>
@@ -384,14 +384,29 @@ MAX_AI_BODIES           = 50       // AI fortress body limit
 |-------|---------|-------------|
 | `room_created` | `{ roomId }` | Room ready |
 | `room_joined` | `{ roomId, side, players }` | Joined room |
+| `room_error` | `{ message }` | Room join/create error |
+| `player_joined` | `{ name, side }` | Opponent joined room |
+| `player_left` | — | Opponent left room |
+| `player_ready_ack` | — | Ready acknowledged |
+| `queue_status` | `{ position }` | Queue position update |
+| `match_found` | `{ roomId }` | Matched with opponent |
 | `match_started` | `{ side }` | Game begins |
 | `gameState` | `{ bodies[], kings }` | Physics snapshot (20 Hz) |
 | `terrain` | `{ points, buildZones, hazards }` | World data |
 | `phase_change` | `{ phase, endsAt, turnPlayer? }` | Phase transition |
+| `turn_start` | `{ side, endsAt }` | Combat turn begins |
+| `build_status` | `{ status, message }` | AI build progress |
+| `build_success` | `{ count, thought }` | AI build complete |
+| `build_error` | `{ message }` | AI build failed |
 | `king_damage` | `{ side, hp, damage }` | King hit |
+| `king_dead` | `{ side }` | King destroyed |
+| `block_destroyed` | `{ bodyId, position, material }` | Block broken |
+| `projectile_impact` | `{ position }` | Projectile hit |
 | `match_result` | `{ winner, reason }` | Round result |
 | `round_result` | `{ winner, roundScore, isFinalRound }` | Best-of-3 tracking |
 | `chat_message` | `{ sender, side, text }` | Chat received |
+| `rematch_requested` | `{ side }` | Opponent wants rematch |
+| `rematch_start` | — | Rematch accepted |
 
 </details>
 

@@ -82,7 +82,7 @@ LOBBY → QUEUE → MATCHED → TERRAIN_GEN → BUILD_PHASE → REVEAL → COMBA
 - **Transition:** Both clients ACK terrain receipt → BUILD_PHASE.
 
 #### STATE: BUILD_PHASE
-- **Duration:** 60 seconds (configurable per match type; ranked = 60s, casual = 90s).
+- **Duration:** 90 seconds (configurable via `BUILD_PHASE_DURATION_MS` in `server/config/constants.ts`).
 - **What the player sees:** Their half of the battlefield, prompt input bar, timer counting down, God Tools for manual tweaks. Opponent's side is fog-of-war (dark overlay with "?" icon).
 - **Allowed actions:**
   - Submit an AI prompt (max 2 prompt submissions per build phase — prevents spamming the AI).
@@ -92,7 +92,7 @@ LOBBY → QUEUE → MATCHED → TERRAIN_GEN → BUILD_PHASE → REVEAL → COMBA
   - On `request_build`: call Gemini, validate via Zod, run Safe Spawn, add bodies to player's side.
   - On `manual_spawn`: validate block is within player's build zone and budget.
   - On `clear_build`: remove all player-placed blocks (not terrain/King).
-  - Track block count per player (max 40 per side).
+  - Track block count per player (max 50 bodies per AI response, validated via Zod schema).
 - **Transition:** Timer expires OR both players press "Done" → REVEAL.
 
 #### STATE: REVEAL
@@ -350,6 +350,8 @@ Hazards activate during the combat phase to prevent stalemates and reward adapti
 
 ### 8.1 Block Budget System
 
+> **Implementation note:** The weight budget system described below is a planned feature. The current implementation enforces a hard cap of **50 bodies per AI response** via the Zod schema. Manual spawning has no budget constraint yet.
+
 Instead of unlimited blocks, each player has a **Weight Budget** that constrains fortress complexity and forces material trade-offs.
 
 | Match Type | Weight Budget |
@@ -371,7 +373,7 @@ Instead of unlimited blocks, each player has a **Weight Budget** that constrains
 - A budget of 100 allows: 100 wood blocks, OR 33 stone blocks, OR 12 steel blocks, OR any mix.
 - The AI prompt includes the remaining budget, so the AI can plan accordingly.
 - The UI shows a "Budget: 72/100" bar that updates as blocks are placed.
-- Max bodies per side hard cap: 40 (regardless of budget, for performance).
+- Max bodies per AI response hard cap: 50 (enforced by Zod schema validation).
 
 ### 8.2 AI Prompt Rules
 
@@ -385,8 +387,8 @@ Instead of unlimited blocks, each player has a **Weight Budget** that constrains
 Before spawning any block, the server validates:
 
 1. **Build zone enforcement:** Block center X must be within the player's half of the map (±10px tolerance for edge blocks).
-2. **Budget check:** Total weight of all player blocks must not exceed the budget.
-3. **Body cap:** Total body count must not exceed 40 per side.
+2. **Budget check:** Total weight of all player blocks must not exceed the budget. *(Planned — not yet enforced)*
+3. **Body cap:** Total body count per AI response must not exceed 50 (enforced by Zod schema).
 4. **Bounds check:** Block position must be within `(0, 0)` to `(mapWidth, 600)`.
 5. **King exclusion zone:** No block center can be within 20px of the King's center (prevents smothering).
 6. **Overlap resolution:** Safe Spawn algorithm (§8.4) handles overlapping blocks.
