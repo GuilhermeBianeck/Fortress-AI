@@ -171,7 +171,7 @@ export class GameSession {
         const w = dims[0];
         const h = dims[1];
 
-        console.log(`Spawn: ${shape} ${material} at (${x.toFixed(0)}, ${y.toFixed(0)}) by ${player.side}`);
+        console.log(`Spawn: ${shape} ${material} at (${x.toFixed(0)}, ${y.toFixed(0)}) dims=${w}x${h} by ${player.side}`);
 
         this.createBody('rectangle', material, x, y, [w, h]);
     }

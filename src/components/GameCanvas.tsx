@@ -919,12 +919,84 @@ export const GameCanvas = ({
         aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
         const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        aim.power = Math.max(5, Math.min(30, 5 + (dist / 15) * 25));
+        aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
     };
 
     const handleMouseUp = () => {
         const aim = aimRef.current;
         if (!aim.active) return;
+        aim.active = false;
+        onFireRef.current(aim.angle, aim.power);
+    };
+
+    // --- Touch handlers for mobile ---
+    const getTouchWorldCoords = (touch: React.Touch) => {
+        const canvas = canvasRef.current!;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const screenX = (touch.clientX - rect.left) * scaleX;
+        const screenY = (touch.clientY - rect.top) * scaleY;
+        const cam = cameraRef.current;
+        return { x: screenX + cam.x, y: screenY, screenX, screenY };
+    };
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const { x, y, screenX, screenY } = getTouchWorldCoords(touch);
+
+        // Minimap tap detection
+        const canvas = canvasRef.current!;
+        const mmW = 200;
+        const mmH = 75;
+        const mmX = canvas.width - mmW - 10;
+        const mmY = canvas.height - mmH - 10;
+        if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
+            const clickRatioX = (screenX - mmX) / mmW;
+            const worldX = clickRatioX * WORLD_WIDTH;
+            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, worldX - CANVAS_WIDTH / 2));
+            return;
+        }
+
+        const currentPhase = phaseRef.current;
+        const side = mySideRef.current;
+
+        if (currentPhase === 'build' && gameModeRef.current === 'build') {
+            e.preventDefault();
+            onSpawnRef.current(x, y);
+            return;
+        }
+
+        if (currentPhase === 'combat' && turnPlayerRef.current === side) {
+            e.preventDefault();
+            const aim = aimRef.current;
+            aim.active = true;
+            aim.useKeyboard = false;
+            const cannon = getMyCannonPos();
+            aim.angle = Math.atan2(cannon.y - y, Math.abs(x - cannon.x));
+            aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
+            const dist = Math.sqrt((x - cannon.x) ** 2 + (y - cannon.y) ** 2);
+            aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!aimRef.current.active || e.touches.length !== 1) return;
+        e.preventDefault();
+        const { x: mx, y: my } = getTouchWorldCoords(e.touches[0]);
+        const cannon = getMyCannonPos();
+        const aim = aimRef.current;
+        aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
+        aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
+        const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
+        aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        const aim = aimRef.current;
+        if (!aim.active) return;
+        e.preventDefault();
         aim.active = false;
         onFireRef.current(aim.angle, aim.power);
     };
@@ -1006,8 +1078,12 @@ export const GameCanvas = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
             onWheel={handleWheel}
-            className={`border border-white/20 rounded-lg shadow-2xl w-full h-auto ${cursorClass}`}
+            className={`border border-white/20 rounded-lg shadow-2xl w-full h-auto touch-none ${cursorClass}`}
             style={{ imageRendering: 'auto' }}
         />
     );
