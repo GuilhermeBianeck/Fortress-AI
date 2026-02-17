@@ -66,7 +66,7 @@ export interface BuildStatus {
 }
 
 export type MaterialType = 'wood' | 'stone' | 'ice' | 'rubber' | 'steel';
-export type ShapeType = 'rectangle' | 'circle';
+export type ShapeType = 'rectangle' | 'pillar' | 'beam';
 
 export const MATERIAL_COLORS: Record<MaterialType, string> = {
     wood: '#A67C52',

@@ -19,12 +19,12 @@ export const SETTLE_POLL_INTERVAL_MS = 200;
 export const SETTLE_SPEED_THRESHOLD = 0.5;
 
 // === Materials ===
-export const MATERIAL_PROPS: Record<string, { density: number; friction: number; restitution: number }> = {
-    wood:   { density: 0.005, friction: 0.6,  restitution: 0.1  },
-    stone:  { density: 0.02,  friction: 0.9,  restitution: 0.05 },
-    ice:    { density: 0.008, friction: 0.02, restitution: 0.05 },
-    rubber: { density: 0.005, friction: 1.0,  restitution: 0.8  },
-    steel:  { density: 0.04,  friction: 0.4,  restitution: 0.05 },
+export const MATERIAL_PROPS: Record<string, { density: number; friction: number; frictionStatic: number; restitution: number }> = {
+    wood:   { density: 0.005, friction: 0.8,  frictionStatic: 1.0,  restitution: 0.05 },
+    stone:  { density: 0.02,  friction: 1.0,  frictionStatic: 1.5,  restitution: 0.02 },
+    ice:    { density: 0.008, friction: 0.05, frictionStatic: 0.1,  restitution: 0.05 },
+    rubber: { density: 0.005, friction: 1.0,  frictionStatic: 1.2,  restitution: 0.6  },
+    steel:  { density: 0.04,  friction: 0.6,  frictionStatic: 1.0,  restitution: 0.02 },
 };
 
 export const DAMAGE_MULTIPLIERS: Record<string, number> = {
@@ -69,6 +69,18 @@ export const LAVA_DAMAGE_PER_TICK = 0.5;
 export const FALLING_ROCK_INTERVAL_MS = 3000;
 export const FALLING_ROCK_RADIUS = 12;
 export const FALLING_ROCK_DAMAGE = 15;
+
+// === Collision categories (bitmask) ===
+export const COL_DEFAULT = 0x0001;
+export const COL_BLOCK = 0x0002;
+export const COL_DIVIDER = 0x0004;
+
+// === Shape dimensions ===
+export const SHAPE_DIMS: Record<string, [number, number]> = {
+    rectangle: [30, 30],
+    pillar: [30, 90],
+    beam: [90, 15],
+};
 
 // === Projectiles ===
 export const PROJECTILE_RADIUS = 8;

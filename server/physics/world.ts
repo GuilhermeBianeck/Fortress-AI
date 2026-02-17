@@ -1,6 +1,6 @@
 import Matter from 'matter-js';
 import { generateTerrain, getRandomSeed, TerrainResult } from './terrain';
-import { WORLD_WIDTH, CANVAS_HEIGHT } from '../config/constants';
+import { WORLD_WIDTH, CANVAS_HEIGHT, COL_DIVIDER, COL_BLOCK } from '../config/constants';
 
 export interface WorldResult {
     engine: Matter.Engine;
@@ -47,7 +47,21 @@ export const createWorld = (seed?: number): WorldResult => {
         WORLD_WIDTH / 2, -wallThickness / 2, WORLD_WIDTH + wallThickness * 2, wallThickness, wallOptions
     );
 
-    Matter.World.add(world, [leftWall, rightWall, ceiling]);
+    // Center divider — blocks building materials from crossing, but lets projectiles through
+    const divider = Matter.Bodies.rectangle(
+        WORLD_WIDTH / 2, CANVAS_HEIGHT / 2, 4, CANVAS_HEIGHT * 2, {
+            isStatic: true,
+            label: 'Boundary',
+            friction: 0.5,
+            restitution: 0.3,
+            collisionFilter: {
+                category: COL_DIVIDER,
+                mask: COL_BLOCK, // only collide with blocks
+            },
+        }
+    );
+
+    Matter.World.add(world, [leftWall, rightWall, ceiling, divider]);
 
     return { engine, world, terrain, seed: terrainSeed };
 };

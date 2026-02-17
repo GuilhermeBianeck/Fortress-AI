@@ -196,6 +196,6 @@ io.on('connection', (socket) => {
     });
 });
 
-httpServer.listen(PORT, () => {
-    console.log(`Game Server running on port ${PORT}`);
+httpServer.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`Game Server running on port ${PORT} (all interfaces)`);
 });

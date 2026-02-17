@@ -108,7 +108,12 @@ function App() {
           {inGame && (
             <button
               onClick={() => setShowChat(!showChat)}
-              className="xl:hidden px-2 py-1.5 text-sm rounded-lg transition-all bg-neutral-800 border border-white/10 hover:bg-neutral-700 flex items-center gap-1.5"
+              className={`xl:hidden px-2 py-1.5 text-sm rounded-lg transition-colors duration-200 touch-manipulation
+                border flex items-center gap-1.5
+                ${showChat
+                  ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
+                  : 'bg-neutral-800 border-white/10 hover:bg-neutral-700 active:bg-neutral-900 text-white'
+                }`}
             >
               <MessageCircle size={14} />
               <span className="hidden sm:inline text-xs">Chat</span>
@@ -120,9 +125,9 @@ function App() {
           {/* API Key toggle */}
           <button
             onClick={() => setShowApiKey(!showApiKey)}
-            className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 flex items-center gap-1.5
+            className={`px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors duration-200 touch-manipulation flex items-center gap-1.5
                        ${apiKey ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' : 'text-amber-400 bg-amber-500/10 border border-amber-500/20'}
-                       hover:bg-white/10`}
+                       hover:bg-white/10 active:bg-white/15`}
           >
             <Key size={14} />
             <span className="hidden sm:inline">{apiKey ? 'Key Set' : 'Set API Key'}</span>
@@ -145,7 +150,8 @@ function App() {
               />
               <button
                 onClick={() => setShowApiKey(false)}
-                className="shrink-0 px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-500 transition-colors"
+                className="shrink-0 px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-500 active:bg-rose-700
+                    transition-colors duration-200 touch-manipulation"
               >
                 Save
               </button>
@@ -288,7 +294,9 @@ function App() {
                 <button
                   type="submit"
                   disabled={isBuilding || !prompt.trim()}
-                  className="p-2 sm:p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-2 sm:p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 active:bg-rose-700
+                      transition-colors duration-200 touch-manipulation
+                      disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   {isBuilding ? <Loader2 size={16} className="animate-spin text-white" /> : <Send size={16} className="text-white" />}
                 </button>
@@ -298,7 +306,7 @@ function App() {
             {/* Combat hint */}
             {phase === 'combat' && turnPlayer === mySide && (
               <div className="text-[10px] sm:text-xs text-neutral-500 font-mono text-center">
-                Drag on canvas to aim &amp; fire &middot; Arrow keys to fine-tune &middot; A/D to pan camera
+                Drag to aim &amp; fire &middot; Scroll / &uarr;&darr; to adjust power &middot; &larr;&rarr; to adjust angle &middot; Space to fire &middot; A/D to pan
               </div>
             )}
           </div>

@@ -140,20 +140,25 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             {rematchState === 'none' && (
                                 <button
                                     onClick={onRequestRematch}
-                                    className="px-4 sm:px-6 py-1.5 sm:py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-colors text-sm"
+                                    className="px-4 sm:px-6 py-1.5 sm:py-2 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-lg text-sm
+                                        transition-colors duration-200 touch-manipulation"
                                 >
                                     REMATCH
                                 </button>
                             )}
                             {rematchState === 'requested' && (
-                                <p className="text-xs sm:text-sm text-amber-400">Waiting for opponent...</p>
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                                    <p className="text-xs sm:text-sm text-amber-400">Waiting for opponent...</p>
+                                </div>
                             )}
                             {rematchState === 'opponent_requested' && (
                                 <div>
-                                    <p className="text-xs sm:text-sm text-emerald-400 mb-2">Opponent wants a rematch!</p>
+                                    <p className="text-xs sm:text-sm text-emerald-400 mb-2 animate-pulse">Opponent wants a rematch!</p>
                                     <button
                                         onClick={onRequestRematch}
-                                        className="px-4 sm:px-6 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors text-sm"
+                                        className="px-4 sm:px-6 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-lg text-sm
+                                            transition-colors duration-200 touch-manipulation"
                                     >
                                         ACCEPT
                                     </button>

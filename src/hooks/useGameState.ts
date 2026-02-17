@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage } from '../types';
 
-const SERVER_URL = 'http://localhost:3001';
+const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
 
 export const useGameState = () => {
     const [gameState, setGameState] = useState<GameState | null>(null);

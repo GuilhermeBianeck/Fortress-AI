@@ -497,7 +497,8 @@ export const GameCanvas = ({
                         vy *= s;
                     }
 
-                    const steps = 80;
+                    // Short guide — shows direction only, not the full arc
+                    const steps = 25;
                     for (let step = 0; step < steps; step++) {
                         vx *= airDamp;
                         vy *= airDamp;
@@ -505,14 +506,18 @@ export const GameCanvas = ({
                         py += vy;
                         vy += gravityAccel;
 
-                        const alpha = 0.6 * (1 - step / steps);
-                        if (alpha < 0.05) break;
-                        ctx.beginPath();
-                        ctx.arc(px, py, 2, 0, Math.PI * 2);
-                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
-                        ctx.fill();
+                        // Fast fade — disappears well before reaching target
+                        const alpha = 0.5 * (1 - step / steps) * (1 - step / steps);
+                        if (alpha < 0.03) break;
 
-                        // Stop if it goes off-screen
+                        // Draw every other dot for a dashed look
+                        if (step % 2 === 0) {
+                            ctx.beginPath();
+                            ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+                            ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+                            ctx.fill();
+                        }
+
                         if (py > CANVAS_HEIGHT + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
                     }
                 }
@@ -567,7 +572,7 @@ export const GameCanvas = ({
         // Draw dynamic bodies
         if (gs) {
             for (const body of gs.bodies) {
-                if (body.label === 'Terrain') continue;
+                if (body.label === 'Terrain' || body.label === 'Boundary') continue;
 
                 ctx.save();
                 ctx.translate(body.position.x, body.position.y);
@@ -576,22 +581,31 @@ export const GameCanvas = ({
                 const fillColor = body.color || MATERIAL_COLORS[body.material] || MATERIAL_COLORS[body.label] || '#e11d48';
                 const strokeColor = MATERIAL_STROKE[body.material] || MATERIAL_STROKE[body.label] || 'rgba(255,255,255,0.3)';
 
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                ctx.shadowBlur = 6;
-                ctx.shadowOffsetX = 2;
-                ctx.shadowOffsetY = 2;
-
                 if (body.circleRadius > 0) {
+                    if (body.label === 'king') {
+                        // King: golden glow instead of drop shadow
+                        ctx.shadowColor = 'rgba(255, 215, 0, 0.4)';
+                        ctx.shadowBlur = 8;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 0;
+                    } else {
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                        ctx.shadowBlur = 6;
+                        ctx.shadowOffsetX = 2;
+                        ctx.shadowOffsetY = 2;
+                    }
+
                     ctx.beginPath();
                     ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
                     ctx.fillStyle = fillColor;
                     ctx.fill();
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
                     ctx.strokeStyle = strokeColor;
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
 
                     if (body.label === 'king') {
-                        ctx.shadowColor = 'transparent';
                         ctx.font = '10px sans-serif';
                         ctx.textAlign = 'center';
                         ctx.fillStyle = '#FFD700';
@@ -600,13 +614,16 @@ export const GameCanvas = ({
 
                     // Projectile glow
                     if (body.label === 'projectile') {
-                        ctx.shadowColor = 'transparent';
                         ctx.beginPath();
                         ctx.arc(0, 0, body.circleRadius + 3, 0, Math.PI * 2);
                         ctx.fillStyle = 'rgba(255, 150, 50, 0.15)';
                         ctx.fill();
                     }
                 } else if (!body.isStatic) {
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                    ctx.shadowBlur = 6;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
                     const w = body.width || 50;
                     const h = body.height || 50;
                     ctx.fillStyle = fillColor;
@@ -890,7 +907,7 @@ export const GameCanvas = ({
             aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
             aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
             const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-            aim.power = Math.max(5, Math.min(50, 5 + (dist / 15) * 45));
+            aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
         }
     };
 
@@ -968,6 +985,16 @@ export const GameCanvas = ({
         };
     }, []);
 
+    const handleWheel = (e: React.WheelEvent) => {
+        // Scroll wheel adjusts power during combat
+        if (phaseRef.current !== 'combat' || turnPlayerRef.current !== mySideRef.current) return;
+        e.preventDefault();
+        const aim = aimRef.current;
+        const delta = e.deltaY < 0 ? 2 : -2;
+        aim.power = Math.max(5, Math.min(50, aim.power + delta));
+        aim.useKeyboard = true;
+    };
+
     const cursorClass = (phase === 'build' && gameMode === 'build') ? 'cursor-crosshair' : 'cursor-default';
 
     return (
@@ -979,6 +1006,7 @@ export const GameCanvas = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
             className={`border border-white/20 rounded-lg shadow-2xl w-full h-auto ${cursorClass}`}
             style={{ imageRendering: 'auto' }}
         />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState } from '../types';
-import { Bot, Swords, Zap } from 'lucide-react';
+import { Bot, Swords, Zap, Check } from 'lucide-react';
 
 interface LobbyProps {
     roomState: RoomState | null;
@@ -21,12 +21,19 @@ export const Lobby = ({
     onCreateRoom, onJoinRoom, onJoinQueue, onLeaveQueue, onReady,
 }: LobbyProps) => {
     const [joinCode, setJoinCode] = useState('');
+    const [isReady, setIsReady] = useState(false);
 
     const handleJoinSubmit = (e: FormEvent) => {
         e.preventDefault();
         if (joinCode.trim().length >= 4) {
             onJoinRoom(joinCode.trim(), playerName);
         }
+    };
+
+    const handleReady = () => {
+        if (isReady) return;
+        setIsReady(true);
+        onReady();
     };
 
     // Waiting room view
@@ -57,10 +64,20 @@ export const Lobby = ({
                     {roomState.opponentConnected && (
                         <div>
                             <button
-                                onClick={onReady}
-                                className="mt-8 w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors text-xl"
+                                onClick={handleReady}
+                                disabled={isReady}
+                                className={`mt-8 w-full py-4 font-bold rounded-xl text-xl touch-manipulation
+                                    transition-colors duration-200
+                                    ${isReady
+                                        ? 'bg-emerald-700 text-emerald-200 ring-2 ring-emerald-400/50 cursor-default'
+                                        : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white cursor-pointer'
+                                    }`}
                             >
-                                READY
+                                {isReady ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <Check size={22} /> READY
+                                    </span>
+                                ) : 'READY'}
                             </button>
                         </div>
                     )}
@@ -79,7 +96,8 @@ export const Lobby = ({
                     <p className="text-base text-neutral-400">Queue position: {queuePosition + 1}</p>
                     <button
                         onClick={onLeaveQueue}
-                        className="mt-8 px-8 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl transition-colors text-base"
+                        className="mt-8 px-8 py-3 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-300 rounded-xl
+                            transition-colors duration-200 touch-manipulation text-base"
                     >
                         Cancel
                     </button>
@@ -128,13 +146,14 @@ export const Lobby = ({
                         onChange={(e) => onPlayerNameChange(e.target.value)}
                         placeholder="Your name..."
                         maxLength={20}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-center text-lg font-medium text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 transition-all"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-center text-lg font-medium text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 transition-all touch-manipulation"
                     />
 
                     {/* Create Room */}
                     <button
                         onClick={() => onCreateRoom(playerName)}
-                        className="w-full py-5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-colors text-xl shadow-lg shadow-rose-600/20"
+                        className="w-full py-5 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-xl text-xl shadow-lg shadow-rose-600/20
+                            transition-colors duration-200 touch-manipulation"
                     >
                         Create Room
                     </button>
@@ -147,12 +166,14 @@ export const Lobby = ({
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                             placeholder="CODE"
                             maxLength={6}
-                            className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-4 text-center text-lg font-mono font-bold text-white placeholder:text-neutral-600 uppercase tracking-[0.15em] outline-none focus:border-rose-500/50"
+                            className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-4 text-center text-lg font-mono font-bold text-white placeholder:text-neutral-600 uppercase tracking-[0.15em] outline-none focus:border-rose-500/50 touch-manipulation"
                         />
                         <button
                             type="submit"
                             disabled={joinCode.trim().length < 4}
-                            className="shrink-0 px-8 py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors text-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="shrink-0 px-8 py-4 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white font-bold rounded-xl text-lg
+                                transition-colors duration-200 touch-manipulation
+                                disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             Join
                         </button>
@@ -167,7 +188,8 @@ export const Lobby = ({
                     {/* Quick Match */}
                     <button
                         onClick={() => onJoinQueue(playerName)}
-                        className="w-full py-5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold rounded-xl transition-colors text-lg border border-white/5"
+                        className="w-full py-5 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-200 font-bold rounded-xl text-lg border border-white/5
+                            transition-colors duration-200 touch-manipulation"
                     >
                         Quick Match
                     </button>

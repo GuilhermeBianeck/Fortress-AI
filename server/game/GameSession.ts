@@ -17,6 +17,7 @@ import {
     WORLD_WIDTH, CANVAS_HEIGHT,
     LEFT_SIDE, RIGHT_SIDE, LEFT_CANNON_X, RIGHT_CANNON_X,
     FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS,
+    COL_BLOCK, SHAPE_DIMS,
 } from '../config/constants';
 import { generateHazards, applyWindForce, checkLavaDamage } from '../physics/hazards';
 
@@ -160,21 +161,19 @@ export class GameSession {
         const player = this.players.get(socketId);
         if (!player) return;
 
-        const { x, y, material = 'wood', shape = 'rectangle', dimensions = [30, 30] } = data;
+        const { x, y, material = 'wood', shape = 'rectangle' } = data;
 
         // Validate within player's half
         if (x < player.buildZone.xMin || x > player.buildZone.xMax) return;
 
+        // Use predefined shape dimensions
+        const dims = SHAPE_DIMS[shape] || SHAPE_DIMS.rectangle;
+        const w = dims[0];
+        const h = dims[1];
+
         console.log(`Spawn: ${shape} ${material} at (${x.toFixed(0)}, ${y.toFixed(0)}) by ${player.side}`);
 
-        if (shape === 'circle') {
-            const radius = dimensions[0] || 15;
-            this.createBody('circle', material, x, y, [radius]);
-        } else {
-            const w = dimensions[0] || 30;
-            const h = dimensions[1] || dimensions[0] || 30;
-            this.createBody(shape as 'rectangle' | 'triangle', material, x, y, [w, h]);
-        }
+        this.createBody('rectangle', material, x, y, [w, h]);
     }
 
     async handleRequestBuild(socket: Socket, data: { apiKey: string; prompt: string }) {
@@ -436,14 +435,21 @@ export class GameSession {
         const props = MATERIAL_PROPS[material] || MATERIAL_PROPS.wood;
         let body: Matter.Body;
 
+        const bodyOpts: Matter.IChamferableBodyDefinition = {
+            density: props.density,
+            friction: props.friction,
+            frictionStatic: props.frictionStatic,
+            restitution: props.restitution,
+            label: material,
+            collisionFilter: {
+                category: COL_BLOCK,
+                mask: 0xFFFFFFFF, // collide with everything (including divider)
+            },
+        };
+
         if (shape === 'circle') {
             const radius = dimensions[0] || 15;
-            body = Matter.Bodies.circle(x, y, radius, {
-                density: props.density,
-                friction: props.friction,
-                restitution: props.restitution,
-                label: material,
-            });
+            body = Matter.Bodies.circle(x, y, radius, bodyOpts);
         } else if (shape === 'triangle') {
             const size = dimensions[0] || 30;
             const vertices = [
@@ -451,26 +457,19 @@ export class GameSession {
                 { x: -size / 2, y: size / 2 },
                 { x: size / 2, y: size / 2 },
             ];
-            body = Matter.Bodies.fromVertices(x, y, [vertices], {
-                density: props.density,
-                friction: props.friction,
-                restitution: props.restitution,
-                label: material,
-            });
+            body = Matter.Bodies.fromVertices(x, y, [vertices], bodyOpts);
             this.stampBlockProps(body, material, size, size);
         } else {
             const w = dimensions[0] || 30;
             const h = dimensions[1] || dimensions[0] || 30;
-            body = Matter.Bodies.rectangle(x, y, w, h, {
-                density: props.density,
-                friction: props.friction,
-                restitution: props.restitution,
-                label: material,
-            });
+            body = Matter.Bodies.rectangle(x, y, w, h, bodyOpts);
             this.stampBlockProps(body, material, w, h);
         }
 
-        if (angle) Matter.Body.setAngle(body, angle);
+        // Blocks spawn upright and resist rotation (high inertia)
+        Matter.Body.setAngle(body, angle ?? 0);
+        Matter.Body.setInertia(body, body.inertia * 80);
+
         Matter.World.add(this.world, body);
         return body;
     }

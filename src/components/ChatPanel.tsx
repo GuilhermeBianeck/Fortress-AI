@@ -37,7 +37,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
             <div className="px-3 py-2 border-b border-white/10 text-xs text-neutral-400 font-bold flex justify-between items-center">
                 <span>CHAT</span>
                 {mobile && onClose && (
-                    <button onClick={onClose} className="text-neutral-500 hover:text-white text-sm">✕</button>
+                    <button onClick={onClose} className="text-neutral-500 hover:text-white active:text-neutral-300 text-sm transition-colors duration-150 touch-manipulation">✕</button>
                 )}
             </div>
             <div
@@ -68,7 +68,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
                 <button
                     type="submit"
                     disabled={!text.trim()}
-                    className="px-3 py-2 text-xs text-rose-400 font-bold hover:text-rose-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="px-3 py-2 text-xs text-rose-400 font-bold hover:text-rose-300 active:text-rose-200 transition-colors duration-150 touch-manipulation disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                     Send
                 </button>
