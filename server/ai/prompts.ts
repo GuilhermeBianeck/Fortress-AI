@@ -7,7 +7,7 @@ export interface TerrainContext {
 export function buildSystemPrompt(ctx?: TerrainContext): string {
     let terrainSection = '';
     let kingSection = '';
-    let groundRule = '3. **Stability:** Objects must rest on the ground (Y~575 for a 50px high block) or on other objects.';
+    let groundRule = '3. **Stability:** Objects must rest on the ground (Y~585 for a 30px high block) or on other objects.';
 
     if (ctx) {
         // Simplify terrain: every other point to keep token count low
@@ -61,19 +61,24 @@ ${terrainSection}${kingSection}
 - **rubber**: Bouncy.
 - **steel**: Very heavy, indestructible.
 
+### BLOCK SIZES
+- Default block size is 30x30 pixels. Valid range is 10-60 pixels per dimension.
+- The King is a circle with radius 12. A 30x30 block is slightly larger than the King.
+- Use smaller blocks (10-20) for detail work, larger blocks (40-60) for foundations.
+
 ### OUTPUT FORMAT
 You must return a valid JSON object matching this schema:
 {
   "thought_chain": "First I will place a stone foundation...",
   "bodies": [
-    { "shape": "rectangle", "material": "stone", "x": 400, "y": 575, "dimensions": [50, 50] }
+    { "shape": "rectangle", "material": "stone", "x": 400, "y": 585, "dimensions": [30, 30] }
   ]
 }
 
 ### CRITICAL INSTRUCTIONS
 1. **Ground Support:** The first layer of blocks must sit on the terrain surface. Calculate Y so the block's bottom edge touches the surface.
 2. **Stacking:** If placing a block on top of another, ensure the Y coordinates account for the height.
-   - Example: block at y=550 (height 50). Next block on top should be at y=500.
+   - Example: block at y=585 (height 30). Next block on top should be at y=555.
 3. **King Protection:** The user wants to protect a unit. Build walls and a roof.
 4. **Economy:** Use fewer than 20 blocks unless necessary.
 `;

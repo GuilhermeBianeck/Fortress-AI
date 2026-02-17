@@ -26,7 +26,7 @@ export function safeSpawn(plans: BodyPlan[], existingWorld: Matter.World): SafeS
         const clone = Matter.Bodies.fromVertices(
             body.position.x,
             body.position.y,
-            body.vertices.map(v => [v]),
+            [body.vertices.map(v => ({ x: v.x, y: v.y }))],
             { isStatic: true, label: body.label }
         );
         if (clone) {
@@ -80,10 +80,10 @@ function createGhostBody(plan: BodyPlan, x: number, y: number): Matter.Body {
     let body: Matter.Body;
 
     if (plan.shape === 'circle') {
-        const radius = plan.dimensions[0] || 25;
+        const radius = plan.dimensions[0] || 15;
         body = Matter.Bodies.circle(x, y, radius, { isStatic: true });
     } else if (plan.shape === 'triangle') {
-        const size = plan.dimensions[0] || 50;
+        const size = plan.dimensions[0] || 30;
         const vertices = [
             { x: 0, y: -size / 2 },
             { x: -size / 2, y: size / 2 },
@@ -91,8 +91,8 @@ function createGhostBody(plan: BodyPlan, x: number, y: number): Matter.Body {
         ];
         body = Matter.Bodies.fromVertices(x, y, [vertices], { isStatic: true });
     } else {
-        const w = plan.dimensions[0] || 50;
-        const h = plan.dimensions[1] || plan.dimensions[0] || 50;
+        const w = plan.dimensions[0] || 30;
+        const h = plan.dimensions[1] || plan.dimensions[0] || 30;
         body = Matter.Bodies.rectangle(x, y, w, h, { isStatic: true });
     }
 

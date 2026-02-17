@@ -9,6 +9,8 @@ export interface BodyState {
     angle: number;
     velocity: Vector;
     label: string;
+    blockHp: number | null;
+    blockMaxHp: number | null;
 }
 
 export interface GameState {

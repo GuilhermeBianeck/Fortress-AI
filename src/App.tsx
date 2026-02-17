@@ -1,22 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
 import { GodTools } from './components/GodTools';
 import { Bot, Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { MaterialType, ShapeType } from './types';
+import type { MaterialType, ShapeType, GameMode } from './types';
 
 function App() {
-  const { gameState, terrain, buildStatus, kingHp, kingMaxHp, spawnBox, requestBuild, clearWorld } = useGameState();
+  const {
+    gameState, terrain, buildStatus, kingHp, kingMaxHp,
+    spawnBox, requestBuild, clearWorld, fireProjectile,
+    setBlockDestroyedCallback, setProjectileImpactCallback,
+  } = useGameState();
 
   // God Tools state
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>('wood');
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
+  const [gameMode, setGameMode] = useState<GameMode>('build');
 
   // AI Architect state
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('fortress_api_key') || '');
   const [prompt, setPrompt] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Tab key to toggle mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setGameMode(prev => prev === 'build' ? 'fire' : 'build');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -120,35 +137,56 @@ function App() {
           onMaterialChange={setSelectedMaterial}
           onShapeChange={setSelectedShape}
           onClear={clearWorld}
+          gameMode={gameMode}
+          onModeChange={setGameMode}
         />
 
         {/* Game Canvas */}
         <div className="relative group">
           <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 to-violet-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 pointer-events-none"></div>
-          <GameCanvas gameState={gameState} terrain={terrain} onSpawn={handleSpawn} kingHp={kingHp} kingMaxHp={kingMaxHp} />
+          <GameCanvas
+            gameState={gameState}
+            terrain={terrain}
+            onSpawn={handleSpawn}
+            kingHp={kingHp}
+            kingMaxHp={kingMaxHp}
+            gameMode={gameMode}
+            onFire={fireProjectile}
+            setBlockDestroyedCallback={setBlockDestroyedCallback}
+            setProjectileImpactCallback={setProjectileImpactCallback}
+          />
         </div>
 
-        {/* Prompt Input */}
-        <form onSubmit={handleSubmitPrompt} className="w-full max-w-[800px] bg-black/40 border border-white/10 rounded-xl p-3 flex gap-3 backdrop-blur-sm">
-          <div className="p-2.5 bg-neutral-900 rounded-lg shrink-0">
-            <Terminal size={18} className="text-neutral-400" />
+        {/* Prompt Input — only in build mode */}
+        {gameMode === 'build' && (
+          <form onSubmit={handleSubmitPrompt} className="w-full max-w-[800px] bg-black/40 border border-white/10 rounded-xl p-3 flex gap-3 backdrop-blur-sm">
+            <div className="p-2.5 bg-neutral-900 rounded-lg shrink-0">
+              <Terminal size={18} className="text-neutral-400" />
+            </div>
+            <input
+              type="text"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Describe your fortress... (e.g., 'Build a stone tower with a wood base')"
+              className="w-full bg-transparent outline-none text-neutral-200 placeholder:text-neutral-600 font-mono text-sm"
+              disabled={isBuilding}
+            />
+            <button
+              type="submit"
+              disabled={isBuilding || !prompt.trim()}
+              className="p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {isBuilding ? <Loader2 size={18} className="animate-spin text-white" /> : <Send size={18} className="text-white" />}
+            </button>
+          </form>
+        )}
+
+        {/* Fire mode hint */}
+        {gameMode === 'fire' && (
+          <div className="text-xs text-neutral-500 font-mono">
+            Drag on canvas to aim &amp; fire &middot; Arrow keys to fine-tune &middot; Tab to switch mode
           </div>
-          <input
-            type="text"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe your fortress... (e.g., 'Build a stone tower with a wood base')"
-            className="w-full bg-transparent outline-none text-neutral-200 placeholder:text-neutral-600 font-mono text-sm"
-            disabled={isBuilding}
-          />
-          <button
-            type="submit"
-            disabled={isBuilding || !prompt.trim()}
-            className="p-2.5 bg-rose-600 rounded-lg shrink-0 hover:bg-rose-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            {isBuilding ? <Loader2 size={18} className="animate-spin text-white" /> : <Send size={18} className="text-white" />}
-          </button>
-        </form>
+        )}
       </main>
     </div>
   );

@@ -1,20 +1,11 @@
 import Matter from 'matter-js';
 import { Server } from 'socket.io';
 import type { KingState } from '../types';
+import { MATERIAL_COLORS } from '../config/constants';
 
 const TICK_RATE = 60;
 const SNAPSHOT_RATE = 20;
 const TICK_DT = 1000 / TICK_RATE;
-
-// Material color map for client rendering
-const MATERIAL_COLORS: Record<string, string> = {
-    wood: '#A67C52',
-    stone: '#7D7D7D',
-    ice: '#A5F2F3',
-    rubber: '#FF69B4',
-    steel: '#434B4D',
-    king: '#FFD700',
-};
 
 export class GameLoop {
     private engine: Matter.Engine;
@@ -22,6 +13,7 @@ export class GameLoop {
     private interval: ReturnType<typeof setInterval> | null = null;
     private lastSnapshotTime = 0;
     private kingState: KingState | null = null;
+    private onTickCallback: (() => void) | null = null;
 
     constructor(engine: Matter.Engine, io: Server, kingState?: KingState) {
         this.engine = engine;
@@ -31,6 +23,10 @@ export class GameLoop {
 
     setKingState(kingState: KingState) {
         this.kingState = kingState;
+    }
+
+    setOnTick(cb: () => void) {
+        this.onTickCallback = cb;
     }
 
     start() {
@@ -52,6 +48,8 @@ export class GameLoop {
         // Fixed timestep update
         Matter.Engine.update(this.engine, TICK_DT);
 
+        this.onTickCallback?.();
+
         // Snapshot broadcast
         const now = Date.now();
         if (now - this.lastSnapshotTime > (1000 / SNAPSHOT_RATE)) {
@@ -62,10 +60,9 @@ export class GameLoop {
 
     private broadcastState() {
         const bodies = Matter.Composite.allBodies(this.engine.world).map(body => {
-            // Calculate bounding box dimensions from vertices
-            const bounds = body.bounds;
-            const width = bounds.max.x - bounds.min.x;
-            const height = bounds.max.y - bounds.min.y;
+            // Use stamped original dimensions to avoid AABB flicker on rotation
+            const width = (body as any).originalWidth || (body.bounds.max.x - body.bounds.min.x);
+            const height = (body as any).originalHeight || (body.bounds.max.y - body.bounds.min.y);
 
             return {
                 id: body.id,
@@ -79,6 +76,8 @@ export class GameLoop {
                 circleRadius: (body as any).circleRadius || 0,
                 material: body.label || 'default',
                 color: MATERIAL_COLORS[body.label] || '#e11d48',
+                blockHp: (body as any).blockHp ?? null,
+                blockMaxHp: (body as any).blockMaxHp ?? null,
             };
         });
 

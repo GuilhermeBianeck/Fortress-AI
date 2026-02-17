@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType } from '../types';
+import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector } from '../types';
 
 const SERVER_URL = 'http://localhost:3001';
 
@@ -12,6 +12,10 @@ export const useGameState = () => {
     const [kingMaxHp, setKingMaxHp] = useState(100);
     const [kingDead, setKingDead] = useState(false);
     const socketRef = useRef<Socket | null>(null);
+
+    // Callback refs for canvas effects
+    const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
+    const projectileImpactCbRef = useRef<((data: { position: Vector }) => void) | null>(null);
 
     useEffect(() => {
         socketRef.current = io(SERVER_URL);
@@ -69,6 +73,14 @@ export const useGameState = () => {
             setKingDead(false);
         });
 
+        socketRef.current.on('block_destroyed', (data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => {
+            blockDestroyedCbRef.current?.(data);
+        });
+
+        socketRef.current.on('projectile_impact', (data: { position: Vector }) => {
+            projectileImpactCbRef.current?.(data);
+        });
+
         socketRef.current.on('disconnect', () => {
             console.log('Disconnected from Game Server');
         });
@@ -83,7 +95,7 @@ export const useGameState = () => {
         y: number,
         material: MaterialType = 'wood',
         shape: ShapeType = 'rectangle',
-        dimensions: number[] = [50, 50]
+        dimensions: number[] = [30, 30]
     ) => {
         socketRef.current?.emit('spawn', { x, y, material, shape, dimensions });
     }, []);
@@ -98,5 +110,21 @@ export const useGameState = () => {
         socketRef.current?.emit('clear_world');
     }, []);
 
-    return { gameState, terrain, buildStatus, kingHp, kingMaxHp, kingDead, spawnBox, requestBuild, clearWorld };
+    const fireProjectile = useCallback((angle: number, power: number) => {
+        socketRef.current?.emit('fire_projectile', { angle, power });
+    }, []);
+
+    const setBlockDestroyedCallback = useCallback((cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => {
+        blockDestroyedCbRef.current = cb;
+    }, []);
+
+    const setProjectileImpactCallback = useCallback((cb: ((data: { position: Vector }) => void) | null) => {
+        projectileImpactCbRef.current = cb;
+    }, []);
+
+    return {
+        gameState, terrain, buildStatus, kingHp, kingMaxHp, kingDead,
+        spawnBox, requestBuild, clearWorld, fireProjectile,
+        setBlockDestroyedCallback, setProjectileImpactCallback,
+    };
 };

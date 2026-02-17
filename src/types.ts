@@ -15,7 +15,11 @@ export interface BodyState {
     circleRadius: number;
     material: string;
     color: string;
+    blockHp: number | null;
+    blockMaxHp: number | null;
 }
+
+export type GameMode = 'build' | 'fire';
 
 export interface GameState {
     bodies: BodyState[];
