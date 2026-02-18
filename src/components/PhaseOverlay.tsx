@@ -41,8 +41,8 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
     if (phase === 'build') {
         return (
             <div className="flex items-center justify-between w-full w-full">
-                <div className="flex items-center gap-1.5 sm:gap-2 bg-green-900/20 border border-green-800/30 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm">
-                    <span className="text-green-400 font-bold text-xs sm:text-sm">
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-green-100/80 border border-green-300/50 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm">
+                    <span className="text-green-700 font-bold text-xs sm:text-sm">
                         {currentRound ? `R${currentRound} — ` : ''}🔨 BUILD
                     </span>
                     {roundScore && (
@@ -52,7 +52,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     )}
                 </div>
                 {timeLeft !== null && (
-                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 10 ? 'text-red-400 animate-pulse' : 'text-amber-200'}`}>
+                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-amber-700'}`}>
                         {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
                     </div>
                 )}
@@ -69,11 +69,11 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         };
         return (
             <div className="flex items-center justify-center w-full w-full">
-                <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-sm text-center">
-                    <span className="text-amber-300 font-bold text-sm sm:text-base">🔭 REVEALING KINGDOMS</span>
-                    <p className="text-[10px] sm:text-xs text-amber-600/80 mt-0.5">The scout surveys the battlefield...</p>
+                <div className="bg-amber-100/80 border border-amber-300/50 rounded-lg px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-sm text-center">
+                    <span className="text-amber-700 font-bold text-sm sm:text-base">🔭 REVEALING KINGDOMS</span>
+                    <p className="text-[10px] sm:text-xs text-amber-500 mt-0.5">The scout surveys the battlefield...</p>
                     {hazards && hazards.length > 0 && (
-                        <p className="text-xs text-amber-400/80 mt-1">
+                        <p className="text-xs text-amber-600 mt-1">
                             ⚠️ Hazards: {hazards.map(h => hazardNames[h.type] || h.type).join(', ')}
                         </p>
                     )}
@@ -90,25 +90,25 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
             <div className="flex items-center justify-between w-full w-full gap-2">
                 <div className={`flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm border ${
                     isMyTurn
-                        ? 'bg-red-900/20 border-red-800/30'
-                        : 'bg-amber-900/15 border-amber-800/20'
+                        ? 'bg-red-100/80 border-red-300/50'
+                        : 'bg-amber-100/70 border-amber-300/40'
                 }`}>
-                    <span className={`font-bold text-xs sm:text-sm ${isMyTurn ? 'text-red-400' : 'text-amber-600'}`}>
+                    <span className={`font-bold text-xs sm:text-sm ${isMyTurn ? 'text-red-600' : 'text-amber-600'}`}>
                         {isMyTurn ? '💥 YOUR TURN — FIRE!' : "⏳ OPPONENT'S TURN"}
                     </span>
                 </div>
                 {windHazard && (
-                    <div className="flex items-center gap-1 bg-cyan-900/20 border border-cyan-800/30 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-sm">
-                        <span className="text-cyan-400 text-sm sm:text-base">
+                    <div className="flex items-center gap-1 bg-cyan-100/80 border border-cyan-300/50 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-sm">
+                        <span className="text-cyan-600 text-sm sm:text-base">
                             {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'}
                         </span>
-                        <span className="text-cyan-300 text-[10px] sm:text-xs font-bold">
+                        <span className="text-cyan-700 text-[10px] sm:text-xs font-bold">
                             WIND {Math.round(((windHazard.windStrength ?? 0.0003) / 0.0003) * 100)}%
                         </span>
                     </div>
                 )}
                 {timeLeft !== null && (
-                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-amber-200'}`}>
+                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-amber-700'}`}>
                         {timeLeft}s
                     </div>
                 )}
@@ -131,43 +131,43 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
             <div className="flex items-center justify-center w-full w-full">
                 <div className={`rounded-xl sm:rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-sm border text-center ${
                     isWinner
-                        ? 'bg-amber-900/20 border-amber-600/30'
-                        : 'bg-red-900/20 border-red-800/30'
+                        ? 'bg-amber-100/80 border-amber-400/50'
+                        : 'bg-red-100/80 border-red-300/50'
                 }`}>
-                    <div className={`text-xl sm:text-3xl font-bold mb-1 ${isWinner ? 'text-amber-300' : 'text-red-400'}`} style={{ fontFamily: "'MedievalSharp', cursive" }}>
+                    <div className={`text-xl sm:text-3xl font-bold mb-1 ${isWinner ? 'text-amber-600' : 'text-red-500'}`} style={{ fontFamily: "'MedievalSharp', cursive" }}>
                         {isWinner ? '👑 VICTORY' : '💀 DEFEAT'}
                     </div>
-                    <p className="text-xs sm:text-sm text-amber-200 mb-1">{winnerName} conquers!</p>
+                    <p className="text-xs sm:text-sm text-amber-700 mb-1">{winnerName} conquers!</p>
                     {roundScore && (
-                        <p className="text-xs sm:text-sm text-amber-600 mb-1">
+                        <p className="text-xs sm:text-sm text-amber-500 mb-1">
                             Rounds: {roundScore.left} - {roundScore.right}
                         </p>
                     )}
                     {reasonText && (
-                        <p className="text-[10px] sm:text-sm text-amber-700">{reasonText}</p>
+                        <p className="text-[10px] sm:text-sm text-amber-500">{reasonText}</p>
                     )}
 
                     {/* Score breakdown */}
                     {myScore && (
-                        <div className="mt-2 sm:mt-3 border-t border-amber-900/30 pt-2 sm:pt-3">
-                            <p className="text-xs sm:text-sm font-bold text-amber-400 mb-1.5">
+                        <div className="mt-2 sm:mt-3 border-t border-amber-300/40 pt-2 sm:pt-3">
+                            <p className="text-xs sm:text-sm font-bold text-amber-600 mb-1.5">
                                 YOUR SCORE: {myScore.totalScore}
                             </p>
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-amber-600">
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-amber-500">
                                 <span className="text-right">Damage dealt:</span>
-                                <span className="text-left text-amber-200">+{myScore.damagePoints}</span>
+                                <span className="text-left text-amber-700">+{myScore.damagePoints}</span>
                                 <span className="text-right">Resource bonus:</span>
-                                <span className="text-left text-amber-200">+{myScore.resourceBonus}</span>
+                                <span className="text-left text-amber-700">+{myScore.resourceBonus}</span>
                                 <span className="text-right">Time bonus:</span>
-                                <span className="text-left text-amber-200">+{myScore.timeBonus}</span>
+                                <span className="text-left text-amber-700">+{myScore.timeBonus}</span>
                                 {myScore.winBonus > 0 && (
                                     <>
                                         <span className="text-right">Win bonus:</span>
-                                        <span className="text-left text-green-400">+{myScore.winBonus}</span>
+                                        <span className="text-left text-green-600">+{myScore.winBonus}</span>
                                     </>
                                 )}
                             </div>
-                            <p className="text-[10px] sm:text-xs text-amber-800 mt-1">
+                            <p className="text-[10px] sm:text-xs text-amber-400 mt-1">
                                 {myScore.resourcesUsed} blocks · {Math.round(myScore.combatTimeMs / 1000)}s combat · {myScore.damageDealt.toFixed(1)} dmg
                             </p>
                         </div>
@@ -179,8 +179,8 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             {rematchState === 'none' && (
                                 <button
                                     onClick={onRequestRematch}
-                                    className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-gradient-to-b from-amber-700 to-amber-800 hover:from-amber-600 hover:to-amber-700 active:from-amber-800 active:to-amber-900 text-amber-100 font-bold rounded-lg text-sm
-                                        transition-colors duration-200 touch-manipulation shadow-md shadow-amber-900/30"
+                                    className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:from-amber-600 active:to-amber-700 text-white font-bold rounded-lg text-sm
+                                        transition-colors duration-200 touch-manipulation shadow-md shadow-amber-400/30"
                                 >
                                     ⚔️ REMATCH
                                 </button>
@@ -188,16 +188,16 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             {rematchState === 'requested' && (
                                 <div className="flex items-center justify-center gap-2">
                                     <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                                    <p className="text-xs sm:text-sm text-amber-400">Awaiting opponent&apos;s response...</p>
+                                    <p className="text-xs sm:text-sm text-amber-600">Awaiting opponent&apos;s response...</p>
                                 </div>
                             )}
                             {rematchState === 'opponent_requested' && (
                                 <div>
-                                    <p className="text-xs sm:text-sm text-green-400 mb-2 animate-pulse">⚔️ The enemy demands a rematch!</p>
+                                    <p className="text-xs sm:text-sm text-green-600 mb-2 animate-pulse">⚔️ The enemy demands a rematch!</p>
                                     <button
                                         onClick={onRequestRematch}
-                                        className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-gradient-to-b from-green-700 to-green-800 hover:from-green-600 hover:to-green-700 active:from-green-800 active:to-green-900 text-green-100 font-bold rounded-lg text-sm
-                                            transition-colors duration-200 touch-manipulation shadow-md shadow-green-900/30"
+                                        className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-gradient-to-b from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 active:from-green-600 active:to-green-700 text-white font-bold rounded-lg text-sm
+                                            transition-colors duration-200 touch-manipulation shadow-md shadow-green-400/30"
                                     >
                                         ACCEPT CHALLENGE
                                     </button>

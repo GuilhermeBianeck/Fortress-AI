@@ -6,9 +6,9 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: dark;
-  color: #f5e6c8;
-  background-color: #1a120b;
+  color-scheme: light;
+  color: #3d2b14;
+  background-color: #fdf6e3;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -20,7 +20,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100dvh;
-  background: linear-gradient(180deg, #1a120b 0%, #2d1f0e 50%, #1a120b 100%);
+  background: linear-gradient(180deg, #fdf6e3 0%, #f5edd5 50%, #fdf6e3 100%);
   /* Prevent pull-to-refresh and overscroll on mobile */
   overscroll-behavior: none;
 }
@@ -53,12 +53,12 @@ body {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #2d1f0e;
+  background: #f0e6d0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #8b6914;
+  background: #c9a96e;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #a67c52;
+  background: #b8923a;
 }
