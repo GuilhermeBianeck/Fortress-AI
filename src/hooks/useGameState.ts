@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage } from '../types';
+import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile } from '../types';
 
 const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
 
@@ -25,6 +25,8 @@ export const useGameState = () => {
     const [roundScore, setRoundScore] = useState<{ left: number; right: number }>({ left: 0, right: 0 });
     const [currentRound, setCurrentRound] = useState(1);
     const [hazards, setHazards] = useState<{ type: string; id: string; position: { x: number; y: number }; width: number; height: number; windDirection?: number; windStrength?: number }[]>([]);
+    const [matchScores, setMatchScores] = useState<MatchScores | null>(null);
+    const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
 
     const socketRef = useRef<Socket | null>(null);
     const mySideRef = useRef<Side>('left');
@@ -202,6 +204,7 @@ export const useGameState = () => {
         socketRef.current.on('rematch_start', () => {
             setRematchState('none');
             setMatchResult(null);
+            setMatchScores(null);
             setGameState(null);
             setBuildStatus({ status: 'idle', message: '' });
         });
@@ -214,6 +217,15 @@ export const useGameState = () => {
                 setMatchResult({ winner: data.winner, reason: data.reason });
                 setPhase('result');
             }
+        });
+
+        // --- Scoring ---
+        socketRef.current.on('match_scores', (data: MatchScores) => {
+            setMatchScores(data);
+        });
+
+        socketRef.current.on('profile_update', (data: PlayerProfile | null) => {
+            setPlayerProfile(data);
         });
 
         socketRef.current.on('disconnect', () => {
@@ -277,6 +289,10 @@ export const useGameState = () => {
         setRematchState('requested');
     }, []);
 
+    const getProfile = useCallback(() => {
+        socketRef.current?.emit('get_profile');
+    }, []);
+
     const setBlockDestroyedCallback = useCallback((cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => {
         blockDestroyedCbRef.current = cb;
     }, []);
@@ -289,9 +305,10 @@ export const useGameState = () => {
         gameState, terrain, buildStatus, kingsHp,
         roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
         chatMessages, rematchState, roundScore, currentRound, hazards,
+        matchScores, playerProfile,
         createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
         spawnBox, requestBuild, fireProjectile,
-        sendChatMessage, requestRematch,
+        sendChatMessage, requestRematch, getProfile,
         setBlockDestroyedCallback, setProjectileImpactCallback,
     };
 };

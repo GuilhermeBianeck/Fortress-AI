@@ -14,9 +14,10 @@ function App() {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards,
+    matchScores, playerProfile,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
-    sendChatMessage, requestRematch,
+    sendChatMessage, requestRematch, getProfile,
     setBlockDestroyedCallback, setProjectileImpactCallback,
   } = useGameState();
 
@@ -171,6 +172,8 @@ function App() {
             onJoinQueue={joinQueue}
             onLeaveQueue={leaveQueue}
             onReady={playerReady}
+            playerProfile={playerProfile}
+            onGetProfile={getProfile}
           />
         ) : (
           /* Desktop: constrained 4:3. Mobile: full width, fills available height. */
@@ -217,6 +220,7 @@ function App() {
                           rematchState={rematchState}
                           onRequestRematch={requestRematch}
                           hazards={hazards}
+                          matchScores={matchScores}
                         />
                       </div>
                     </div>

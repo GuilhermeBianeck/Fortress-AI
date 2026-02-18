@@ -5,9 +5,10 @@ import { GameLoop } from '../physics/loop';
 import { generateFortress } from '../ai/gemini';
 import type { TerrainContext } from '../ai/prompts';
 import { safeSpawn } from '../ai/overlap';
-import type { KingState, PlayerInfo, PlayerState, Side, KingHpState, MatchPhase, HazardData } from '../types';
+import type { KingState, PlayerInfo, PlayerState, Side, KingHpState, MatchPhase, HazardData, MatchScores } from '../types';
 import type { TerrainResult } from '../physics/terrain';
 import { MatchStateMachine } from './MatchStateMachine';
+import { ScoreManager } from './ScoreManager';
 import {
     MATERIAL_PROPS, DAMAGE_MULTIPLIERS, MATERIAL_BLOCK_HP,
     KING_MAX_HP, IMPACT_THRESHOLD, DAMAGE_SCALE,
@@ -36,6 +37,7 @@ export class GameSession {
     private onRoundEndCallback?: (winner: Side, reason: string) => 'continue' | 'match_over';
     private hazards: HazardData[] = [];
     private hazardTimers: ReturnType<typeof setInterval>[] = [];
+    private scoreManager: ScoreManager = new ScoreManager();
 
     constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void, onRoundEnd?: (winner: Side, reason: string) => 'continue' | 'match_over') {
         this.onPhaseChangeCallback = onPhaseChange;
@@ -85,6 +87,7 @@ export class GameSession {
             onPhaseChange: (phase) => {
                 this.onPhaseChangeCallback?.(phase);
                 if (phase === 'combat') {
+                    this.scoreManager.startCombatTimer();
                     this.startFallingRocks();
                 }
             },
@@ -110,6 +113,15 @@ export class GameSession {
 
     getStateMachine(): MatchStateMachine {
         return this.stateMachine;
+    }
+
+    getScoreManager(): ScoreManager {
+        return this.scoreManager;
+    }
+
+    computeMatchScores(winner: Side): MatchScores {
+        this.scoreManager.stopCombatTimer();
+        return this.scoreManager.computeScores(winner);
     }
 
     getTerrainData() {
@@ -174,6 +186,7 @@ export class GameSession {
         console.log(`Spawn: ${shape} ${material} at (${x.toFixed(0)}, ${y.toFixed(0)}) dims=${w}x${h} by ${player.side}`);
 
         this.createBody('rectangle', material, x, y, [w, h]);
+        this.scoreManager.recordResourceUsed(player.side);
     }
 
     async handleRequestBuild(socket: Socket, data: { apiKey: string; prompt: string }) {
@@ -237,6 +250,7 @@ export class GameSession {
             }
 
             socket.emit('build_success', { count: spawnedCount, thought: plan.thought_chain });
+            this.scoreManager.recordResourceUsed(player.side, spawnedCount);
         } catch (err: any) {
             console.error("Build Error:", err);
             socket.emit('build_error', { message: err.message || "AI Generation Failed" });
@@ -503,6 +517,10 @@ export class GameSession {
                             const damage = ((impactForce - IMPACT_THRESHOLD) * multiplier) * DAMAGE_SCALE;
                             ps.kingState.hp = Math.max(0, ps.kingState.hp - damage);
                             ps.kingState.position = { x: ps.kingBody.position.x, y: ps.kingBody.position.y };
+
+                            // Record damage for scoring (attacker is the opposite side)
+                            const attackerSide: Side = ps.side === 'left' ? 'right' : 'left';
+                            this.scoreManager.recordDamage(attackerSide, damage);
 
                             console.log(`${ps.side} King hit by ${otherBody.label} | force=${impactForce.toFixed(1)} | damage=${damage.toFixed(1)} | HP=${ps.kingState.hp.toFixed(1)}/${ps.kingState.maxHp}`);
 

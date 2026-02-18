@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import type { RoomState } from '../types';
-import { Bot, Swords, Zap, Check } from 'lucide-react';
+import type { RoomState, PlayerProfile } from '../types';
+import { Bot, Swords, Zap, Check, Trophy } from 'lucide-react';
 
 interface LobbyProps {
     roomState: RoomState | null;
@@ -13,15 +13,22 @@ interface LobbyProps {
     onJoinQueue: (name?: string) => void;
     onLeaveQueue: () => void;
     onReady: () => void;
+    playerProfile?: PlayerProfile | null;
+    onGetProfile?: () => void;
 }
 
 export const Lobby = ({
     roomState, queuePosition,
     playerName, onPlayerNameChange,
     onCreateRoom, onJoinRoom, onJoinQueue, onLeaveQueue, onReady,
+    playerProfile, onGetProfile,
 }: LobbyProps) => {
     const [joinCode, setJoinCode] = useState('');
     const [isReady, setIsReady] = useState(false);
+
+    useEffect(() => {
+        onGetProfile?.();
+    }, [onGetProfile]);
 
     const handleJoinSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -194,6 +201,46 @@ export const Lobby = ({
                     >
                         Quick Match
                     </button>
+
+                    {/* Player Profile & History */}
+                    {playerProfile && playerProfile.matchesPlayed > 0 && (
+                        <div className="mt-2 p-4 rounded-xl bg-black/40 border border-white/5">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Trophy size={16} className="text-amber-400" />
+                                <span className="text-sm font-bold text-white">Your Stats</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                                <div>
+                                    <p className="text-lg font-bold text-amber-400">{playerProfile.totalScore}</p>
+                                    <p className="text-[10px] text-neutral-500">Total Score</p>
+                                </div>
+                                <div>
+                                    <p className="text-lg font-bold text-white">{playerProfile.matchesPlayed}</p>
+                                    <p className="text-[10px] text-neutral-500">Matches</p>
+                                </div>
+                                <div>
+                                    <p className="text-lg font-bold text-emerald-400">{playerProfile.matchesWon}</p>
+                                    <p className="text-[10px] text-neutral-500">Wins</p>
+                                </div>
+                            </div>
+                            {playerProfile.history.length > 0 && (
+                                <div>
+                                    <p className="text-xs text-neutral-400 mb-1.5">Recent Matches</p>
+                                    <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
+                                        {playerProfile.history.slice(0, 5).map((entry, i) => (
+                                            <div key={`${entry.matchId}-${i}`} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-white/5">
+                                                <span className={entry.won ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'}>
+                                                    {entry.won ? 'W' : 'L'}
+                                                </span>
+                                                <span className="text-neutral-400 truncate mx-2">vs {entry.opponentName}</span>
+                                                <span className="text-amber-400 font-mono">{entry.score.totalScore}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

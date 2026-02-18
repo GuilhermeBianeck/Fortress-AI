@@ -167,6 +167,13 @@ io.on('connection', (socket) => {
         roomManager.requestRematch(socket.id);
     });
 
+    // --- Profile ---
+
+    socket.on('get_profile', () => {
+        const profile = roomManager.getProfile(socket.id);
+        socket.emit('profile_update', profile);
+    });
+
     // --- Chat ---
 
     socket.on('chat_message', (data: { text: string }) => {

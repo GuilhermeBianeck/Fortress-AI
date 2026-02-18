@@ -82,6 +82,15 @@ export const SHAPE_DIMS: Record<string, [number, number]> = {
     beam: [90, 15],
 };
 
+// === Scoring ===
+export const SCORE_DAMAGE_MULTIPLIER = 10;       // points per unit of damage dealt
+export const SCORE_RESOURCE_MAX_BONUS = 200;     // max bonus for using fewer resources
+export const SCORE_RESOURCE_THRESHOLD = 50;      // max blocks before bonus drops to 0
+export const SCORE_TIME_MAX_BONUS = 300;         // max bonus for fast kills
+export const SCORE_TIME_THRESHOLD_MS = 120_000;  // combat time after which time bonus is 0
+export const SCORE_WIN_BONUS = 500;              // flat bonus for winning
+export const MAX_MATCH_HISTORY = 20;             // max history entries per player
+
 // === Projectiles ===
 export const PROJECTILE_RADIUS = 8;
 export const PROJECTILE_DENSITY = 0.05;

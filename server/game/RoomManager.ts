@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { GameSession } from './GameSession';
-import type { PlayerInfo, MatchPhase, Side } from '../types';
-import { ROUNDS_TO_WIN, ROUND_INTERSTITIAL_MS } from '../config/constants';
+import type { PlayerInfo, MatchPhase, Side, PlayerProfile, MatchHistoryEntry, MatchScores } from '../types';
+import { ROUNDS_TO_WIN, ROUND_INTERSTITIAL_MS, MAX_MATCH_HISTORY } from '../config/constants';
 
 export interface Room {
     id: string;
@@ -25,6 +25,7 @@ function generateRoomId(): string {
 export class RoomManager {
     rooms: Map<string, Room> = new Map();
     playerRoomMap: Map<string, string> = new Map(); // socketId → roomId
+    private playerProfiles: Map<string, PlayerProfile> = new Map(); // socketId → profile
     private matchmakingQueue: string[] = [];
     private queueNames: Map<string, string> = new Map(); // socketId → name
     private io: Server;
@@ -225,6 +226,12 @@ export class RoomManager {
         });
 
         if (isFinalRound) {
+            // Compute and emit match scores
+            if (room.session) {
+                const scores = room.session.computeMatchScores(winner);
+                this.io.to(room.id).emit('match_scores', scores);
+                this.saveMatchResults(room, winner, scores);
+            }
             return 'match_over';
         }
 
@@ -321,6 +328,60 @@ export class RoomManager {
 
     getQueuePosition(socketId: string): number {
         return this.matchmakingQueue.indexOf(socketId);
+    }
+
+    getProfile(socketId: string): PlayerProfile | null {
+        return this.playerProfiles.get(socketId) ?? null;
+    }
+
+    private getOrCreateProfile(socketId: string, name: string): PlayerProfile {
+        let profile = this.playerProfiles.get(socketId);
+        if (!profile) {
+            profile = {
+                name,
+                totalScore: 0,
+                matchesPlayed: 0,
+                matchesWon: 0,
+                history: [],
+            };
+            this.playerProfiles.set(socketId, profile);
+        }
+        profile.name = name;
+        return profile;
+    }
+
+    private saveMatchResults(room: Room, winner: Side, scores: MatchScores): void {
+        for (const [socketId, playerInfo] of room.players.entries()) {
+            const side = playerInfo.side;
+            const opponentInfo = Array.from(room.players.values()).find(p => p.side !== side);
+            const opponentName = opponentInfo?.name || 'Unknown';
+            const score = scores[side];
+            const won = side === winner;
+
+            const profile = this.getOrCreateProfile(socketId, playerInfo.name);
+            profile.totalScore += score.totalScore;
+            profile.matchesPlayed++;
+            if (won) profile.matchesWon++;
+
+            const historyEntry: MatchHistoryEntry = {
+                matchId: room.id,
+                timestamp: Date.now(),
+                opponentName,
+                side,
+                won,
+                score,
+                rounds: { ...room.roundScore },
+            };
+
+            profile.history.unshift(historyEntry);
+            if (profile.history.length > MAX_MATCH_HISTORY) {
+                profile.history = profile.history.slice(0, MAX_MATCH_HISTORY);
+            }
+
+            // Emit updated profile to the player
+            const playerSocket = this.io.sockets.sockets.get(socketId);
+            playerSocket?.emit('profile_update', profile);
+        }
     }
 
     private cleanupStaleRooms(): void {
