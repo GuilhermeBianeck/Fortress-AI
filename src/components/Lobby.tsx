@@ -3,12 +3,12 @@ import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
 import { Swords, Zap, Check, Trophy } from 'lucide-react';
 
-interface LobbyProps {
+export interface LobbyProps {
     roomState: RoomState | null;
     queuePosition: number | null;
     playerName: string;
     onPlayerNameChange: (name: string) => void;
-    onCreateRoom: (name?: string) => void;
+    onCreateRoom: (name?: string, mode?: 'pvp' | 'single') => void;
     onJoinRoom: (code: string, name?: string) => void;
     onJoinQueue: (name?: string) => void;
     onLeaveQueue: () => void;
@@ -45,22 +45,33 @@ export const Lobby = ({
 
     // Waiting room view
     if (roomState) {
+        const isSinglePlayer = roomState.opponentName === 'Training Bot';
+
         return (
             <div className="flex-1 w-full flex items-center justify-center bg-gradient-to-br from-[#fdf6e3] via-[#faf0d7] to-[#fdf6e3] p-6">
-                <div className="w-full text-center">
-                    <h2 className="text-2xl font-bold text-amber-700 mb-3" style={{ fontFamily: "'MedievalSharp', cursive" }}>⚔️ War Room</h2>
-                    <div className="text-5xl font-mono font-bold text-amber-500 tracking-[0.3em] mb-6 select-all">
-                        {roomState.roomId}
-                    </div>
-                    <p className="text-base text-amber-600 mb-4">
-                        Share this code with your opponent
-                    </p>
+                <div className="w-full max-w-md text-center">
+                    <h2 className="text-2xl font-bold text-amber-700 mb-3" style={{ fontFamily: "'MedievalSharp', cursive" }}>
+                        {isSinglePlayer ? '⚔️ Training Grounds' : '⚔️ War Room'}
+                    </h2>
 
-                    <div className="p-4 rounded-xl bg-white/60 border border-amber-300/30 inline-block">
+                    {!isSinglePlayer && (
+                        <>
+                            <div className="text-5xl font-mono font-bold text-amber-500 tracking-[0.3em] mb-6 select-all">
+                                {roomState.roomId}
+                            </div>
+                            <p className="text-base text-amber-600 mb-4">
+                                Share this code with your opponent
+                            </p>
+                        </>
+                    )}
+
+                    <div className="p-4 rounded-xl bg-white/60 border border-amber-300/30 inline-block w-full">
                         <div className="flex items-center justify-center gap-2 text-base">
                             <span className={`w-2.5 h-2.5 rounded-full ${roomState.opponentConnected ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
                             <span className={roomState.opponentConnected ? 'text-green-600' : 'text-amber-500'}>
-                                {roomState.opponentConnected ? 'Opponent has arrived' : 'Awaiting challenger...'}
+                                {roomState.opponentConnected
+                                    ? (isSinglePlayer ? 'Bot is ready' : 'Opponent has arrived')
+                                    : 'Awaiting challenger...'}
                             </span>
                         </div>
                         <p className="text-sm text-amber-500 mt-2">
@@ -73,7 +84,7 @@ export const Lobby = ({
                             <button
                                 onClick={handleReady}
                                 disabled={isReady}
-                                className={`mt-6 sm:mt-8 w-full min-h-[48px] py-3.5 sm:py-4 font-bold rounded-xl text-lg sm:text-xl touch-manipulation
+                                className={`mt-6 sm:mt-8 w-full max-w-sm mx-auto min-h-[48px] py-3.5 sm:py-4 font-bold rounded-xl text-lg sm:text-xl touch-manipulation
                                     transition-colors duration-200 shadow-lg
                                     ${isReady
                                         ? 'bg-green-200 text-green-700 ring-2 ring-green-400/50 cursor-default shadow-green-300/30'
@@ -158,13 +169,22 @@ export const Lobby = ({
                         className="w-full bg-white/60 border border-amber-300/40 rounded-xl px-4 py-3 sm:py-4 text-center text-base sm:text-lg font-medium text-amber-800 placeholder:text-amber-400/60 outline-none focus:border-amber-500/60 transition-all touch-manipulation"
                     />
 
+                    {/* Single Player */}
+                    <button
+                        onClick={() => onCreateRoom(playerName, 'single')}
+                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-gradient-to-b from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600 active:from-blue-600 active:to-blue-700 text-white font-bold rounded-xl text-lg sm:text-xl shadow-lg shadow-blue-400/30
+                            transition-colors duration-200 touch-manipulation mb-3 sm:mb-4"
+                    >
+                        🧙 Single Player (Training)
+                    </button>
+
                     {/* Create Room */}
                     <button
-                        onClick={() => onCreateRoom(playerName)}
+                        onClick={() => onCreateRoom(playerName, 'pvp')}
                         className="w-full min-h-[48px] py-3.5 sm:py-5 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:from-amber-600 active:to-amber-700 text-white font-bold rounded-xl text-lg sm:text-xl shadow-lg shadow-amber-400/30
                             transition-colors duration-200 touch-manipulation"
                     >
-                        🏰 Create Kingdom
+                        🏰 Create Kingdom (PvP)
                     </button>
 
                     {/* Join Room */}

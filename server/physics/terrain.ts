@@ -9,7 +9,7 @@ function seededRandom(seed: number): () => number {
     };
 }
 
-function noise1D(x: number, seed: number, octaves: number = 3): number {
+function noise1D(x: number, seed: number, octaves: number = 3, freq: number = 0.01): number {
     const rng = seededRandom(seed);
     // Pre-generate phase offsets for each octave
     const phases: number[] = [];
@@ -23,7 +23,7 @@ function noise1D(x: number, seed: number, octaves: number = 3): number {
     let maxAmplitude = 0;
 
     for (let i = 0; i < octaves; i++) {
-        value += amplitude * Math.sin(x * frequency * 0.01 + phases[i]);
+        value += amplitude * Math.sin(x * frequency * freq + phases[i]);
         maxAmplitude += amplitude;
         amplitude *= 0.5;
         frequency *= 2;
@@ -43,13 +43,13 @@ export interface TerrainConfig {
 }
 
 const DEFAULT_CONFIG: TerrainConfig = {
-    width: 800,
+    width: 2400,
     height: 600,
     resolution: 20,
     seed: 42,
     baseHeight: 520,      // Ground sits at ~520px from top
-    amplitude: 80,        // ±80px variation
-    octaves: 3
+    amplitude: 120,       // ±120px variation (Significant hills)
+    octaves: 4
 };
 
 export interface TerrainResult {
@@ -65,14 +65,15 @@ export function generateTerrain(config: Partial<TerrainConfig> = {}): TerrainRes
     // Generate surface points
     const surfacePoints: { x: number; y: number }[] = [];
     for (let x = 0; x <= width; x += resolution) {
-        const noiseVal = noise1D(x, seed, octaves);
+        // Frequency 0.002 for defined but broad hills
+        const noiseVal = noise1D(x, seed, octaves, 0.002);
         const y = baseHeight + noiseVal * amplitude;
         surfacePoints.push({ x, y });
     }
 
     // Ensure edges reach the full width
     if (surfacePoints[surfacePoints.length - 1].x < width) {
-        const noiseVal = noise1D(width, seed, octaves);
+        const noiseVal = noise1D(width, seed, octaves, 0.002);
         surfacePoints.push({ x: width, y: baseHeight + noiseVal * amplitude });
     }
 
@@ -118,7 +119,7 @@ function createTerrainSegments(
         const body = Matter.Bodies.fromVertices(cx, cy, [vertices], {
             isStatic: true,
             label: 'Terrain',
-            friction: 0.8,
+            friction: 2.0, // Increased friction to prevent sliding
             render: { fillStyle: '#2a2a2a' },
         });
 

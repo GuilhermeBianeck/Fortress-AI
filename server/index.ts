@@ -27,11 +27,32 @@ io.on('connection', (socket) => {
 
     // --- Lobby events ---
 
-    socket.on('create_room', (data?: { name?: string }) => {
-        const room = roomManager.createRoom(socket.id, data?.name);
+    socket.on('create_room', (data?: { name?: string; mode?: 'pvp' | 'single' }) => {
+        const room = roomManager.createRoom(socket.id, data?.name, data?.mode);
         socket.join(room.id);
         socket.emit('room_created', { roomId: room.id });
-        console.log(`Room ${room.id} created by ${socket.id}`);
+        console.log(`Room ${room.id} created by ${socket.id} (mode: ${data?.mode || 'pvp'})`);
+
+        // If single player, we need to notify the client about the bot immediately
+        if (data?.mode === 'single') {
+            const playerInfo = room.players.get(socket.id)!;
+            // We can simulate a join event for the bot or just let the room_joined event handle it
+            // but room_joined event is emitted below for the creator.
+            // We should emit room_joined with both players (user + bot).
+
+            const players = Array.from(room.players.values()).map(p => ({
+                side: p.side,
+                ready: p.ready,
+                name: p.name,
+            }));
+
+            socket.emit('room_joined', {
+                roomId: room.id,
+                side: playerInfo.side,
+                players,
+            });
+            // The bot "joined", so consistent with pvp.
+        }
     });
 
     socket.on('join_room', (data: { roomId: string; name?: string }) => {

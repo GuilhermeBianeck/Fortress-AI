@@ -76,11 +76,11 @@ export const MATERIAL_COLORS: Record<MaterialType, string> = {
     steel: '#434B4D',
 };
 
-export const WORLD_WIDTH = 1600;
+export const WORLD_WIDTH = 2400; // Synced with server
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
 export const LEFT_CANNON_X = 20;
-export const RIGHT_CANNON_X = 1580;
+export const RIGHT_CANNON_X = 2380;
 
 // === Scoring ===
 

@@ -88,11 +88,10 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const windHazard = hazards?.find(h => h.type === 'wind_zone');
         return (
             <div className="flex items-center justify-between w-full w-full gap-2">
-                <div className={`flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm border ${
-                    isMyTurn
+                <div className={`flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm border ${isMyTurn
                         ? 'bg-red-100/80 border-red-300/50'
                         : 'bg-amber-100/70 border-amber-300/40'
-                }`}>
+                    }`}>
                     <span className={`font-bold text-xs sm:text-sm ${isMyTurn ? 'text-red-600' : 'text-amber-600'}`}>
                         {isMyTurn ? '💥 YOUR TURN — FIRE!' : "⏳ OPPONENT'S TURN"}
                     </span>
@@ -103,7 +102,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'}
                         </span>
                         <span className="text-cyan-700 text-[10px] sm:text-xs font-bold">
-                            WIND {Math.round(((windHazard.windStrength ?? 0.0003) / 0.0003) * 100)}%
+                            {Math.round((windHazard.windStrength ?? 0.0003) * 20000)} KNOTS
                         </span>
                     </div>
                 )}
@@ -129,11 +128,10 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
         return (
             <div className="flex items-center justify-center w-full w-full">
-                <div className={`rounded-xl sm:rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-sm border text-center ${
-                    isWinner
+                <div className={`rounded-xl sm:rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-sm border text-center ${isWinner
                         ? 'bg-amber-100/80 border-amber-400/50'
                         : 'bg-red-100/80 border-red-300/50'
-                }`}>
+                    }`}>
                     <div className={`text-xl sm:text-3xl font-bold mb-1 ${isWinner ? 'text-amber-600' : 'text-red-500'}`} style={{ fontFamily: "'MedievalSharp', cursive" }}>
                         {isWinner ? '👑 VICTORY' : '💀 DEFEAT'}
                     </div>

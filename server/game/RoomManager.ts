@@ -38,7 +38,7 @@ export class RoomManager {
         this.cleanupInterval = setInterval(() => this.cleanupStaleRooms(), 60_000);
     }
 
-    createRoom(hostSocketId: string, name?: string): Room {
+    createRoom(hostSocketId: string, name?: string, mode: 'pvp' | 'single' = 'pvp'): Room {
         let roomId: string;
         do {
             roomId = generateRoomId();
@@ -64,6 +64,20 @@ export class RoomManager {
         room.players.set(hostSocketId, playerInfo);
         this.rooms.set(roomId, room);
         this.playerRoomMap.set(hostSocketId, roomId);
+
+        // If single player, add a dummy bot immediately
+        if (mode === 'single') {
+            const botId = `bot-${Date.now()}`;
+            const botInfo: PlayerInfo = {
+                socketId: botId,
+                side: 'right',
+                ready: true, // Bot is always ready
+                name: 'Training Bot',
+            };
+            room.players.set(botId, botInfo);
+            // We map the bot ID too, so it gets cleaned up if we iterate players
+            this.playerRoomMap.set(botId, roomId);
+        }
 
         return room;
     }

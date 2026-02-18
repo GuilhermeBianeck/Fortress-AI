@@ -38,6 +38,8 @@ export function generateHazards(terrain: TerrainResult, seed: number): HazardDat
 
         if (type === 'wind_zone') {
             // Wind covers the entire world width, full height
+            // Randomize wind strength: 0.5x to 1.5x of base strength
+            const variation = 0.5 + rng(); // 0.5 to 1.5
             hazards.push({
                 type: 'wind_zone',
                 id,
@@ -45,7 +47,7 @@ export function generateHazards(terrain: TerrainResult, seed: number): HazardDat
                 width: WORLD_WIDTH,
                 height: CANVAS_HEIGHT,
                 windDirection: rng() < 0.5 ? -1 : 1,
-                windStrength: WIND_STRENGTH,
+                windStrength: WIND_STRENGTH * variation,
             });
         } else if (type === 'lava_pool') {
             const w = 80 + rng() * 120;
@@ -90,8 +92,13 @@ export function applyWindForce(world: Matter.World, hazards: HazardData[]): void
             if (bx >= x && bx <= x + wind.width && by >= y && by <= y + wind.height) {
                 const dir = wind.windDirection ?? 1;
                 const str = wind.windStrength ?? WIND_STRENGTH;
+
+                // Cap wind effect (user request: "should be less")
+                // Apply reduced force
+                const WIND_INFLUENCE_FACTOR = 0.4;
+
                 Matter.Body.applyForce(body, body.position, {
-                    x: dir * str * body.mass,
+                    x: dir * str * WIND_INFLUENCE_FACTOR,
                     y: 0,
                 });
             }

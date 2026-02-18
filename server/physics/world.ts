@@ -15,8 +15,8 @@ export const createWorld = (seed?: number): WorldResult => {
 
     engine.gravity.y = 2;
     engine.enableSleeping = true;
-    engine.positionIterations = 10;
-    engine.velocityIterations = 8;
+    engine.positionIterations = 12; // Increased for stability
+    engine.velocityIterations = 10;
 
     const terrainSeed = seed ?? getRandomSeed();
 
@@ -50,15 +50,15 @@ export const createWorld = (seed?: number): WorldResult => {
     // Center divider — blocks building materials from crossing, but lets projectiles through
     const divider = Matter.Bodies.rectangle(
         WORLD_WIDTH / 2, CANVAS_HEIGHT / 2, 4, CANVAS_HEIGHT * 2, {
-            isStatic: true,
-            label: 'Boundary',
-            friction: 0.5,
-            restitution: 0.3,
-            collisionFilter: {
-                category: COL_DIVIDER,
-                mask: COL_BLOCK, // only collide with blocks
-            },
-        }
+        isStatic: true,
+        label: 'Boundary',
+        friction: 0.5,
+        restitution: 0.3,
+        collisionFilter: {
+            category: COL_DIVIDER,
+            mask: COL_BLOCK, // only collide with blocks
+        },
+    }
     );
 
     Matter.World.add(world, [leftWall, rightWall, ceiling, divider]);

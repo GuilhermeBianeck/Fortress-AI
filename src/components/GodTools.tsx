@@ -59,11 +59,12 @@ export const GodTools = ({
     return (
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full">
             {/* Mode Toggle */}
-            <div className="flex items-center bg-white/60 border border-amber-300/40 rounded-lg p-0.5 sm:p-1 backdrop-blur-sm">
+            {/* Mode Toggle - Mobile Only for Preview */}
+            <div className="flex items-center bg-white/60 border border-amber-300/40 rounded-lg p-0.5 sm:p-1 backdrop-blur-sm sm:hidden">
                 <button
                     onClick={() => onModeChange('build')}
                     className={`
-                        min-h-[36px] sm:min-h-0 px-3 sm:px-3 py-1.5 sm:py-1.5 rounded-md text-xs sm:text-xs font-bold
+                        min-h-[36px] px-3 py-1.5 rounded-md text-xs font-bold
                         transition-colors duration-200 touch-manipulation
                         ${gameMode === 'build'
                             ? 'bg-green-100/80 text-green-700 ring-1 ring-green-400/40'
@@ -76,7 +77,7 @@ export const GodTools = ({
                 <button
                     onClick={() => onModeChange('fire')}
                     className={`
-                        min-h-[36px] sm:min-h-0 px-3 sm:px-3 py-1.5 sm:py-1.5 rounded-md text-xs sm:text-xs font-bold
+                        min-h-[36px] px-3 py-1.5 rounded-md text-xs font-bold
                         transition-colors duration-200 touch-manipulation
                         ${gameMode === 'fire'
                             ? 'bg-red-100/80 text-red-600 ring-1 ring-red-300/40'
@@ -109,9 +110,8 @@ export const GodTools = ({
                                 <span className="text-sm">{mat.icon}</span>
                                 <span className="hidden sm:inline">{mat.label}</span>
                                 <span
-                                    className={`w-2.5 h-2.5 rounded-full border transition-colors duration-150 ${
-                                        selectedMaterial === mat.key ? 'border-amber-500/40 ring-1 ring-amber-400/30' : 'border-amber-300/40'
-                                    }`}
+                                    className={`w-2.5 h-2.5 rounded-full border transition-colors duration-150 ${selectedMaterial === mat.key ? 'border-amber-500/40 ring-1 ring-amber-400/30' : 'border-amber-300/40'
+                                        }`}
                                     style={{ backgroundColor: MATERIAL_COLORS[mat.key] }}
                                 />
                             </button>
@@ -151,7 +151,7 @@ export const GodTools = ({
                 onClick={handleReady}
                 disabled={isReady}
                 className={`hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold
-                    transition-colors duration-200 touch-manipulation ml-auto border shadow-md
+                    transition-colors duration-200 touch-manipulation border shadow-md
                     ${isReady
                         ? 'bg-green-100/80 text-green-700 border-green-400/50 ring-1 ring-green-400/30 cursor-default shadow-green-300/20'
                         : 'bg-gradient-to-b from-green-500 to-green-600 text-white border-green-500/40 hover:from-green-400 hover:to-green-500 active:from-green-600 active:to-green-700 cursor-pointer shadow-green-400/20'

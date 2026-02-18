@@ -239,8 +239,8 @@ export const useGameState = () => {
 
     // --- Actions ---
 
-    const createRoom = useCallback((name?: string) => {
-        socketRef.current?.emit('create_room', { name });
+    const createRoom = useCallback((name?: string, mode: 'pvp' | 'single' = 'pvp') => {
+        socketRef.current?.emit('create_room', { name, mode });
     }, []);
 
     const joinRoom = useCallback((roomId: string, name?: string) => {

@@ -111,6 +111,17 @@ export const GameCanvas = ({
     // Particles
     const particlesRef = useRef(new ParticleSystem());
 
+    // Cloud state
+    interface Cloud {
+        x: number;
+        y: number;
+        speed: number;
+        scale: number;
+        depth: number; // 0=far, 1=near
+        puffs: { dx: number; dy: number; rx: number; ry: number }[];
+    }
+    const cloudsRef = useRef<Cloud[] | null>(null);
+
     // Projectile trails: bodyId -> last N positions
     const trailsRef = useRef<Map<number, Vector[]>>(new Map());
 
@@ -256,7 +267,7 @@ export const GameCanvas = ({
         };
         rafRef.current = requestAnimationFrame(render);
         return () => cancelAnimationFrame(rafRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const renderFrame = () => {
@@ -308,21 +319,144 @@ export const GameCanvas = ({
         ctx.fillStyle = bgGrad;
         ctx.fillRect(-10, -10, canvas.width + 20, canvas.height + 20);
 
-        // Draw clouds (fixed to screen, not world)
-        for (let i = 0; i < 8; i++) {
-            const cx = (i * 137.5 + Date.now() * 0.003 * ((i % 3) + 1) * 0.3) % (canvas.width + 100) - 50;
-            const cy = 30 + (i * 43.7) % 80;
-            const size = 15 + (i % 4) * 8;
-            ctx.fillStyle = `rgba(255, 255, 255, ${0.25 + (i % 3) * 0.08})`;
+        // Initialize clouds if they don't exist
+        if (!cloudsRef.current) {
+            const generateCloud = (layer: 'far' | 'mid' | 'near') => {
+                const depth = layer === 'far' ? 0.2 : layer === 'mid' ? 0.5 : 0.8;
+                const baseScale = layer === 'far' ? 0.6 : layer === 'mid' ? 1.0 : 1.5;
+                const speed = layer === 'far' ? 0.1 : layer === 'mid' ? 0.2 : 0.35;
+
+                return {
+                    x: Math.random() * (WORLD_WIDTH * 1.5),
+                    y: (Math.random() * 150) + (layer === 'far' ? 20 : layer === 'mid' ? 50 : 80),
+                    speed: speed + Math.random() * 0.1,
+                    scale: baseScale * (0.8 + Math.random() * 0.4),
+                    depth,
+                    puffs: Array.from({ length: 4 + Math.floor(Math.random() * 4) }, () => ({
+                        dx: (Math.random() - 0.5) * 80,
+                        dy: (Math.random() * 20), // Biased down for flat bottom look
+                        rx: 30 + Math.random() * 20,
+                        ry: 15 + Math.random() * 15 // Flattened
+                    }))
+                };
+            };
+
+            const clouds: Cloud[] = [];
+            // Far layer
+            for (let i = 0; i < 8; i++) clouds.push(generateCloud('far'));
+            // Mid layer
+            for (let i = 0; i < 6; i++) clouds.push(generateCloud('mid'));
+            // Near layer
+            for (let i = 0; i < 4; i++) clouds.push(generateCloud('near'));
+
+            cloudsRef.current = clouds;
+        }
+
+        // Draw Background Parallax (Mountains)
+        const drawMountains = (color: string, height: number, parallaxFactor: number, frequency: number) => {
+            ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.ellipse(cx, cy, size * 1.5, size * 0.6, 0, 0, Math.PI * 2);
+            const startX = -100;
+            const endX = canvas.width + 100;
+            const camX = cam.x * parallaxFactor;
+
+            ctx.moveTo(startX, canvas.height);
+            for (let x = startX; x <= endX; x += 20) {
+                // Perlin-ish noise using sine waves
+                const worldX = x + camX;
+                const noise = Math.sin(worldX * frequency) * 40 + Math.sin(worldX * frequency * 2.5) * 20 + Math.sin(worldX * frequency * 5) * 10;
+                const y = canvas.height - height + noise;
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(endX, canvas.height);
             ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(cx - size * 0.5, cy + 3, size, size * 0.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(cx + size * 0.6, cy + 2, size * 0.8, size * 0.45, 0, 0, Math.PI * 2);
-            ctx.fill();
+        };
+
+        // Distant mountains (very slow)
+        drawMountains('rgba(100, 140, 180, 0.4)', 200, 0.1, 0.002);
+        // Closer hills (slower than midground)
+        drawMountains('rgba(90, 160, 120, 0.3)', 120, 0.2, 0.005);
+
+
+        // Update and draw clouds (sorted by depth for correct occlusion if they overlap, though purely additive here)
+        const clouds = cloudsRef.current;
+        // Optimization: Don't sort every frame, they maintain relative depth usually. 
+        // Just draw them.
+
+        for (const cloud of clouds) {
+            // Move cloud
+            cloud.x -= cloud.speed;
+
+            // Wrap logic: needs to wrap based on WORLD_WIDTH effectively
+            const totalWidth = WORLD_WIDTH + 800;
+            if (cloud.x < -400) cloud.x += totalWidth;
+
+            // Parallax offset computation
+            // "depth" defines how much it *follows* the camera.
+            // 0 depth = grounded (moves 1:1 with camera, effectively staying in world spot).
+            // 1 depth = HUD (moves 1:1 with camera view, effectively static on screen).
+            // Actually, usually parallax factor < 1 means it moves slower.
+            // Screen X = (World X - Camera X * ParallaxFactor)
+
+            const parallaxFactor = cloud.depth; // 0.2 (far), 0.5 (mid), 0.8 (near)
+            // Wait, standard parallax:
+            // Far objects move slower. So if cam moves 100px right, far object moves 20px left on screen.
+            // Near objects move faster.
+
+            // Let's use standard factor:
+            // far (0.2) -> cam moves 100, cloud shifts 20 on screen (looks far).
+            // near (0.8) -> cam moves 100, cloud shifts 80 on screen (looks closer).
+
+            // We need to handle wrapping relative to the camera view to avoid popping.
+            // Simple approach: Render at screen coords.
+
+            const screenX = cloud.x - (cam.x * parallaxFactor);
+
+            // Handle visible wrapping for infinite scroll effect on screen?
+            // Since world is finite (WORLD_WIDTH), but clouds drift...
+            // Let's just draw them where they are.
+
+            // Wrap the *screen* position to keep them around? 
+            // Better: Keep world position wrapping, just apply parallax.
+            // If explicit wrapping is needed for infinite background feel:
+            // const modX = ((cloud.x - cam.x * parallaxFactor) % (canvas.width + 500));
+            // simplified:
+
+            let drawX = screenX;
+            // Provide localized wrapping if it goes too far off screen?
+            // For a fixed world size, standard parallax is fine.
+
+            const drawY = cloud.y;
+
+            // Check visibility
+            if (drawX > -300 && drawX < canvas.width + 300) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + cloud.depth * 0.2})`;
+
+                for (const puff of cloud.puffs) {
+                    const px = drawX + puff.dx * cloud.scale;
+                    const py = drawY + puff.dy * cloud.scale;
+                    const rx = puff.rx * cloud.scale;
+                    const ry = puff.ry * cloud.scale;
+
+                    ctx.beginPath();
+                    ctx.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Flat bottom effect (subtle cut)
+                    // const cutY = py + ry * 0.4;
+                    // ctx.fillRect(px - rx, cutY, rx * 2, ry); 
+                    // (Actually ellipse looks fine for cumulus if aspect ratio is right)
+                }
+
+                // Draw a flat bottom to make it look like a cumulus cloud
+                ctx.beginPath();
+                const bottomY = drawY + 15 * cloud.scale;
+                const width = 100 * cloud.scale;
+                // Gradient fade for bottom?
+                // Simple rect approximation for base
+                // ctx.roundRect(drawX - width/2, bottomY - 10, width, 20, 10);
+                // ctx.fill();
+            }
         }
 
         // === Apply camera offset for world drawing ===
@@ -530,7 +664,8 @@ export const GameCanvas = ({
                         if (step % 2 === 0) {
                             ctx.beginPath();
                             ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-                            ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+                            // Brownish color for better visibility against light sky/clouds
+                            ctx.fillStyle = `rgba(139, 69, 19, ${Math.min(0.8, alpha + 0.2).toFixed(2)})`;
                             ctx.fill();
                         }
 
