@@ -39,7 +39,7 @@ const MATERIAL_COLORS: Record<string, string> = {
     rubber: '#FF69B4',
     steel: '#434B4D',
     king: '#FFD700',
-    Terrain: '#1a1a2e',
+    Terrain: '#4a8c3f',
 };
 
 const MATERIAL_STROKE: Record<string, string> = {
@@ -298,22 +298,30 @@ export const GameCanvas = ({
             shake.remaining--;
         }
 
-        // Clear with gradient background
+        // Clear with medieval sky gradient (bright blue daytime sky)
         const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        bgGrad.addColorStop(0, '#0a0a1a');
-        bgGrad.addColorStop(0.6, '#0f0f2e');
-        bgGrad.addColorStop(1, '#1a1a3e');
+        bgGrad.addColorStop(0, '#4a90d9');
+        bgGrad.addColorStop(0.3, '#6ba8e5');
+        bgGrad.addColorStop(0.6, '#8ec5f0');
+        bgGrad.addColorStop(0.85, '#b8daf5');
+        bgGrad.addColorStop(1, '#c8e6c9');
         ctx.fillStyle = bgGrad;
         ctx.fillRect(-10, -10, canvas.width + 20, canvas.height + 20);
 
-        // Draw stars (fixed to screen, not world)
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        for (let i = 0; i < 40; i++) {
-            const sx = (i * 137.5) % canvas.width;
-            const sy = (i * 73.7) % (canvas.height * 0.5);
-            const size = (i % 3 === 0) ? 1.5 : 1;
+        // Draw clouds (fixed to screen, not world)
+        for (let i = 0; i < 8; i++) {
+            const cx = (i * 137.5 + Date.now() * 0.003 * ((i % 3) + 1) * 0.3) % (canvas.width + 100) - 50;
+            const cy = 30 + (i * 43.7) % 80;
+            const size = 15 + (i % 4) * 8;
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.15 + (i % 3) * 0.05})`;
             ctx.beginPath();
-            ctx.arc(sx, sy, size, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy, size * 1.5, size * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx - size * 0.5, cy + 3, size, size * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx + size * 0.6, cy + 2, size * 0.8, size * 0.45, 0, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -332,9 +340,10 @@ export const GameCanvas = ({
             ctx.closePath();
 
             const terrainGrad = ctx.createLinearGradient(0, 400, 0, canvas.height);
-            terrainGrad.addColorStop(0, '#2a3a2a');
-            terrainGrad.addColorStop(0.3, '#1f2f1f');
-            terrainGrad.addColorStop(1, '#0a150a');
+            terrainGrad.addColorStop(0, '#4a8c3f');
+            terrainGrad.addColorStop(0.15, '#3d7a35');
+            terrainGrad.addColorStop(0.4, '#5a3a1e');
+            terrainGrad.addColorStop(1, '#3d2b14');
             ctx.fillStyle = terrainGrad;
             ctx.fill();
 
@@ -343,15 +352,15 @@ export const GameCanvas = ({
             for (let i = 1; i < terr.points.length; i++) {
                 ctx.lineTo(terr.points[i].x, terr.points[i].y);
             }
-            ctx.strokeStyle = 'rgba(100, 200, 100, 0.3)';
+            ctx.strokeStyle = 'rgba(80, 160, 60, 0.5)';
             ctx.lineWidth = 2;
             ctx.stroke();
 
             // Build zone overlays
             for (const zone of terr.buildZones) {
-                ctx.fillStyle = 'rgba(100, 200, 100, 0.05)';
+                ctx.fillStyle = 'rgba(80, 160, 60, 0.08)';
                 ctx.fillRect(zone.x, zone.y - 100, zone.width, 100);
-                ctx.strokeStyle = 'rgba(100, 200, 100, 0.15)';
+                ctx.strokeStyle = 'rgba(80, 160, 60, 0.2)';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
@@ -362,7 +371,7 @@ export const GameCanvas = ({
             }
 
             // Draw center divider line
-            ctx.strokeStyle = 'rgba(255, 100, 100, 0.2)';
+            ctx.strokeStyle = 'rgba(180, 120, 60, 0.3)';
             ctx.lineWidth = 1;
             ctx.setLineDash([8, 8]);
             ctx.beginPath();
@@ -466,9 +475,9 @@ export const GameCanvas = ({
                 ctx.translate(cannonX, cannonY);
                 const barrelAngle = facingRight ? -currentAngle : -(Math.PI - currentAngle);
                 ctx.rotate(barrelAngle);
-                ctx.fillStyle = isActive ? '#555' : '#333';
+                ctx.fillStyle = isActive ? '#5a4a3a' : '#4a3a2a';
                 ctx.fillRect(0, -4, 24, 8);
-                ctx.strokeStyle = isActive ? '#777' : '#555';
+                ctx.strokeStyle = isActive ? '#8b7355' : '#6b5b45';
                 ctx.lineWidth = 1;
                 ctx.strokeRect(0, -4, 24, 8);
                 ctx.restore();
@@ -476,9 +485,9 @@ export const GameCanvas = ({
                 // Base
                 ctx.beginPath();
                 ctx.arc(cannonX, cannonY, 6, 0, Math.PI * 2);
-                ctx.fillStyle = isActive ? '#555' : '#444';
+                ctx.fillStyle = isActive ? '#5a4a3a' : '#4a3a2a';
                 ctx.fill();
-                ctx.strokeStyle = isActive ? '#888' : '#666';
+                ctx.strokeStyle = isActive ? '#8b7355' : '#6b5b45';
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
@@ -691,9 +700,9 @@ export const GameCanvas = ({
                         const barY = body.position.y - (body.circleRadius || 12) - 10;
                         const hpRatio = Math.max(0, kHp / kMaxHp);
 
-                        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                        ctx.fillStyle = 'rgba(30, 20, 10, 0.7)';
                         ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                        ctx.fillStyle = '#333';
+                        ctx.fillStyle = '#3d2b14';
                         ctx.fillRect(barX, barY, barWidth, barHeight);
                         ctx.fillStyle = getHpColor(hpRatio);
                         ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
@@ -708,9 +717,9 @@ export const GameCanvas = ({
                     const barY = body.position.y - (body.height || 30) / 2 - 6;
                     const hpRatio = Math.max(0, body.blockHp / body.blockMaxHp);
 
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillStyle = 'rgba(30, 20, 10, 0.6)';
                     ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                    ctx.fillStyle = '#333';
+                    ctx.fillStyle = '#3d2b14';
                     ctx.fillRect(barX, barY, barWidth, barHeight);
                     ctx.fillStyle = getHpColor(hpRatio);
                     ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
@@ -760,9 +769,9 @@ export const GameCanvas = ({
         const scaleY = mmH / CANVAS_HEIGHT;
 
         // Background
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillStyle = 'rgba(30, 20, 10, 0.7)';
         ctx.fillRect(mmX, mmY, mmW, mmH);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.strokeStyle = 'rgba(180, 120, 60, 0.4)';
         ctx.lineWidth = 1;
         ctx.strokeRect(mmX, mmY, mmW, mmH);
 
@@ -775,7 +784,7 @@ export const GameCanvas = ({
             }
             ctx.lineTo(mmX + mmW, mmY + mmH);
             ctx.closePath();
-            ctx.fillStyle = 'rgba(100, 200, 100, 0.4)';
+            ctx.fillStyle = 'rgba(74, 140, 63, 0.5)';
             ctx.fill();
         }
 
@@ -821,7 +830,7 @@ export const GameCanvas = ({
         // Viewport rectangle
         const vpX = mmX + cam.x * scaleX;
         const vpW = CANVAS_WIDTH * scaleX;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.strokeStyle = 'rgba(220, 180, 100, 0.6)';
         ctx.lineWidth = 1;
         ctx.strokeRect(vpX, mmY, vpW, mmH);
     }
@@ -831,7 +840,7 @@ export const GameCanvas = ({
         const hudHeight = 14;
         const hpRatio = king.maxHp > 0 ? Math.max(0, king.hp / king.maxHp) : 0;
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillStyle = 'rgba(30, 20, 10, 0.7)';
         ctx.fillRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
 
         ctx.font = 'bold 10px monospace';
@@ -840,11 +849,11 @@ export const GameCanvas = ({
         ctx.fillText(`\u265A ${label}`, hudX, hudY + 10);
 
         const barY = hudY + 14;
-        ctx.fillStyle = '#333';
+        ctx.fillStyle = '#3d2b14';
         ctx.fillRect(hudX, barY, hudWidth, hudHeight);
         ctx.fillStyle = getHpColor(hpRatio);
         ctx.fillRect(hudX, barY, hudWidth * hpRatio, hudHeight);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.strokeStyle = 'rgba(180, 120, 60, 0.5)';
         ctx.lineWidth = 1;
         ctx.strokeRect(hudX, barY, hudWidth, hudHeight);
 

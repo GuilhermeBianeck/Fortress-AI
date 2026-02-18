@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Bot, Swords, Zap, Check, Trophy } from 'lucide-react';
+import { Swords, Zap, Check, Trophy } from 'lucide-react';
 
 interface LobbyProps {
     roomState: RoomState | null;
@@ -46,25 +46,25 @@ export const Lobby = ({
     // Waiting room view
     if (roomState) {
         return (
-            <div className="flex-1 w-full flex items-center justify-center bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 p-6">
+            <div className="flex-1 w-full flex items-center justify-center bg-gradient-to-br from-[#1a120b] via-[#2d1f0e] to-[#1a120b] p-6">
                 <div className="w-full text-center">
-                    <h2 className="text-2xl font-bold text-white mb-3">Room Code</h2>
-                    <div className="text-5xl font-mono font-bold text-rose-400 tracking-[0.3em] mb-6 select-all">
+                    <h2 className="text-2xl font-bold text-amber-100 mb-3" style={{ fontFamily: "'MedievalSharp', cursive" }}>⚔️ War Room</h2>
+                    <div className="text-5xl font-mono font-bold text-amber-400 tracking-[0.3em] mb-6 select-all">
                         {roomState.roomId}
                     </div>
-                    <p className="text-base text-neutral-400 mb-4">
+                    <p className="text-base text-amber-700 mb-4">
                         Share this code with your opponent
                     </p>
 
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/5 inline-block">
+                    <div className="p-4 rounded-xl bg-[#1a120b]/60 border border-amber-900/20 inline-block">
                         <div className="flex items-center justify-center gap-2 text-base">
-                            <span className={`w-2.5 h-2.5 rounded-full ${roomState.opponentConnected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                            <span className={roomState.opponentConnected ? 'text-emerald-400' : 'text-amber-400'}>
-                                {roomState.opponentConnected ? 'Opponent connected' : 'Waiting for opponent...'}
+                            <span className={`w-2.5 h-2.5 rounded-full ${roomState.opponentConnected ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
+                            <span className={roomState.opponentConnected ? 'text-green-400' : 'text-amber-400'}>
+                                {roomState.opponentConnected ? 'Opponent has arrived' : 'Awaiting challenger...'}
                             </span>
                         </div>
-                        <p className="text-sm text-neutral-500 mt-2">
-                            You are: <span className="text-white font-medium">{roomState.side.toUpperCase()}</span> player
+                        <p className="text-sm text-amber-800 mt-2">
+                            You are: <span className="text-amber-200 font-medium">{roomState.side.toUpperCase()}</span> kingdom
                         </p>
                     </div>
 
@@ -74,17 +74,17 @@ export const Lobby = ({
                                 onClick={handleReady}
                                 disabled={isReady}
                                 className={`mt-6 sm:mt-8 w-full min-h-[48px] py-3.5 sm:py-4 font-bold rounded-xl text-lg sm:text-xl touch-manipulation
-                                    transition-colors duration-200
+                                    transition-colors duration-200 shadow-lg
                                     ${isReady
-                                        ? 'bg-emerald-700 text-emerald-200 ring-2 ring-emerald-400/50 cursor-default'
-                                        : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white cursor-pointer'
+                                        ? 'bg-green-800 text-green-200 ring-2 ring-green-600/50 cursor-default shadow-green-900/30'
+                                        : 'bg-gradient-to-b from-green-700 to-green-800 hover:from-green-600 hover:to-green-700 active:from-green-800 active:to-green-900 text-white cursor-pointer shadow-green-900/30'
                                     }`}
                             >
                                 {isReady ? (
                                     <span className="flex items-center justify-center gap-2">
-                                        <Check size={22} /> READY
+                                        <Check size={22} /> READY FOR BATTLE
                                     </span>
-                                ) : 'READY'}
+                                ) : '⚔️ READY FOR BATTLE'}
                             </button>
                         </div>
                     )}
@@ -96,17 +96,17 @@ export const Lobby = ({
     // Queue view
     if (queuePosition !== null) {
         return (
-            <div className="flex-1 w-full flex items-center justify-center bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 p-6">
+            <div className="flex-1 w-full flex items-center justify-center bg-gradient-to-br from-[#1a120b] via-[#2d1f0e] to-[#1a120b] p-6">
                 <div className="w-full text-center">
-                    <div className="w-10 h-10 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-                    <h2 className="text-2xl font-bold text-white mb-3">Finding Match...</h2>
-                    <p className="text-base text-neutral-400">Queue position: {queuePosition + 1}</p>
+                    <div className="w-10 h-10 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-amber-100 mb-3" style={{ fontFamily: "'MedievalSharp', cursive" }}>Seeking Challenger...</h2>
+                    <p className="text-base text-amber-700">Queue position: {queuePosition + 1}</p>
                     <button
                         onClick={onLeaveQueue}
-                        className="mt-6 sm:mt-8 min-h-[48px] px-8 py-3 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-300 rounded-xl
+                        className="mt-6 sm:mt-8 min-h-[48px] px-8 py-3 bg-[#2d1f0e] hover:bg-[#3d2b14] active:bg-[#1a120b] text-amber-400 rounded-xl border border-amber-900/30
                             transition-colors duration-200 touch-manipulation text-base"
                     >
-                        Cancel
+                        Retreat
                     </button>
                 </div>
             </div>
@@ -115,34 +115,35 @@ export const Lobby = ({
 
     // Main lobby — fills full width, two columns on wide screens
     return (
-        <div className="flex-1 w-full flex flex-col lg:flex-row items-stretch bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 overflow-hidden">
+        <div className="flex-1 w-full flex flex-col lg:flex-row items-stretch bg-gradient-to-br from-[#1a120b] via-[#2d1f0e] to-[#1a120b] overflow-hidden">
             {/* Left side — Branding */}
             <div className="flex flex-col items-center justify-center lg:flex-1 p-6 sm:p-8 lg:p-12">
                 <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-                    <div className="bg-rose-600 p-2.5 sm:p-3 rounded-2xl shadow-lg shadow-rose-600/20">
-                        <Bot size={32} className="text-white sm:hidden" />
-                        <Bot size={40} className="text-white hidden sm:block" />
-                    </div>
+                    <div className="text-5xl">🏰</div>
                     <div>
-                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">FORTRESS AI</h1>
-                        <p className="text-sm sm:text-base text-neutral-400 mt-1">2-Player AI Battle</p>
+                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-amber-100" style={{ fontFamily: "'MedievalSharp', cursive" }}>FORTRESS AI</h1>
+                        <p className="text-sm sm:text-base text-amber-600 mt-1">⚔️ Castle War — Build & Conquer</p>
                     </div>
                 </div>
-                <div className="hidden lg:flex flex-col gap-4 text-neutral-500 text-sm">
+                <div className="hidden lg:flex flex-col gap-4 text-amber-700 text-sm">
                     <div className="flex items-center gap-3">
-                        <Swords size={18} className="text-rose-400 shrink-0" />
-                        <span>Build AI-powered fortresses and destroy your opponent</span>
+                        <Swords size={18} className="text-amber-500 shrink-0" />
+                        <span>Build AI-powered castles and siege your enemy&apos;s kingdom</span>
                     </div>
                     <div className="flex items-center gap-3">
                         <Zap size={18} className="text-amber-400 shrink-0" />
-                        <span>Turn-based combat with physics-based destruction</span>
+                        <span>Turn-based combat with cannon fire and physics destruction</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-lg shrink-0">🛡️</span>
+                        <span>Defend your King against enemy bombardment</span>
                     </div>
                 </div>
             </div>
 
             {/* Divider */}
-            <div className="hidden lg:block w-px self-stretch bg-white/10 my-10" />
-            <div className="lg:hidden w-2/3 h-px bg-white/10 mx-auto" />
+            <div className="hidden lg:block w-px self-stretch bg-amber-900/30 my-10" />
+            <div className="lg:hidden w-2/3 h-px bg-amber-900/30 mx-auto" />
 
             {/* Right side — Actions: fills all available width */}
             <div className="flex flex-col items-center justify-center lg:flex-1 p-6 sm:p-8 lg:p-12">
@@ -152,18 +153,18 @@ export const Lobby = ({
                         type="text"
                         value={playerName}
                         onChange={(e) => onPlayerNameChange(e.target.value)}
-                        placeholder="Your name..."
+                        placeholder="Enter thy name..."
                         maxLength={20}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 sm:py-4 text-center text-base sm:text-lg font-medium text-white placeholder:text-neutral-600 outline-none focus:border-rose-500/50 transition-all touch-manipulation"
+                        className="w-full bg-[#1a120b]/60 border border-amber-900/30 rounded-xl px-4 py-3 sm:py-4 text-center text-base sm:text-lg font-medium text-amber-100 placeholder:text-amber-900/50 outline-none focus:border-amber-600/50 transition-all touch-manipulation"
                     />
 
                     {/* Create Room */}
                     <button
                         onClick={() => onCreateRoom(playerName)}
-                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-bold rounded-xl text-lg sm:text-xl shadow-lg shadow-rose-600/20
+                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-gradient-to-b from-amber-700 to-amber-800 hover:from-amber-600 hover:to-amber-700 active:from-amber-800 active:to-amber-900 text-amber-100 font-bold rounded-xl text-lg sm:text-xl shadow-lg shadow-amber-900/30
                             transition-colors duration-200 touch-manipulation"
                     >
-                        Create Room
+                        🏰 Create Kingdom
                     </button>
 
                     {/* Join Room */}
@@ -174,13 +175,13 @@ export const Lobby = ({
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                             placeholder="CODE"
                             maxLength={6}
-                            className="min-w-0 flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-3 sm:py-4 text-center text-base sm:text-lg font-mono font-bold text-white placeholder:text-neutral-600 uppercase tracking-[0.15em] outline-none focus:border-rose-500/50 touch-manipulation"
+                            className="min-w-0 flex-1 bg-[#1a120b]/60 border border-amber-900/30 rounded-xl px-3 py-3 sm:py-4 text-center text-base sm:text-lg font-mono font-bold text-amber-100 placeholder:text-amber-900/50 uppercase tracking-[0.15em] outline-none focus:border-amber-600/50 touch-manipulation"
                         />
                         <button
                             type="submit"
                             disabled={joinCode.trim().length < 4}
-                            className="shrink-0 min-h-[48px] px-6 sm:px-8 py-3 sm:py-4 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white font-bold rounded-xl text-base sm:text-lg
-                                transition-colors duration-200 touch-manipulation
+                            className="shrink-0 min-h-[48px] px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-b from-green-700 to-green-800 hover:from-green-600 hover:to-green-700 active:from-green-800 active:to-green-900 text-green-100 font-bold rounded-xl text-base sm:text-lg
+                                transition-colors duration-200 touch-manipulation shadow-lg shadow-green-900/30
                                 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             Join
@@ -188,51 +189,51 @@ export const Lobby = ({
                     </form>
 
                     <div className="flex items-center gap-3 my-0.5 sm:my-1">
-                        <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-xs text-neutral-500">or</span>
-                        <div className="flex-1 h-px bg-white/10" />
+                        <div className="flex-1 h-px bg-amber-900/30" />
+                        <span className="text-xs text-amber-800">or</span>
+                        <div className="flex-1 h-px bg-amber-900/30" />
                     </div>
 
                     {/* Quick Match */}
                     <button
                         onClick={() => onJoinQueue(playerName)}
-                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 text-neutral-200 font-bold rounded-xl text-base sm:text-lg border border-white/5
+                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-[#2d1f0e] hover:bg-[#3d2b14] active:bg-[#1a120b] text-amber-300 font-bold rounded-xl text-base sm:text-lg border border-amber-900/20
                             transition-colors duration-200 touch-manipulation"
                     >
-                        Quick Match
+                        ⚔️ Quick Battle
                     </button>
 
                     {/* Player Profile & History */}
                     {playerProfile && playerProfile.matchesPlayed > 0 && (
-                        <div className="mt-2 p-4 rounded-xl bg-black/40 border border-white/5">
+                        <div className="mt-2 p-4 rounded-xl bg-[#1a120b]/60 border border-amber-900/20">
                             <div className="flex items-center gap-2 mb-3">
                                 <Trophy size={16} className="text-amber-400" />
-                                <span className="text-sm font-bold text-white">Your Stats</span>
+                                <span className="text-sm font-bold text-amber-100">Your Stats</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                                 <div>
                                     <p className="text-lg font-bold text-amber-400">{playerProfile.totalScore}</p>
-                                    <p className="text-[10px] text-neutral-500">Total Score</p>
+                                    <p className="text-[10px] text-amber-800">Total Score</p>
                                 </div>
                                 <div>
-                                    <p className="text-lg font-bold text-white">{playerProfile.matchesPlayed}</p>
-                                    <p className="text-[10px] text-neutral-500">Matches</p>
+                                    <p className="text-lg font-bold text-amber-100">{playerProfile.matchesPlayed}</p>
+                                    <p className="text-[10px] text-amber-800">Matches</p>
                                 </div>
                                 <div>
-                                    <p className="text-lg font-bold text-emerald-400">{playerProfile.matchesWon}</p>
-                                    <p className="text-[10px] text-neutral-500">Wins</p>
+                                    <p className="text-lg font-bold text-green-400">{playerProfile.matchesWon}</p>
+                                    <p className="text-[10px] text-amber-800">Wins</p>
                                 </div>
                             </div>
                             {playerProfile.history.length > 0 && (
                                 <div>
-                                    <p className="text-xs text-neutral-400 mb-1.5">Recent Matches</p>
+                                    <p className="text-xs text-amber-600 mb-1.5">Recent Matches</p>
                                     <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                                         {playerProfile.history.slice(0, 5).map((entry, i) => (
-                                            <div key={`${entry.matchId}-${i}`} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-white/5">
-                                                <span className={entry.won ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'}>
+                                            <div key={`${entry.matchId}-${i}`} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-amber-900/10">
+                                                <span className={entry.won ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}>
                                                     {entry.won ? 'W' : 'L'}
                                                 </span>
-                                                <span className="text-neutral-400 truncate mx-2">vs {entry.opponentName}</span>
+                                                <span className="text-amber-600 truncate mx-2">vs {entry.opponentName}</span>
                                                 <span className="text-amber-400 font-mono">{entry.score.totalScore}</span>
                                             </div>
                                         ))}
