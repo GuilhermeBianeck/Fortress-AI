@@ -1,13 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700;900&display=swap');
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Cinzel', 'Georgia', 'Times New Roman', serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: dark;
+  color: #f5e6c8;
+  background-color: #1a120b;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -19,6 +20,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100dvh;
+  background: linear-gradient(180deg, #1a120b 0%, #2d1f0e 50%, #1a120b 100%);
   /* Prevent pull-to-refresh and overscroll on mobile */
   overscroll-behavior: none;
 }
@@ -44,4 +46,19 @@ body {
   .game-container {
     width: 100%;
   }
+}
+
+/* Medieval decorative scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #2d1f0e;
+}
+::-webkit-scrollbar-thumb {
+  background: #8b6914;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a67c52;
 }
