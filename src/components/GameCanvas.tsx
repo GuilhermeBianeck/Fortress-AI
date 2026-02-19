@@ -266,9 +266,9 @@ export const GameCanvas = ({
             const kingX = kingsHp[mySide]?.x;
             if (kingX) {
                 const maxCamX = WORLD_WIDTH - currentCanvasWidth;
-                cam.targetX = Math.max(0, Math.min(maxCamX, kingX - currentCanvasWidth / 2));
-                // If it's the very first pan, set the immediate position too so it doesn't swipe from 0
-                if (cam.x === 0) cam.x = cam.targetX;
+                const target = Math.max(0, Math.min(maxCamX, kingX - currentCanvasWidth / 2));
+                cam.targetX = target;
+                cam.x = target; // Snap immediately so King is centered from the first frame
                 hasPannedForPhaseRef.current = phase;
             }
         } else if (phase === 'reveal') {
