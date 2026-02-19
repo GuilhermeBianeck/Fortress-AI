@@ -181,7 +181,7 @@ export const GameCanvas = ({
     const keysRef = useRef<Set<string>>(new Set());
 
     // Flag to ensure initial camera setup only happens once
-    const hasPannedForPhaseRef = useRef<MatchPhase | null>(null);
+    const hasPannedForPhaseRef = useRef<string | null>(null);
 
     // Sync refs
     useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -259,19 +259,22 @@ export const GameCanvas = ({
 
     // Auto-pan camera based on phase
     useEffect(() => {
-        if (hasPannedForPhaseRef.current === phase) return;
         const cam = cameraRef.current;
 
         if (phase === 'build') {
             const kingX = kingsHp[mySide]?.x;
             if (kingX) {
+                // Re-pan if phase changed OR canvas width changed (mobile resize)
+                const panKey = `${phase}_${currentCanvasWidth}`;
+                if (hasPannedForPhaseRef.current === panKey) return;
                 const maxCamX = WORLD_WIDTH - currentCanvasWidth;
                 const target = Math.max(0, Math.min(maxCamX, kingX - currentCanvasWidth / 2));
                 cam.targetX = target;
                 cam.x = target; // Snap immediately so King is centered from the first frame
-                hasPannedForPhaseRef.current = phase;
+                hasPannedForPhaseRef.current = panKey;
             }
         } else if (phase === 'reveal') {
+            if (hasPannedForPhaseRef.current?.startsWith('reveal')) return;
             const myKingX = kingsHp[mySide]?.x;
             const enemyKingX = kingsHp[mySide === 'left' ? 'right' : 'left']?.x;
 
@@ -281,7 +284,7 @@ export const GameCanvas = ({
                 const panTimer = setTimeout(() => {
                     cam.targetX = Math.max(0, Math.min(maxCamX, enemyKingX - currentCanvasWidth / 2));
                 }, 2500);
-                hasPannedForPhaseRef.current = phase;
+                hasPannedForPhaseRef.current = 'reveal';
                 return () => clearTimeout(panTimer);
             }
         } else {
