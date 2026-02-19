@@ -109,5 +109,5 @@ export const PROJECTILE_MIN_IMPACT = 3;
 export const PHYSICS_GRAVITY = 2.0;
 export const PHYSICS_GRAVITY_SCALE = 0.001;
 export const PHYSICS_MAX_SPEED = 1000;
-export const PHYSICS_POWER_MULTIPLIER = 4.0;
+export const PHYSICS_POWER_MULTIPLIER = 1.0;
 export const PHYSICS_AIR_FRICTION = 0.005;

@@ -71,7 +71,7 @@ function interpolateTerrainY(points: { x: number; y: number }[], x: number): num
 const PHYSICS_GRAVITY = 2.0;
 const PHYSICS_GRAVITY_SCALE = 0.001;
 const PHYSICS_MAX_SPEED = 1000;
-const PHYSICS_POWER_MULTIPLIER = 4.0;
+const PHYSICS_POWER_MULTIPLIER = 1.0;
 const PHYSICS_AIR_FRICTION = 0.005;
 
 export const GameCanvas = ({
@@ -195,14 +195,12 @@ export const GameCanvas = ({
 
     // Set initial camera to own side
     useEffect(() => {
-        if (mySide === 'right') {
-            cameraRef.current.x = WORLD_WIDTH - currentCanvasWidth;
-            cameraRef.current.targetX = WORLD_WIDTH - currentCanvasWidth;
-        } else {
-            cameraRef.current.x = 0;
-            cameraRef.current.targetX = 0;
-        }
-    }, [mySide, currentCanvasWidth]);
+        if (currentCanvasWidth <= 0 || phase) return; // Only do this once on mount/resize before phase is set
+        const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+        const targetX = Math.max(0, Math.min(WORLD_WIDTH - currentCanvasWidth, cannonX - currentCanvasWidth / 2));
+        cameraRef.current.x = targetX;
+        cameraRef.current.targetX = targetX;
+    }, [mySide, currentCanvasWidth, phase]);
 
     // Detect King HP decrease -> shake
     useEffect(() => {
@@ -268,28 +266,36 @@ export const GameCanvas = ({
         const cam = cameraRef.current;
         if (phase === 'build') {
             // Pan to own side during build
-            cam.targetX = mySide === 'left' ? 0 : WORLD_WIDTH - currentCanvasWidth;
+            const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+            const maxCamX = WORLD_WIDTH - currentCanvasWidth;
+            cam.targetX = Math.max(0, Math.min(maxCamX, cannonX - currentCanvasWidth / 2));
         } else if (phase === 'reveal') {
-            // Auto-pan from left to right during reveal
-            cam.targetX = 0;
+            // Auto-pan from own base to enemy base during reveal
+            const myCannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+            const enemyCannonX = mySide === 'left' ? RIGHT_CANNON_X : LEFT_CANNON_X;
+
+            // Limit the max camera X so we don't pan past the background
+            const maxCamX = WORLD_WIDTH - currentCanvasWidth;
+
+            cam.targetX = Math.max(0, Math.min(maxCamX, myCannonX - currentCanvasWidth / 2));
             const panTimer = setTimeout(() => {
-                cam.targetX = WORLD_WIDTH - currentCanvasWidth;
+                cam.targetX = Math.max(0, Math.min(maxCamX, enemyCannonX - currentCanvasWidth / 2));
             }, 2500);
             return () => clearTimeout(panTimer);
         }
     }, [phase, mySide, currentCanvasWidth]);
 
-    // Auto-pan to own cannon when it's my turn
+    // Auto-pan to active cannon when it's their turn
     useEffect(() => {
         if (phase !== 'combat') return;
-        if (turnPlayer === mySide) {
-            const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+        if (turnPlayer) {
+            const cannonX = turnPlayer === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
             cameraRef.current.targetX = Math.max(0, Math.min(
                 WORLD_WIDTH - currentCanvasWidth,
                 cannonX - currentCanvasWidth / 2
             ));
         }
-    }, [phase, turnPlayer, mySide, currentCanvasWidth]);
+    }, [phase, turnPlayer, currentCanvasWidth]);
 
     // Track projectile during combat for auto-pan
     useEffect(() => {
@@ -1242,7 +1248,9 @@ export const GameCanvas = ({
             aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
             aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
             const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-            aim.power = Math.max(5, Math.min(100, 5 + (dist / 200) * 95));
+            // Non-linear power mapping for better sensitivity
+            const normalizedDist = Math.max(0, Math.min(1, dist / 800));
+            aim.power = Math.max(5, Math.min(100, 5 + Math.pow(normalizedDist, 1.2) * 95));
         }
     };
 
@@ -1255,7 +1263,9 @@ export const GameCanvas = ({
         aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
         const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        aim.power = Math.max(5, Math.min(100, 5 + (dist / 200) * 95));
+        // Non-linear power mapping for better sensitivity
+        const normalizedDist = Math.max(0, Math.min(1, dist / 800));
+        aim.power = Math.max(5, Math.min(100, 5 + Math.pow(normalizedDist, 1.2) * 95));
     };
 
     const handleMouseUp = () => {
@@ -1362,7 +1372,8 @@ export const GameCanvas = ({
         // Power from drag distance (screen pixels from initial tap)
         // Power from distance between touch and cannon (same as mouse)
         const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        aim.power = Math.max(5, Math.min(100, 5 + (dist / 200) * 95));
+        const normalizedDist = Math.max(0, Math.min(1, dist / 800));
+        aim.power = Math.max(5, Math.min(100, 5 + Math.pow(normalizedDist, 1.2) * 95));
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {

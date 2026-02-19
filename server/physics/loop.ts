@@ -4,7 +4,7 @@ import type { KingState } from '../types';
 import { MATERIAL_COLORS } from '../config/constants';
 
 const TICK_RATE = 60;
-const SNAPSHOT_RATE = 20;
+const SNAPSHOT_RATE = 60;
 const TICK_DT = 1000 / TICK_RATE;
 
 export class GameLoop {
