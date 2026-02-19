@@ -81,7 +81,8 @@ export function generateTerrain(config: Partial<TerrainConfig> = {}): TerrainRes
     const buildZones = findBuildZones(surfacePoints, 5, 100);
 
     // Flatten terrain points within build zones so they become true platforms
-    flattenBuildZones(surfacePoints, buildZones);
+    // DISABLED: User requested natural terrain variation, not flat shelves.
+    // flattenBuildZones(surfacePoints, buildZones);
 
     // Create convex trapezoid segments instead of one concave polygon
     const bodies = createTerrainSegments(surfacePoints, height + 50);

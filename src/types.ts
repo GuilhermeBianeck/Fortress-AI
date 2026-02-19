@@ -74,6 +74,7 @@ export const MATERIAL_COLORS: Record<MaterialType, string> = {
     ice: '#A5F2F3',
     rubber: '#FF69B4',
     steel: '#434B4D',
+    foundation: '#7D7D7D',
 };
 
 export const WORLD_WIDTH = 2400; // Synced with server

@@ -261,14 +261,20 @@ export const GameCanvas = ({
 
     // 60fps render loop
     useEffect(() => {
+        console.log('GameCanvas: useEffect mount - starting render loop');
         const render = () => {
             renderFrame();
             rafRef.current = requestAnimationFrame(render);
         };
         rafRef.current = requestAnimationFrame(render);
-        return () => cancelAnimationFrame(rafRef.current);
+        return () => {
+            console.log('GameCanvas: useEffect unmount - stopping render loop');
+            cancelAnimationFrame(rafRef.current);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const debugLogRef = useRef(false);
 
     const renderFrame = () => {
         const canvas = canvasRef.current;
@@ -278,6 +284,21 @@ export const GameCanvas = ({
 
         const gs = gameStateRef.current;
         const terr = terrainRef.current;
+        const cam = cameraRef.current;
+
+        if (!debugLogRef.current) {
+            console.log('renderFrame: first run', {
+                hasTerrain: !!terr,
+                points: terr?.points?.length,
+                camX: cam.x,
+                camTargetX: cam.targetX,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
+                firstPoint: terr?.points?.[0],
+                lastPoint: terr?.points?.[terr.points.length - 1]
+            });
+            debugLogRef.current = true;
+        }
         const kings = kingsHpRef.current;
         const side = mySideRef.current;
         const currentPhase = phaseRef.current;
@@ -285,7 +306,9 @@ export const GameCanvas = ({
         const aim = aimRef.current;
         const shake = shakeRef.current;
         const particles = particlesRef.current;
-        const cam = cameraRef.current;
+        // const cam = cameraRef.current; // Already declared above
+
+
 
         // Update camera with smooth lerp
         const keys = keysRef.current;
@@ -352,30 +375,47 @@ export const GameCanvas = ({
             cloudsRef.current = clouds;
         }
 
-        // Draw Background Parallax (Mountains)
-        const drawMountains = (color: string, height: number, parallaxFactor: number, frequency: number) => {
+        // Draw Background Parallax (Mountains/Hills)
+        const drawLayer = (color: string, height: number, parallaxFactor: number, seedOffset: number, verticalOffset: number, frequency: number) => {
             ctx.fillStyle = color;
             ctx.beginPath();
             const startX = -100;
             const endX = canvas.width + 100;
             const camX = cam.x * parallaxFactor;
+            // Use terrain seed if available, otherwise 0
+            const baseSeed = terr?.seed ?? 0;
+            const amplitude = 120; // Fixed amplitude for background layers
 
             ctx.moveTo(startX, canvas.height);
             for (let x = startX; x <= endX; x += 20) {
-                // Perlin-ish noise using sine waves
+                // Perlin-ish noise using sine waves with custom seed offset
                 const worldX = x + camX;
-                const noise = Math.sin(worldX * frequency) * 40 + Math.sin(worldX * frequency * 2.5) * 20 + Math.sin(worldX * frequency * 5) * 10;
-                const y = canvas.height - height + noise;
+                const layerSeed = baseSeed + seedOffset;
+                const noise = Math.sin(worldX * frequency + layerSeed) * amplitude
+                    + Math.sin(worldX * frequency * 2.5 + layerSeed * 1.5) * (amplitude * 0.5)
+                    + Math.sin(worldX * frequency * 5 + layerSeed * 2.2) * (amplitude * 0.25);
+                // Height = base height from bottom
+                // VerticalOffset = additional shift (likely downwards if positive, or just an offset)
+                // User call: drawLayer('#A0BEDC', 250, 0.05, 123, 100, 0.002);
+
+                const y = canvas.height - height + noise + verticalOffset;
+
                 ctx.lineTo(x, y);
             }
             ctx.lineTo(endX, canvas.height);
             ctx.fill();
         };
 
-        // Distant mountains (very slow)
-        drawMountains('rgba(100, 140, 180, 0.4)', 200, 0.1, 0.002);
-        // Closer hills (slower than midground)
-        drawMountains('rgba(90, 160, 120, 0.3)', 120, 0.2, 0.005);
+        // Layer 1: Far Mountains (Atmospheric, simple, jagged)
+        // Solid color (no alpha) to prevent "see-through" effect.
+        // Light blue/grey to simulate distance (atmospheric perspective).
+        drawLayer('#A0BEDC', 250, 0.05, 123, 100, 0.002);
+
+        // Layer 2: Mid Hills (Greener but desaturated)
+        drawLayer('#6EA08C', 150, 0.15, 456, 60, 0.005);
+
+        // Layer 3: Near Hills (Darker ground color, more detail)
+        drawLayer('#5A8264', 80, 0.3, 789, 40, 0.008);
 
 
         // Update and draw clouds (sorted by depth for correct occlusion if they overlap, though purely additive here)
@@ -770,7 +810,7 @@ export const GameCanvas = ({
                         ctx.fillStyle = 'rgba(255, 150, 50, 0.15)';
                         ctx.fill();
                     }
-                } else if (!body.isStatic) {
+                } else if (!body.isStatic || body.label === 'foundation') {
                     ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
                     ctx.shadowBlur = 6;
                     ctx.shadowOffsetX = 2;

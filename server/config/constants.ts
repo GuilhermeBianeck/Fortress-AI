@@ -43,6 +43,7 @@ export const MATERIAL_COLORS: Record<string, string> = {
     rubber: '#FF69B4',
     steel: '#434B4D',
     king: '#FFD700',
+    foundation: '#7D7D7D',
 };
 
 export const MATERIAL_BLOCK_HP: Record<string, number> = {

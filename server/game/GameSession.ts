@@ -427,7 +427,69 @@ export class GameSession {
         // Tag with side for collision identification
         (body as any).side = side;
 
+        (body as any).side = side;
+
         Matter.World.add(this.world, body);
+
+        // --- Create Robust Concrete Foundation ---
+        // Scan terrain under the King's area to find the highest point (min Y)
+        // This ensures the foundation sits on top of the highest terrain peak
+        // and extends downwards, so nothing is underground or floating.
+
+        const foundationWidth = 360; // 4 beams wide
+        const halfWidth = foundationWidth / 2;
+        const scanStart = Math.floor(spawnX - halfWidth);
+        const scanEnd = Math.ceil(spawnX + halfWidth);
+
+        // Find highest terrain point (minimum Y value) in the foundation footprint
+        let highestY = Infinity; // Lower Y is higher up
+        const pts = this.terrain.points;
+
+        // Optimized scan: find points within range or interpolate
+        // Since points are sorted by X, we can find range efficiently or just iterate relevant ones
+        // Points resolution is 20px, so just iterating all is fast enough for initialization
+        for (const pt of pts) {
+            if (pt.x >= scanStart && pt.x <= scanEnd) {
+                if (pt.y < highestY) highestY = pt.y;
+            }
+        }
+
+        // If no points found (edge case), use spawnY
+        if (highestY === Infinity) highestY = spawnY;
+
+        // Foundation Geometry
+        // Top protrudes above highest terrain so it's visible as a platform
+        // Bottom extends underground for anchoring
+        const foundationVisibleHeight = 20; // How much protrudes above terrain
+        const bottomY = CANVAS_HEIGHT + 200;
+        const foundationTop = highestY - foundationVisibleHeight;
+        const foundationDisplayHeight = bottomY - foundationTop;
+        const foundationCenterY = (foundationTop + bottomY) / 2;
+
+        const foundation = Matter.Bodies.rectangle(spawnX, foundationCenterY, foundationWidth, foundationDisplayHeight, {
+            isStatic: true,
+            label: 'foundation',
+            friction: 2.0, // High friction
+            render: { fillStyle: '#7D7D7D' } // Stone color
+        });
+
+        // Tag it so it doesn't get destroyed easily (high HP)
+        this.stampBlockProps(foundation, 'stone', foundationWidth, foundationDisplayHeight);
+        (foundation as any).blockHp = 10000; // Indestructible-ish
+        (foundation as any).blockMaxHp = 10000;
+
+        Matter.World.add(this.world, foundation);
+
+        // Adjust King Position
+        // King should sit exactly on top of the foundation
+        // Foundation Top is at `foundationTop`
+        // King Y = foundationTop - kingRadius - epsilon
+        const correctedKingY = foundationTop - kingRadius - 1;
+
+        Matter.Body.setPosition(body, { x: spawnX, y: correctedKingY });
+
+        // Update King State to match new position
+        // ----------------------------------
 
         const state: KingState = {
             bodyId: body.id,
