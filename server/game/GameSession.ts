@@ -187,8 +187,8 @@ export class GameSession {
         let left: KingHpState = { hp: 0, maxHp: 0 };
         let right: KingHpState = { hp: 0, maxHp: 0 };
         for (const ps of this.players.values()) {
-            if (ps.side === 'left') left = { hp: ps.kingState.hp, maxHp: ps.kingState.maxHp };
-            if (ps.side === 'right') right = { hp: ps.kingState.hp, maxHp: ps.kingState.maxHp };
+            if (ps.side === 'left') left = { hp: ps.kingState.hp, maxHp: ps.kingState.maxHp, x: ps.kingBody.position.x, y: ps.kingBody.position.y };
+            if (ps.side === 'right') right = { hp: ps.kingState.hp, maxHp: ps.kingState.maxHp, x: ps.kingBody.position.x, y: ps.kingBody.position.y };
         }
         return { left, right };
     }

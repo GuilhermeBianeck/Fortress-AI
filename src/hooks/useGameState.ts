@@ -9,8 +9,8 @@ export const useGameState = () => {
     const [terrain, setTerrain] = useState<TerrainData | null>(null);
     const [buildStatus, setBuildStatus] = useState<BuildStatus>({ status: 'idle', message: '' });
     const [kingsHp, setKingsHp] = useState<{ left: KingHpState; right: KingHpState }>({
-        left: { hp: 100, maxHp: 100 },
-        right: { hp: 100, maxHp: 100 },
+        left: { hp: 100, maxHp: 100, x: 0 },
+        right: { hp: 100, maxHp: 100, x: 0 },
     });
 
     // Room/match state

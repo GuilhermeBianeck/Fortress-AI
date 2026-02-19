@@ -19,6 +19,8 @@ export type MatchPhase = 'lobby' | 'build' | 'reveal' | 'combat' | 'result';
 export interface KingHpState {
     hp: number;
     maxHp: number;
+    x?: number;
+    y?: number;
 }
 
 export interface GameState {

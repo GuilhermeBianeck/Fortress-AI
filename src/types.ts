@@ -26,6 +26,8 @@ export type Side = 'left' | 'right';
 export interface KingHpState {
     hp: number;
     maxHp: number;
+    x?: number;
+    y?: number;
 }
 
 export interface GameState {
@@ -68,7 +70,7 @@ export interface BuildStatus {
 export type MaterialType = 'wood' | 'stone' | 'ice' | 'rubber' | 'steel';
 export type ShapeType = 'rectangle' | 'pillar' | 'beam';
 
-export const MATERIAL_COLORS: Record<MaterialType, string> = {
+export const MATERIAL_COLORS: Record<MaterialType | 'foundation', string> = {
     wood: '#A67C52',
     stone: '#7D7D7D',
     ice: '#A5F2F3',

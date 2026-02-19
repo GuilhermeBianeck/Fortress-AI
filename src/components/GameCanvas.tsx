@@ -181,7 +181,7 @@ export const GameCanvas = ({
     const keysRef = useRef<Set<string>>(new Set());
 
     // Flag to ensure initial camera setup only happens once
-    const hasSetInitialCameraRef = useRef(false);
+    const hasPannedForPhaseRef = useRef<MatchPhase | null>(null);
 
     // Sync refs
     useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -197,16 +197,6 @@ export const GameCanvas = ({
     useEffect(() => { hazardsRef.current = hazards; }, [hazards]);
     useEffect(() => { roundScoreRef.current = roundScore; }, [roundScore]);
     useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
-
-    // Set initial camera to own side
-    useEffect(() => {
-        if (currentCanvasWidth <= 0 || hasSetInitialCameraRef.current) return;
-        const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
-        const targetX = Math.max(0, Math.min(WORLD_WIDTH - currentCanvasWidth, cannonX - currentCanvasWidth / 2));
-        cameraRef.current.x = targetX;
-        cameraRef.current.targetX = targetX;
-        hasSetInitialCameraRef.current = true;
-    }, [mySide, currentCanvasWidth]);
 
     // Detect King HP decrease -> shake
     useEffect(() => {
@@ -269,27 +259,35 @@ export const GameCanvas = ({
 
     // Auto-pan camera based on phase
     useEffect(() => {
+        if (hasPannedForPhaseRef.current === phase) return;
         const cam = cameraRef.current;
+
         if (phase === 'build') {
-            // Pan to own side during build
-            const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
-            const maxCamX = WORLD_WIDTH - currentCanvasWidth;
-            cam.targetX = Math.max(0, Math.min(maxCamX, cannonX - currentCanvasWidth / 2));
+            const kingX = kingsHp[mySide]?.x;
+            if (kingX) {
+                const maxCamX = WORLD_WIDTH - currentCanvasWidth;
+                cam.targetX = Math.max(0, Math.min(maxCamX, kingX - currentCanvasWidth / 2));
+                // If it's the very first pan, set the immediate position too so it doesn't swipe from 0
+                if (cam.x === 0) cam.x = cam.targetX;
+                hasPannedForPhaseRef.current = phase;
+            }
         } else if (phase === 'reveal') {
-            // Auto-pan from own base to enemy base during reveal
-            const myCannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
-            const enemyCannonX = mySide === 'left' ? RIGHT_CANNON_X : LEFT_CANNON_X;
+            const myKingX = kingsHp[mySide]?.x;
+            const enemyKingX = kingsHp[mySide === 'left' ? 'right' : 'left']?.x;
 
-            // Limit the max camera X so we don't pan past the background
-            const maxCamX = WORLD_WIDTH - currentCanvasWidth;
-
-            cam.targetX = Math.max(0, Math.min(maxCamX, myCannonX - currentCanvasWidth / 2));
-            const panTimer = setTimeout(() => {
-                cam.targetX = Math.max(0, Math.min(maxCamX, enemyCannonX - currentCanvasWidth / 2));
-            }, 2500);
-            return () => clearTimeout(panTimer);
+            if (myKingX && enemyKingX) {
+                const maxCamX = WORLD_WIDTH - currentCanvasWidth;
+                cam.targetX = Math.max(0, Math.min(maxCamX, myKingX - currentCanvasWidth / 2));
+                const panTimer = setTimeout(() => {
+                    cam.targetX = Math.max(0, Math.min(maxCamX, enemyKingX - currentCanvasWidth / 2));
+                }, 2500);
+                hasPannedForPhaseRef.current = phase;
+                return () => clearTimeout(panTimer);
+            }
+        } else {
+            hasPannedForPhaseRef.current = phase;
         }
-    }, [phase, mySide, currentCanvasWidth]);
+    }, [phase, mySide, currentCanvasWidth, kingsHp]);
 
     // Auto-pan to active cannon when it's their turn
     useEffect(() => {
