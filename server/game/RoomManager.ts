@@ -277,7 +277,7 @@ export class RoomManager {
 
         for (const [sid, pInfo] of room.players.entries()) {
             const playerSocket = this.io.sockets.sockets.get(sid);
-            playerSocket?.emit('match_started', { side: pInfo.side });
+            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp() });
         }
 
         session.getStateMachine().startBuildPhase();
@@ -338,7 +338,7 @@ export class RoomManager {
 
         for (const [sid, pInfo] of room.players.entries()) {
             const playerSocket = this.io.sockets.sockets.get(sid);
-            playerSocket?.emit('match_started', { side: pInfo.side });
+            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp() });
         }
 
         session.getStateMachine().startBuildPhase();

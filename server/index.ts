@@ -146,7 +146,7 @@ io.on('connection', (socket) => {
                     // Send side info to each player
                     for (const [sid, pInfo] of room.players.entries()) {
                         const playerSocket = io.sockets.sockets.get(sid);
-                        playerSocket?.emit('match_started', { side: pInfo.side });
+                        playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp() });
                     }
 
                     // Start build phase

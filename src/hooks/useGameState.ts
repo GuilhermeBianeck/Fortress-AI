@@ -150,8 +150,11 @@ export const useGameState = () => {
             setQueuePosition(null);
         });
 
-        socketRef.current.on('match_started', (data: { side: Side }) => {
+        socketRef.current.on('match_started', (data: { side: Side, kingsHp?: { left: KingHpState; right: KingHpState } }) => {
             setRoomState(prev => prev ? { ...prev, side: data.side, phase: 'build' } : prev);
+            if (data.kingsHp) {
+                setKingsHp(data.kingsHp);
+            }
         });
 
         // --- Phase events ---

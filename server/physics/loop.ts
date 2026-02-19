@@ -89,8 +89,8 @@ export class GameLoop {
             bodies,
             timestamp: Date.now(),
             kings: {
-                left: { hp: leftKing?.hp ?? 0, maxHp: leftKing?.maxHp ?? 0 },
-                right: { hp: rightKing?.hp ?? 0, maxHp: rightKing?.maxHp ?? 0 },
+                left: { hp: leftKing?.hp ?? 0, maxHp: leftKing?.maxHp ?? 0, x: leftKing?.position.x, y: leftKing?.position.y },
+                right: { hp: rightKing?.hp ?? 0, maxHp: rightKing?.maxHp ?? 0, x: rightKing?.position.x, y: rightKing?.position.y },
             },
         });
     }
