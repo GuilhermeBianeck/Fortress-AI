@@ -180,6 +180,9 @@ export const GameCanvas = ({
     // Keys pressed for camera
     const keysRef = useRef<Set<string>>(new Set());
 
+    // Flag to ensure initial camera setup only happens once
+    const hasSetInitialCameraRef = useRef(false);
+
     // Sync refs
     useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
     useEffect(() => { terrainRef.current = terrain; }, [terrain]);
@@ -197,12 +200,13 @@ export const GameCanvas = ({
 
     // Set initial camera to own side
     useEffect(() => {
-        if (currentCanvasWidth <= 0 || phase) return; // Only do this once on mount/resize before phase is set
+        if (currentCanvasWidth <= 0 || hasSetInitialCameraRef.current) return;
         const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
         const targetX = Math.max(0, Math.min(WORLD_WIDTH - currentCanvasWidth, cannonX - currentCanvasWidth / 2));
         cameraRef.current.x = targetX;
         cameraRef.current.targetX = targetX;
-    }, [mySide, currentCanvasWidth, phase]);
+        hasSetInitialCameraRef.current = true;
+    }, [mySide, currentCanvasWidth]);
 
     // Detect King HP decrease -> shake
     useEffect(() => {
