@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Trophy } from 'lucide-react';
+import { Swords, Zap, Check, Trophy, Shield, Crown, Crosshair, Users, LogIn, ChevronRight } from 'lucide-react';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -17,6 +17,108 @@ export interface LobbyProps {
     onGetProfile?: () => void;
 }
 
+/* ═══════════════════════════════════════
+   Ember Particle Component (CSS-driven)
+   ═══════════════════════════════════════ */
+const EmberParticles = () => {
+    const embers = Array.from({ length: 18 }, (_, i) => ({
+        id: i,
+        left: `${Math.random() * 100}%`,
+        delay: `${Math.random() * 8}s`,
+        duration: `${6 + Math.random() * 8}s`,
+        size: 2 + Math.random() * 3,
+        opacity: 0.3 + Math.random() * 0.5,
+    }));
+
+    return (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]">
+            {embers.map(e => (
+                <div
+                    key={e.id}
+                    className="ember animate-ember"
+                    style={{
+                        left: e.left,
+                        bottom: '-5px',
+                        width: `${e.size}px`,
+                        height: `${e.size}px`,
+                        animationDelay: e.delay,
+                        animationDuration: e.duration,
+                        opacity: e.opacity,
+                    }}
+                />
+            ))}
+        </div>
+    );
+};
+
+/* ═══════════════════════════════════════
+   Mountain Silhouette SVG (CSS art)
+   ═══════════════════════════════════════ */
+const MountainLayer = ({ color, height, offset, className }: { color: string; height: string; offset: string; className?: string }) => (
+    <div className={`absolute bottom-0 left-0 right-0 ${className || ''}`} style={{ height }}>
+        <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="w-full h-full" style={{ transform: `translateY(${offset})` }}>
+            <path
+                fill={color}
+                d="M0,224L48,213.3C96,203,192,181,288,186.7C384,192,480,224,576,229.3C672,235,768,213,864,186.7C960,160,1056,128,1152,133.3C1248,139,1344,181,1392,202.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+            />
+        </svg>
+    </div>
+);
+
+const MountainLayerAlt = ({ color, height, offset, className }: { color: string; height: string; offset: string; className?: string }) => (
+    <div className={`absolute bottom-0 left-0 right-0 ${className || ''}`} style={{ height }}>
+        <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="w-full h-full" style={{ transform: `translateY(${offset})` }}>
+            <path
+                fill={color}
+                d="M0,288L60,261.3C120,235,240,181,360,165.3C480,149,600,171,720,186.7C840,203,960,213,1080,197.3C1200,181,1320,139,1380,117.3L1440,96L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"
+            />
+        </svg>
+    </div>
+);
+
+/* ═══════════════════════════════════════
+   Castle Silhouette SVG
+   ═══════════════════════════════════════ */
+const CastleSilhouette = ({ side, className }: { side: 'left' | 'right'; className?: string }) => (
+    <div className={`absolute bottom-[12%] ${side === 'left' ? 'left-[5%]' : 'right-[5%]'} ${className || ''}`} style={{ width: '120px', height: '140px' }}>
+        <svg viewBox="0 0 120 140" fill="none" className={`w-full h-full ${side === 'right' ? 'scale-x-[-1]' : ''}`}>
+            {/* Main tower */}
+            <rect x="35" y="30" width="50" height="110" fill="#0d1117" />
+            {/* Left turret */}
+            <rect x="15" y="50" width="25" height="90" fill="#0d1117" />
+            <rect x="10" y="45" width="35" height="8" fill="#0d1117" />
+            {/* Right turret */}
+            <rect x="80" y="40" width="25" height="100" fill="#0d1117" />
+            <rect x="75" y="35" width="35" height="8" fill="#0d1117" />
+            {/* Battlements left */}
+            <rect x="10" y="42" width="8" height="10" fill="#0d1117" />
+            <rect x="22" y="42" width="8" height="10" fill="#0d1117" />
+            <rect x="34" y="42" width="8" height="10" fill="#0d1117" />
+            {/* Battlements right */}
+            <rect x="75" y="32" width="8" height="10" fill="#0d1117" />
+            <rect x="87" y="32" width="8" height="10" fill="#0d1117" />
+            <rect x="99" y="32" width="8" height="10" fill="#0d1117" />
+            {/* Center top */}
+            <rect x="45" y="10" width="30" height="25" fill="#0d1117" />
+            <rect x="40" y="5" width="8" height="30" fill="#0d1117" />
+            <rect x="72" y="5" width="8" height="30" fill="#0d1117" />
+            {/* Flag pole */}
+            <rect x="57" y="0" width="2" height="15" fill="#0d1117" />
+            <polygon points="59,0 59,8 68,4" fill="#0d1117" />
+            {/* Gate */}
+            <rect x="48" y="105" width="24" height="35" rx="12" fill="#060810" />
+            {/* Windows - subtle glow */}
+            <rect x="52" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.6" />
+            <rect x="62" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.6" />
+            <rect x="52" y="80" width="6" height="8" fill="#ffd700" opacity="0.15" />
+            <rect x="62" y="80" width="6" height="8" fill="#ffd700" opacity="0.15" />
+        </svg>
+    </div>
+);
+
+/* ═══════════════════════════════════════
+   Main Lobby Component
+   ═══════════════════════════════════════ */
 export const Lobby = ({
     roomState, queuePosition,
     playerName, onPlayerNameChange,
@@ -25,10 +127,21 @@ export const Lobby = ({
 }: LobbyProps) => {
     const [joinCode, setJoinCode] = useState('');
     const [isReady, setIsReady] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
         onGetProfile?.();
     }, [onGetProfile]);
+
+    // Parallax mouse tracking
+    const handleMouseMove = useCallback((e: React.MouseEvent) => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width - 0.5; // -0.5 to 0.5
+        const y = (e.clientY - rect.top) / rect.height - 0.5;
+        setMousePos({ x, y });
+    }, []);
 
     const handleJoinSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -43,79 +156,89 @@ export const Lobby = ({
         onReady();
     };
 
-    // Waiting room view
+    // ─── Waiting Room View ───
     if (roomState) {
         const isSinglePlayer = roomState.opponentName === 'Training Bot';
 
         return (
-            <div className="flex-1 w-full flex items-center justify-center bg-gradient-to-br from-[#fdf6e3] via-[#faf0d7] to-[#fdf6e3] p-6">
-                <div className="w-full max-w-md text-center">
-                    <h2 className="text-2xl font-bold text-amber-700 mb-3" style={{ fontFamily: "'MedievalSharp', cursive" }}>
-                        {isSinglePlayer ? '⚔️ Training Grounds' : '⚔️ War Room'}
-                    </h2>
+            <div className="flex-1 w-full flex items-center justify-center p-6 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #0f0e17 50%, #1a1a2e 100%)' }}>
+                {/* Subtle stars */}
+                <div className="stars-layer absolute inset-0 opacity-40" />
+
+                <div className="w-full max-w-md text-center relative z-10">
+                    <div className="flex items-center justify-center gap-3 mb-3">
+                        <Swords size={28} className="text-[var(--gold)]" />
+                        <h2 className="text-2xl font-bold text-[var(--gold)] font-heading text-glow-gold">
+                            {isSinglePlayer ? 'Training Grounds' : 'War Room'}
+                        </h2>
+                        <Swords size={28} className="text-[var(--gold)]" />
+                    </div>
 
                     {!isSinglePlayer && (
                         <>
-                            <div className="text-5xl font-mono font-bold text-amber-500 tracking-[0.3em] mb-6 select-all">
+                            <div className="text-5xl font-mono font-bold text-[var(--gold)] tracking-[0.3em] mb-4 select-all text-glow-gold">
                                 {roomState.roomId}
                             </div>
-                            <p className="text-base text-amber-600 mb-4">
+                            <p className="text-sm text-[var(--text-secondary)] mb-4">
                                 Share this code with your opponent
                             </p>
                         </>
                     )}
 
-                    <div className="p-4 rounded-xl bg-white/60 border border-amber-300/30 inline-block w-full">
+                    <div className="card-dark p-4 rounded-xl w-full">
                         <div className="flex items-center justify-center gap-2 text-base">
-                            <span className={`w-2.5 h-2.5 rounded-full ${roomState.opponentConnected ? 'bg-green-500' : 'bg-amber-400 animate-pulse'}`} />
-                            <span className={roomState.opponentConnected ? 'text-green-600' : 'text-amber-500'}>
+                            <span className={`w-2.5 h-2.5 rounded-full ${roomState.opponentConnected ? 'bg-[var(--emerald)]' : 'bg-[var(--gold)] animate-pulse'}`} />
+                            <span className={roomState.opponentConnected ? 'text-[var(--emerald)]' : 'text-[var(--text-secondary)]'}>
                                 {roomState.opponentConnected
                                     ? (isSinglePlayer ? 'Bot is ready' : 'Opponent has arrived')
                                     : 'Awaiting challenger...'}
                             </span>
                         </div>
-                        <p className="text-sm text-amber-500 mt-2">
-                            You are: <span className="text-amber-800 font-medium">{roomState.side.toUpperCase()}</span> kingdom
+                        <p className="text-sm text-[var(--text-muted)] mt-2">
+                            You are: <span className="text-[var(--gold)] font-bold">{roomState.side.toUpperCase()}</span> kingdom
                         </p>
                     </div>
 
                     {roomState.opponentConnected && (
-                        <div>
-                            <button
-                                onClick={handleReady}
-                                disabled={isReady}
-                                className={`mt-6 sm:mt-8 w-full max-w-sm mx-auto min-h-[48px] py-3.5 sm:py-4 font-bold rounded-xl text-lg sm:text-xl touch-manipulation
-                                    transition-colors duration-200 shadow-lg
-                                    ${isReady
-                                        ? 'bg-green-200 text-green-700 ring-2 ring-green-400/50 cursor-default shadow-green-300/30'
-                                        : 'bg-gradient-to-b from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 active:from-green-600 active:to-green-700 text-white cursor-pointer shadow-green-400/30'
-                                    }`}
-                            >
-                                {isReady ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <Check size={22} /> READY FOR BATTLE
-                                    </span>
-                                ) : '⚔️ READY FOR BATTLE'}
-                            </button>
-                        </div>
+                        <button
+                            onClick={handleReady}
+                            disabled={isReady}
+                            className={`mt-6 w-full max-w-sm mx-auto min-h-[52px] py-3.5 rounded-xl text-lg touch-manipulation
+                                transition-all duration-300
+                                ${isReady
+                                    ? 'card-dark text-[var(--emerald)] border-[var(--emerald)] cursor-default'
+                                    : 'btn-emerald cursor-pointer'
+                                }`}
+                        >
+                            {isReady ? (
+                                <span className="flex items-center justify-center gap-2 font-bold">
+                                    <Check size={22} /> READY FOR BATTLE
+                                </span>
+                            ) : (
+                                <span className="flex items-center justify-center gap-2 font-bold">
+                                    <Swords size={20} /> READY FOR BATTLE
+                                </span>
+                            )}
+                        </button>
                     )}
                 </div>
             </div>
         );
     }
 
-    // Queue view
+    // ─── Queue View ───
     if (queuePosition !== null) {
         return (
-            <div className="flex-1 w-full flex items-center justify-center bg-gradient-to-br from-[#fdf6e3] via-[#faf0d7] to-[#fdf6e3] p-6">
-                <div className="w-full text-center">
-                    <div className="w-10 h-10 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-                    <h2 className="text-2xl font-bold text-amber-700 mb-3" style={{ fontFamily: "'MedievalSharp', cursive" }}>Seeking Challenger...</h2>
-                    <p className="text-base text-amber-500">Queue position: {queuePosition + 1}</p>
+            <div className="flex-1 w-full flex items-center justify-center p-6 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #0f0e17 50%, #1a1a2e 100%)' }}>
+                <div className="stars-layer absolute inset-0 opacity-40" />
+
+                <div className="w-full text-center relative z-10">
+                    <div className="w-12 h-12 border-2 border-[var(--gold)] border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-[var(--gold)] mb-3 font-heading text-glow-gold">Seeking Challenger...</h2>
+                    <p className="text-base text-[var(--text-secondary)]">Queue position: {queuePosition + 1}</p>
                     <button
                         onClick={onLeaveQueue}
-                        className="mt-6 sm:mt-8 min-h-[48px] px-8 py-3 bg-white/70 hover:bg-amber-100/60 active:bg-amber-200/60 text-amber-600 rounded-xl border border-amber-300/40
-                            transition-colors duration-200 touch-manipulation text-base"
+                        className="mt-6 btn-medieval min-h-[48px] px-8 py-3 rounded-xl text-base"
                     >
                         Retreat
                     </button>
@@ -124,41 +247,112 @@ export const Lobby = ({
         );
     }
 
-    // Main lobby — fills full width, two columns on wide screens
+    // ─── Main Lobby — Parallax Landing Page ───
     return (
-        <div className="flex-1 w-full flex flex-col lg:flex-row items-stretch bg-gradient-to-br from-[#fdf6e3] via-[#faf0d7] to-[#fdf6e3] overflow-hidden">
-            {/* Left side — Branding */}
-            <div className="flex flex-col items-center justify-center lg:flex-1 p-6 sm:p-8 lg:p-12">
-                <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-                    <div className="text-5xl">🏰</div>
-                    <div>
-                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-amber-700" style={{ fontFamily: "'MedievalSharp', cursive" }}>FORTRESS AI</h1>
-                        <p className="text-sm sm:text-base text-amber-500 mt-1">⚔️ Castle War — Build & Conquer</p>
+        <div
+            ref={containerRef}
+            onMouseMove={handleMouseMove}
+            className="parallax-container flex-1 w-full flex flex-col items-center"
+            style={{ background: 'linear-gradient(180deg, #070710 0%, #0a0a16 20%, #0f0e17 40%, #1a1a2e 70%, #16213e 100%)' }}
+        >
+            {/* ═══ PARALLAX LAYERS ═══ */}
+
+            {/* Layer 0: Stars */}
+            <div
+                className="stars-layer parallax-layer"
+                style={{ transform: `translate(${mousePos.x * -5}px, ${mousePos.y * -5}px)` }}
+            />
+
+            {/* Horizon glow */}
+            <div
+                className="absolute bottom-0 left-0 right-0 h-[40%] pointer-events-none"
+                style={{
+                    background: 'radial-gradient(ellipse 80% 40% at 50% 100%, rgba(230, 126, 34, 0.08) 0%, transparent 70%)',
+                    transform: `translate(${mousePos.x * -3}px, ${mousePos.y * -2}px)`,
+                }}
+            />
+
+            {/* Layer 1: Far mountains */}
+            <MountainLayerAlt
+                color="#0d0d1a"
+                height="55%"
+                offset="10px"
+                className="opacity-80"
+            />
+
+            {/* Layer 2: Mid mountains */}
+            <MountainLayer
+                color="#0b0b15"
+                height="45%"
+                offset="20px"
+            />
+
+            {/* Castle silhouettes */}
+            <CastleSilhouette side="left" className="opacity-60" />
+            <CastleSilhouette side="right" className="opacity-60" />
+
+            {/* Layer 3: Near hills */}
+            <MountainLayerAlt
+                color="#090912"
+                height="30%"
+                offset="0px"
+            />
+
+            {/* Fog overlay */}
+            <div
+                className="absolute bottom-0 left-0 right-0 h-[25%] pointer-events-none z-[2]"
+                style={{
+                    background: 'linear-gradient(0deg, rgba(10, 10, 18, 0.95) 0%, rgba(10, 10, 18, 0.5) 40%, transparent 100%)',
+                }}
+            />
+
+            {/* Ember particles */}
+            <EmberParticles />
+
+            {/* ═══ CONTENT ═══ */}
+            <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full max-w-lg px-6 py-8 sm:py-12">
+
+                {/* Logo & Branding */}
+                <div className="flex flex-col items-center mb-8 sm:mb-10 animate-float">
+                    {/* Crown icon */}
+                    <div className="relative mb-3">
+                        <div className="absolute inset-0 blur-xl bg-[var(--gold)] opacity-20 rounded-full scale-150" />
+                        <Crown size={48} className="text-[var(--gold)] relative" strokeWidth={1.5} />
+                    </div>
+
+                    <h1
+                        className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wide text-[var(--gold)] font-heading text-glow-gold"
+                    >
+                        FORTRESS AI
+                    </h1>
+
+                    <div className="ornament-divider w-48 my-3">
+                        <span className="text-[var(--gold-dim)] text-xs font-display tracking-[0.3em]">✦</span>
+                    </div>
+
+                    <p className="text-sm sm:text-base text-[var(--text-secondary)] font-display tracking-wider">
+                        CASTLE WAR — BUILD & CONQUER
+                    </p>
+                </div>
+
+                {/* Feature pills — visible on larger screens */}
+                <div className="hidden sm:flex gap-6 mb-8 text-[var(--text-secondary)] text-xs">
+                    <div className="flex items-center gap-2">
+                        <Shield size={14} className="text-[var(--gold-dim)]" />
+                        <span>AI-Powered Castles</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Crosshair size={14} className="text-[var(--ember)]" />
+                        <span>Physics Destruction</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Swords size={14} className="text-[var(--crimson)]" />
+                        <span>Turn-Based Combat</span>
                     </div>
                 </div>
-                <div className="hidden lg:flex flex-col gap-4 text-amber-600 text-sm">
-                    <div className="flex items-center gap-3">
-                        <Swords size={18} className="text-amber-500 shrink-0" />
-                        <span>Build AI-powered castles and siege your enemy&apos;s kingdom</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Zap size={18} className="text-amber-400 shrink-0" />
-                        <span>Turn-based combat with cannon fire and physics destruction</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-lg shrink-0">🛡️</span>
-                        <span>Defend your King against enemy bombardment</span>
-                    </div>
-                </div>
-            </div>
 
-            {/* Divider */}
-            <div className="hidden lg:block w-px self-stretch bg-amber-300/40 my-10" />
-            <div className="lg:hidden w-2/3 h-px bg-amber-300/40 mx-auto" />
-
-            {/* Right side — Actions: fills all available width */}
-            <div className="flex flex-col items-center justify-center lg:flex-1 p-6 sm:p-8 lg:p-12">
-                <div className="flex flex-col gap-3 sm:gap-4 w-full max-w-md">
+                {/* Action Panel */}
+                <div className="w-full flex flex-col gap-3">
                     {/* Player Name */}
                     <input
                         type="text"
@@ -166,25 +360,26 @@ export const Lobby = ({
                         onChange={(e) => onPlayerNameChange(e.target.value)}
                         placeholder="Enter thy name..."
                         maxLength={20}
-                        className="w-full bg-white/60 border border-amber-300/40 rounded-xl px-4 py-3 sm:py-4 text-center text-base sm:text-lg font-medium text-amber-800 placeholder:text-amber-400/60 outline-none focus:border-amber-500/60 transition-all touch-manipulation"
+                        className="input-medieval w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-display font-bold tracking-wide touch-manipulation"
                     />
 
                     {/* Single Player */}
                     <button
                         onClick={() => onCreateRoom(playerName, 'single')}
-                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-gradient-to-b from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600 active:from-blue-600 active:to-blue-700 text-white font-bold rounded-xl text-lg sm:text-xl shadow-lg shadow-blue-400/30
-                            transition-colors duration-200 touch-manipulation mb-3 sm:mb-4"
+                        className="btn-blue w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        🧙 Single Player (Training)
+                        <Zap size={20} />
+                        <span>Single Player</span>
                     </button>
 
-                    {/* Create Room */}
+                    {/* Create Kingdom */}
                     <button
                         onClick={() => onCreateRoom(playerName, 'pvp')}
-                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:from-amber-600 active:to-amber-700 text-white font-bold rounded-xl text-lg sm:text-xl shadow-lg shadow-amber-400/30
-                            transition-colors duration-200 touch-manipulation"
+                        className="btn-primary w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        🏰 Create Kingdom (PvP)
+                        <Crown size={20} />
+                        <span>Create Kingdom</span>
+                        <span className="text-xs opacity-70 ml-1">(PvP)</span>
                     </button>
 
                     {/* Join Room */}
@@ -193,68 +388,69 @@ export const Lobby = ({
                             type="text"
                             value={joinCode}
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                            placeholder="CODE"
+                            placeholder="ROOM CODE"
                             maxLength={6}
-                            className="min-w-0 flex-1 bg-white/60 border border-amber-300/40 rounded-xl px-3 py-3 sm:py-4 text-center text-base sm:text-lg font-mono font-bold text-amber-800 placeholder:text-amber-400/60 uppercase tracking-[0.15em] outline-none focus:border-amber-500/60 touch-manipulation"
+                            className="input-medieval min-w-0 flex-1 rounded-xl px-3 py-3.5 text-center text-base font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
                         />
                         <button
                             type="submit"
                             disabled={joinCode.trim().length < 4}
-                            className="shrink-0 min-h-[48px] px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-b from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 active:from-green-600 active:to-green-700 text-white font-bold rounded-xl text-base sm:text-lg
-                                transition-colors duration-200 touch-manipulation shadow-lg shadow-green-400/30
-                                disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="btn-emerald shrink-0 min-h-[52px] px-6 py-3 rounded-xl text-base touch-manipulation
+                                flex items-center gap-2
+                                disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
                         >
+                            <LogIn size={18} />
                             Join
                         </button>
                     </form>
 
-                    <div className="flex items-center gap-3 my-0.5 sm:my-1">
-                        <div className="flex-1 h-px bg-amber-300/40" />
-                        <span className="text-xs text-amber-400">or</span>
-                        <div className="flex-1 h-px bg-amber-300/40" />
+                    {/* Divider */}
+                    <div className="ornament-divider mx-4">
+                        <span className="text-[10px] text-[var(--text-muted)] font-display tracking-widest">OR</span>
                     </div>
 
                     {/* Quick Match */}
                     <button
                         onClick={() => onJoinQueue(playerName)}
-                        className="w-full min-h-[48px] py-3.5 sm:py-5 bg-white/60 hover:bg-amber-100/60 active:bg-amber-200/60 text-amber-600 font-bold rounded-xl text-base sm:text-lg border border-amber-300/30
-                            transition-colors duration-200 touch-manipulation"
+                        className="btn-medieval w-full min-h-[52px] py-3.5 rounded-xl text-base touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        ⚔️ Quick Battle
+                        <Users size={18} />
+                        <span>Quick Battle</span>
+                        <ChevronRight size={16} className="opacity-50" />
                     </button>
 
                     {/* Player Profile & History */}
                     {playerProfile && playerProfile.matchesPlayed > 0 && (
-                        <div className="mt-2 p-4 rounded-xl bg-white/60 border border-amber-300/30">
+                        <div className="card-dark mt-2 p-4 rounded-xl">
                             <div className="flex items-center gap-2 mb-3">
-                                <Trophy size={16} className="text-amber-500" />
-                                <span className="text-sm font-bold text-amber-800">Your Stats</span>
+                                <Trophy size={16} className="text-[var(--gold)]" />
+                                <span className="text-sm font-bold text-[var(--gold)] font-display">Your Stats</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-center mb-3">
                                 <div>
-                                    <p className="text-lg font-bold text-amber-500">{playerProfile.totalScore}</p>
-                                    <p className="text-[10px] text-amber-400">Total Score</p>
+                                    <p className="text-lg font-bold text-[var(--gold)]">{playerProfile.totalScore}</p>
+                                    <p className="text-[10px] text-[var(--text-muted)]">Total Score</p>
                                 </div>
                                 <div>
-                                    <p className="text-lg font-bold text-amber-800">{playerProfile.matchesPlayed}</p>
-                                    <p className="text-[10px] text-amber-400">Matches</p>
+                                    <p className="text-lg font-bold text-[var(--text-primary)]">{playerProfile.matchesPlayed}</p>
+                                    <p className="text-[10px] text-[var(--text-muted)]">Matches</p>
                                 </div>
                                 <div>
-                                    <p className="text-lg font-bold text-green-600">{playerProfile.matchesWon}</p>
-                                    <p className="text-[10px] text-amber-400">Wins</p>
+                                    <p className="text-lg font-bold text-[var(--emerald)]">{playerProfile.matchesWon}</p>
+                                    <p className="text-[10px] text-[var(--text-muted)]">Wins</p>
                                 </div>
                             </div>
                             {playerProfile.history.length > 0 && (
                                 <div>
-                                    <p className="text-xs text-amber-500 mb-1.5">Recent Matches</p>
+                                    <p className="text-xs text-[var(--text-muted)] mb-1.5">Recent Matches</p>
                                     <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                                         {playerProfile.history.slice(0, 5).map((entry, i) => (
-                                            <div key={`${entry.matchId}-${i}`} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-amber-100/50">
-                                                <span className={entry.won ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                                            <div key={`${entry.matchId}-${i}`} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-[var(--bg-elevated)]">
+                                                <span className={entry.won ? 'text-[var(--emerald)] font-medium' : 'text-[var(--crimson)] font-medium'}>
                                                     {entry.won ? 'W' : 'L'}
                                                 </span>
-                                                <span className="text-amber-600 truncate mx-2">vs {entry.opponentName}</span>
-                                                <span className="text-amber-500 font-mono">{entry.score.totalScore}</span>
+                                                <span className="text-[var(--text-secondary)] truncate mx-2">vs {entry.opponentName}</span>
+                                                <span className="text-[var(--gold)] font-mono">{entry.score.totalScore}</span>
                                             </div>
                                         ))}
                                     </div>

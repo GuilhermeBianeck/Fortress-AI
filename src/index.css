@@ -1,14 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=MedievalSharp&family=Cinzel:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════
+   FORTRESS AI — Dark Medieval Design System
+   ═══════════════════════════════════════════ */
+
 :root {
-  font-family: 'Cinzel', 'Georgia', 'Times New Roman', serif;
+  /* Core palette */
+  --bg-deepest: #0a0a12;
+  --bg-deep: #0f0e17;
+  --bg-dark: #1a1a2e;
+  --bg-surface: #16213e;
+  --bg-elevated: #1e2a4a;
+  --bg-card: rgba(22, 33, 62, 0.7);
+
+  /* Accent colors */
+  --gold: #ffd700;
+  --gold-dim: #b8960f;
+  --gold-glow: rgba(255, 215, 0, 0.3);
+  --ember: #e67e22;
+  --ember-dim: #d35400;
+  --crimson: #c0392b;
+  --crimson-dim: #922b21;
+  --royal-blue: #3498db;
+  --emerald: #27ae60;
+
+  /* Text */
+  --text-primary: #e8e0d4;
+  --text-secondary: #a89984;
+  --text-muted: #665c54;
+  --text-gold: #ffd700;
+
+  /* Borders */
+  --border-subtle: rgba(255, 215, 0, 0.1);
+  --border-medium: rgba(255, 215, 0, 0.2);
+  --border-accent: rgba(255, 215, 0, 0.4);
+
+  /* Fonts */
+  font-family: 'Inter', 'Cinzel', Georgia, serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light;
-  color: #3d2b14;
-  background-color: #fdf6e3;
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--bg-deepest);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -20,12 +55,26 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100dvh;
-  background: linear-gradient(180deg, #fdf6e3 0%, #f5edd5 50%, #fdf6e3 100%);
-  /* Prevent pull-to-refresh and overscroll on mobile */
+  background: linear-gradient(180deg, var(--bg-deepest) 0%, var(--bg-deep) 40%, var(--bg-dark) 100%);
   overscroll-behavior: none;
 }
 
-/* Safe area padding for notched devices */
+/* Font classes */
+.font-heading {
+  font-family: 'Uncial Antiqua', 'MedievalSharp', cursive;
+}
+
+.font-medieval {
+  font-family: 'MedievalSharp', cursive;
+}
+
+.font-display {
+  font-family: 'Cinzel', Georgia, serif;
+}
+
+/* ═══════════════════════
+   Safe Area (Notched devices)
+   ═══════════════════════ */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -34,31 +83,322 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-/* Desktop: constrain game to 4:3 aspect */
+/* ═══════════════════════
+   Game Container
+   ═══════════════════════ */
 @media (min-width: 640px) {
   .game-container {
     max-width: calc((100vh - 10rem) * 4 / 3);
   }
 }
 
-/* Mobile: ensure canvas fills the available width without overflow */
 @media (max-width: 639px) {
   .game-container {
     width: 100%;
   }
 }
 
-/* Medieval decorative scrollbar */
+/* ═══════════════════════
+   Medieval Scrollbar
+   ═══════════════════════ */
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #f0e6d0;
+  background: var(--bg-deep);
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #c9a96e;
+  background: var(--gold-dim);
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #b8923a;
+  background: var(--gold);
+}
+
+/* ═══════════════════════
+   Glow & Effects
+   ═══════════════════════ */
+.text-glow-gold {
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 30px rgba(255, 215, 0, 0.2);
+}
+
+.text-glow-ember {
+  text-shadow: 0 0 10px rgba(230, 126, 34, 0.5), 0 0 30px rgba(230, 126, 34, 0.2);
+}
+
+.box-glow-gold {
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.15), inset 0 1px 0 rgba(255, 215, 0, 0.1);
+}
+
+.box-glow-ember {
+  box-shadow: 0 0 15px rgba(230, 126, 34, 0.2), inset 0 1px 0 rgba(230, 126, 34, 0.1);
+}
+
+/* ═══════════════════════
+   Button Styles
+   ═══════════════════════ */
+.btn-medieval {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.05) 100%);
+  border: 1px solid var(--border-accent);
+  color: var(--gold);
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.btn-medieval::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn-medieval:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2), inset 0 1px 0 rgba(255, 215, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-medieval:hover::before {
+  opacity: 1;
+}
+
+.btn-medieval:active {
+  transform: translateY(0);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dim) 100%);
+  border: 1px solid var(--gold);
+  color: var(--bg-deepest);
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(180deg, #ffe44d 0%, var(--gold) 100%);
+  box-shadow: 0 4px 25px rgba(255, 215, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+}
+
+.btn-blue {
+  background: linear-gradient(180deg, #4a9eff 0%, #2c7be5 100%);
+  border: 1px solid rgba(74, 158, 255, 0.5);
+  color: white;
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+}
+
+.btn-blue:hover {
+  background: linear-gradient(180deg, #5eabff 0%, #3a88f2 100%);
+  box-shadow: 0 4px 25px rgba(52, 152, 219, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-blue:active {
+  transform: translateY(0);
+}
+
+.btn-emerald {
+  background: linear-gradient(180deg, #2ecc71 0%, #27ae60 100%);
+  border: 1px solid rgba(46, 204, 113, 0.5);
+  color: white;
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+}
+
+.btn-emerald:hover {
+  box-shadow: 0 4px 25px rgba(39, 174, 96, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-emerald:active {
+  transform: translateY(0);
+}
+
+/* ═══════════════════════
+   Input Styles
+   ═══════════════════════ */
+.input-medieval {
+  background: rgba(15, 14, 23, 0.6);
+  border: 1px solid var(--border-medium);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.input-medieval::placeholder {
+  color: var(--text-muted);
+}
+
+.input-medieval:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+  outline: none;
+}
+
+/* ═══════════════════════
+   Card Styles
+   ═══════════════════════ */
+.card-dark {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(12px);
+}
+
+/* ═══════════════════════
+   Parallax & Animations
+   ═══════════════════════ */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes ember-rise {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(-100vh) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes star-twinkle {
+
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-ember {
+  animation: ember-rise linear infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+/* ═══════════════════════
+   Parallax Landing
+   ═══════════════════════ */
+.parallax-container {
+  position: relative;
+  overflow: hidden;
+  min-height: 100dvh;
+}
+
+.parallax-layer {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  transition: transform 0.1s ease-out;
+}
+
+/* Stars */
+.stars-layer {
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255, 255, 255, 0.8) 0%, transparent 100%),
+    radial-gradient(1px 1px at 30% 50%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 50% 10%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+    radial-gradient(1px 1px at 70% 40%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 60%, rgba(255, 255, 255, 0.9) 0%, transparent 100%),
+    radial-gradient(2px 2px at 15% 70%, rgba(255, 215, 0, 0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 40% 80%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+    radial-gradient(1px 1px at 60% 25%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+    radial-gradient(2px 2px at 80% 15%, rgba(255, 215, 0, 0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 25% 35%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 45% 65%, rgba(255, 255, 255, 0.4) 0%, transparent 100%),
+    radial-gradient(1px 1px at 85% 85%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 5% 90%, rgba(255, 215, 0, 0.3) 0%, transparent 100%),
+    radial-gradient(1px 1px at 55% 45%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+    radial-gradient(1px 1px at 75% 75%, rgba(255, 255, 255, 0.7) 0%, transparent 100%);
+}
+
+/* Ember particles */
+.ember {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ember);
+  box-shadow: 0 0 6px var(--ember), 0 0 12px rgba(230, 126, 34, 0.3);
+  pointer-events: none;
+}
+
+/* Divider ornament */
+.ornament-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ornament-divider::before,
+.ornament-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
 }
