@@ -937,10 +937,15 @@ export const GameCanvas = ({
                     ctx.stroke();
 
                     if (body.label === 'king') {
-                        ctx.font = '10px sans-serif';
+                        // Crown icon — larger and on top
+                        ctx.font = 'bold 14px sans-serif';
                         ctx.textAlign = 'center';
                         ctx.fillStyle = '#FFD700';
-                        ctx.fillText('\u265A', 0, 4);
+                        ctx.shadowColor = 'rgba(255, 215, 0, 0.6)';
+                        ctx.shadowBlur = 6;
+                        ctx.fillText('♛', 0, -body.circleRadius - 4);
+                        ctx.shadowColor = 'transparent';
+                        ctx.shadowBlur = 0;
                     }
 
                     // Projectile glow
@@ -1091,12 +1096,24 @@ export const GameCanvas = ({
         const scaleX = mmW / WORLD_WIDTH;
         const scaleY = mmH / height;
 
-        // Dark minimap background
-        ctx.fillStyle = 'rgba(10, 10, 18, 0.8)';
-        ctx.fillRect(mmX, mmY, mmW, mmH);
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(mmX, mmY, mmW, mmH);
+        // Dark minimap background with rounded corners
+        ctx.beginPath();
+        const mmR = 6;
+        ctx.moveTo(mmX + mmR, mmY);
+        ctx.lineTo(mmX + mmW - mmR, mmY);
+        ctx.arcTo(mmX + mmW, mmY, mmX + mmW, mmY + mmR, mmR);
+        ctx.lineTo(mmX + mmW, mmY + mmH - mmR);
+        ctx.arcTo(mmX + mmW, mmY + mmH, mmX + mmW - mmR, mmY + mmH, mmR);
+        ctx.lineTo(mmX + mmR, mmY + mmH);
+        ctx.arcTo(mmX, mmY + mmH, mmX, mmY + mmH - mmR, mmR);
+        ctx.lineTo(mmX, mmY + mmR);
+        ctx.arcTo(mmX, mmY, mmX + mmR, mmY, mmR);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
 
         // Terrain silhouette
         if (terr && terr.points.length > 0) {
@@ -1160,34 +1177,67 @@ export const GameCanvas = ({
 
     function drawKingHud(ctx: CanvasRenderingContext2D, hudX: number, hudY: number, king: KingHpState, label: string) {
         const hudWidth = 120;
-        const hudHeight = 14;
+        const barHeight = 12;
         const hpRatio = king.maxHp > 0 ? Math.max(0, king.hp / king.maxHp) : 0;
+        const cornerR = 6;
+        const totalH = barHeight + 22;
 
-        // Dark translucent HUD panel
-        ctx.fillStyle = 'rgba(10, 10, 18, 0.8)';
-        ctx.fillRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
+        // Rounded translucent HUD panel
+        ctx.beginPath();
+        ctx.moveTo(hudX + cornerR, hudY);
+        ctx.lineTo(hudX + hudWidth + 4 - cornerR, hudY);
+        ctx.arcTo(hudX + hudWidth + 4, hudY, hudX + hudWidth + 4, hudY + cornerR, cornerR);
+        ctx.lineTo(hudX + hudWidth + 4, hudY + totalH - cornerR);
+        ctx.arcTo(hudX + hudWidth + 4, hudY + totalH, hudX + hudWidth + 4 - cornerR, hudY + totalH, cornerR);
+        ctx.lineTo(hudX + cornerR, hudY + totalH);
+        ctx.arcTo(hudX, hudY + totalH, hudX, hudY + totalH - cornerR, cornerR);
+        ctx.lineTo(hudX, hudY + cornerR);
+        ctx.arcTo(hudX, hudY, hudX + cornerR, hudY, cornerR);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
+        // Player name label
         ctx.font = 'bold 10px monospace';
         ctx.fillStyle = '#FFD700';
         ctx.textAlign = 'left';
-        ctx.fillText(`\u265A ${label}`, hudX, hudY + 10);
+        ctx.fillText(`♛ ${label}`, hudX + 4, hudY + 13);
 
-        const barY = hudY + 14;
+        // HP bar with gradient fill
+        const barY = hudY + 18;
+        const barX = hudX + 4;
+        const barW = hudWidth - 4;
         ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(hudX, barY, hudWidth, hudHeight);
-        ctx.fillStyle = getHpColor(hpRatio);
-        ctx.fillRect(hudX, barY, hudWidth * hpRatio, hudHeight);
+        ctx.fillRect(barX, barY, barW, barHeight);
+
+        if (hpRatio > 0) {
+            const grad = ctx.createLinearGradient(barX, barY, barX + barW * hpRatio, barY);
+            if (hpRatio > 0.5) {
+                grad.addColorStop(0, '#27ae60');
+                grad.addColorStop(1, '#2ecc71');
+            } else if (hpRatio > 0.25) {
+                grad.addColorStop(0, '#e67e22');
+                grad.addColorStop(1, '#f39c12');
+            } else {
+                grad.addColorStop(0, '#c0392b');
+                grad.addColorStop(1, '#e74c3c');
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(barX, barY, barW * hpRatio, barHeight);
+        }
+
         ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
         ctx.lineWidth = 0.5;
-        ctx.strokeRect(hudX, barY, hudWidth, hudHeight);
+        ctx.strokeRect(barX, barY, barW, barHeight);
 
-        ctx.font = 'bold 9px monospace';
+        // HP text
+        ctx.font = 'bold 8px monospace';
         ctx.fillStyle = '#e0d0b0';
         ctx.textAlign = 'center';
-        ctx.fillText(`${Math.ceil(king.hp)} / ${king.maxHp}`, hudX + hudWidth / 2, barY + 11);
+        ctx.fillText(`${Math.ceil(king.hp)} / ${king.maxHp}`, barX + barW / 2, barY + 9);
     }
 
     // Mouse coordinate helper — converts screen coords to world coords

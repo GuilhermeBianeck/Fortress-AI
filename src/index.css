@@ -409,3 +409,39 @@ body {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
 }
+
+/* ═══════════════════════
+   Subtle Pulse (DONE / Ready buttons)
+   ═══════════════════════ */
+@keyframes pulse-subtle {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 25px rgba(39, 174, 96, 0.6), 0 0 40px rgba(39, 174, 96, 0.15);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s ease-in-out infinite;
+}
+
+/* ═══════════════════════
+   Timer Urgency (< 10s remaining)
+   ═══════════════════════ */
+@keyframes timer-urgent {
+  0%, 100% {
+    color: #e74c3c;
+    text-shadow: 0 0 8px rgba(231, 76, 60, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    color: #ff6b6b;
+    text-shadow: 0 0 16px rgba(231, 76, 60, 0.6);
+    transform: scale(1.08);
+  }
+}
+
+.timer-urgent {
+  animation: timer-urgent 1s ease-in-out infinite;
+}

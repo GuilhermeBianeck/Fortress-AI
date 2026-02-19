@@ -20,11 +20,20 @@ const MATERIALS: { key: MaterialType; label: string; icon: string }[] = [
     { key: 'steel', label: 'Steel', icon: '⚙️' },
 ];
 
-const SHAPES: { key: ShapeType; label: string; icon: string }[] = [
-    { key: 'rectangle', label: 'Block', icon: '⬜' },
-    { key: 'pillar', label: 'Pillar', icon: '▮' },
-    { key: 'beam', label: 'Beam', icon: '▬' },
+const SHAPES: { key: ShapeType; label: string }[] = [
+    { key: 'rectangle', label: 'Block' },
+    { key: 'pillar', label: 'Pillar' },
+    { key: 'beam', label: 'Beam' },
 ];
+
+/* Small SVG shape previews */
+const ShapeIcon = ({ shape, color }: { shape: ShapeType; color: string }) => (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        {shape === 'rectangle' && <rect x="3" y="3" width="12" height="12" rx="1" fill={color} opacity="0.9" />}
+        {shape === 'pillar' && <rect x="5" y="1" width="8" height="16" rx="1" fill={color} opacity="0.9" />}
+        {shape === 'beam' && <rect x="1" y="6" width="16" height="6" rx="1" fill={color} opacity="0.9" />}
+    </svg>
+);
 
 export const GodTools = ({
     selectedMaterial,
@@ -56,6 +65,8 @@ export const GodTools = ({
         onReady();
     };
 
+    const activeColor = MATERIAL_COLORS[selectedMaterial] || '#ffd700';
+
     return (
         <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3 w-full">
             {/* Mode Toggle - Mobile Only */}
@@ -64,7 +75,7 @@ export const GodTools = ({
                     onClick={() => onModeChange('build')}
                     className={`
                         min-h-[36px] px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5
-                        transition-colors duration-200 touch-manipulation
+                        transition-all duration-200 touch-manipulation
                         ${gameMode === 'build'
                             ? 'bg-[rgba(39,174,96,0.2)] text-[var(--emerald)] ring-1 ring-[rgba(39,174,96,0.4)]'
                             : 'text-[var(--text-muted)] active:text-[var(--text-secondary)]'
@@ -78,53 +89,73 @@ export const GodTools = ({
 
             {gameMode === 'build' ? (
                 <>
-                    {/* Material Selector */}
-                    <div className="flex items-center gap-0.5 sm:gap-1.5 border border-[var(--border-subtle)] rounded-lg p-0.5 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
-                        {MATERIALS.map(mat => (
-                            <button
-                                key={mat.key}
-                                onClick={() => onMaterialChange(mat.key)}
-                                className={`
-                                    flex items-center gap-1 sm:gap-1.5 min-h-[36px] sm:min-h-0 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-xs font-medium
-                                    transition-colors duration-150 touch-manipulation
-                                    ${selectedMaterial === mat.key
-                                        ? 'bg-[rgba(255,215,0,0.15)] text-[var(--gold)] shadow-inner ring-1 ring-[var(--border-accent)]'
-                                        : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] active:text-[var(--text-primary)]'
-                                    }
-                                `}
-                                title={mat.label}
-                            >
-                                <span className="text-sm">{mat.icon}</span>
-                                <span className="hidden sm:inline">{mat.label}</span>
-                                <span
-                                    className={`w-2.5 h-2.5 rounded-full border transition-colors duration-150 ${selectedMaterial === mat.key ? 'border-[var(--gold-dim)] ring-1 ring-[var(--gold-glow)]' : 'border-[var(--text-muted)]'
-                                        }`}
-                                    style={{ backgroundColor: MATERIAL_COLORS[mat.key] }}
-                                />
-                            </button>
-                        ))}
+                    {/* Material Selector — Color Swatches */}
+                    <div className="flex items-center gap-0.5 sm:gap-1 border border-[var(--border-subtle)] rounded-xl p-1 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
+                        {MATERIALS.map(mat => {
+                            const isActive = selectedMaterial === mat.key;
+                            const matColor = MATERIAL_COLORS[mat.key];
+                            return (
+                                <button
+                                    key={mat.key}
+                                    onClick={() => onMaterialChange(mat.key)}
+                                    className={`
+                                        flex items-center gap-1.5 min-h-[40px] sm:min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold
+                                        transition-all duration-200 touch-manipulation relative
+                                        ${isActive
+                                            ? 'text-white shadow-lg'
+                                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] active:text-[var(--text-primary)]'
+                                        }
+                                    `}
+                                    style={isActive ? {
+                                        background: `linear-gradient(135deg, ${matColor}33, ${matColor}15)`,
+                                        boxShadow: `0 0 12px ${matColor}40, inset 0 0 8px ${matColor}20`,
+                                        border: `1.5px solid ${matColor}80`,
+                                    } : {
+                                        border: '1.5px solid transparent',
+                                    }}
+                                    title={mat.label}
+                                >
+                                    <span className="text-sm">{mat.icon}</span>
+                                    <span className="hidden sm:inline">{mat.label}</span>
+                                    <span
+                                        className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${isActive ? 'ring-2 ring-white/40 scale-110' : ''}`}
+                                        style={{ backgroundColor: matColor, boxShadow: isActive ? `0 0 8px ${matColor}` : 'none' }}
+                                    />
+                                </button>
+                            );
+                        })}
                     </div>
 
-                    {/* Shape Selector */}
-                    <div className="flex items-center gap-0.5 sm:gap-1.5 border border-[var(--border-subtle)] rounded-lg p-0.5 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
-                        {SHAPES.map(shape => (
-                            <button
-                                key={shape.key}
-                                onClick={() => onShapeChange(shape.key)}
-                                className={`
-                                    flex items-center gap-1 sm:gap-1.5 min-h-[36px] sm:min-h-0 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-xs sm:text-xs font-medium
-                                    transition-colors duration-150 touch-manipulation
-                                    ${selectedShape === shape.key
-                                        ? 'bg-[rgba(255,215,0,0.15)] text-[var(--gold)] shadow-inner ring-1 ring-[var(--border-accent)]'
-                                        : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] active:text-[var(--text-primary)]'
-                                    }
-                                `}
-                                title={shape.label}
-                            >
-                                <span className="text-sm">{shape.icon}</span>
-                                <span className="hidden sm:inline">{shape.label}</span>
-                            </button>
-                        ))}
+                    {/* Shape Selector — SVG Previews */}
+                    <div className="flex items-center gap-0.5 sm:gap-1 border border-[var(--border-subtle)] rounded-xl p-1 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
+                        {SHAPES.map(shape => {
+                            const isActive = selectedShape === shape.key;
+                            return (
+                                <button
+                                    key={shape.key}
+                                    onClick={() => onShapeChange(shape.key)}
+                                    className={`
+                                        flex items-center gap-1.5 min-h-[40px] sm:min-h-[36px] px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-bold
+                                        transition-all duration-200 touch-manipulation
+                                        ${isActive
+                                            ? `text-[var(--gold)] shadow-lg`
+                                            : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] active:text-[var(--text-primary)]'
+                                        }
+                                    `}
+                                    style={isActive ? {
+                                        background: `linear-gradient(135deg, rgba(255, 215, 0, 0.12), rgba(255, 215, 0, 0.04))`,
+                                        boxShadow: `0 0 10px rgba(255, 215, 0, 0.15)`,
+                                        border: '1.5px solid rgba(255, 215, 0, 0.4)',
+                                    } : {
+                                        border: '1.5px solid transparent',
+                                    }}
+                                    title={shape.label}
+                                >
+                                    <ShapeIcon shape={shape.key} color={isActive ? activeColor : '#665c54'} />
+                                    <span className="hidden sm:inline">{shape.label}</span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </>
             ) : (
@@ -138,14 +169,14 @@ export const GodTools = ({
             <button
                 onClick={handleReady}
                 disabled={isReady}
-                className={`hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold
+                className={`hidden sm:flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold
                     transition-all duration-200 touch-manipulation border shadow-md
                     ${isReady
                         ? 'card-dark text-[var(--emerald)] border-[rgba(39,174,96,0.3)] cursor-default'
-                        : 'btn-emerald cursor-pointer'
+                        : 'btn-emerald cursor-pointer animate-pulse-subtle'
                     }`}
             >
-                {isReady ? <Check size={12} /> : <Swords size={12} />}
+                {isReady ? <Check size={14} /> : <Swords size={14} />}
                 {isReady ? 'READY!' : 'DONE'}
             </button>
         </div>
@@ -174,14 +205,14 @@ export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onRead
         <button
             onClick={handleReady}
             disabled={isReady}
-            className={`flex items-center gap-1.5 min-h-[40px] px-4 py-1.5 rounded-lg text-xs font-bold
-                transition-all duration-200 touch-manipulation border shadow-md
+            className={`flex items-center gap-1.5 min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold
+                transition-all duration-200 touch-manipulation border shadow-lg
                 ${isReady
                     ? 'card-dark text-[var(--emerald)] border-[rgba(39,174,96,0.3)] cursor-default'
-                    : 'btn-emerald cursor-pointer'
+                    : 'btn-emerald cursor-pointer animate-pulse-subtle'
                 }`}
         >
-            {isReady ? <Check size={12} /> : <Swords size={12} />}
+            {isReady ? <Check size={14} /> : <Swords size={14} />}
             {isReady ? 'READY!' : 'DONE'}
         </button>
     );

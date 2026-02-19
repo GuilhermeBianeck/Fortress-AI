@@ -119,6 +119,15 @@ const CastleSilhouette = ({ side, className }: { side: 'left' | 'right'; classNa
 /* ═══════════════════════════════════════
    Main Lobby Component
    ═══════════════════════════════════════ */
+const TIPS = [
+    '💡 Use beams as roofs to deflect projectiles!',
+    '🏰 Stone blocks resist more damage than wood',
+    '⚡ Place blocks close together for stability',
+    '🎯 Aim at the base of enemy walls for maximum destruction',
+    '🛡️ Build walls in front of your King for protection',
+    '🔥 Steel blocks are nearly indestructible',
+];
+
 export const Lobby = ({
     roomState, queuePosition,
     playerName, onPlayerNameChange,
@@ -129,10 +138,16 @@ export const Lobby = ({
     const [isReady, setIsReady] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [tipIndex, setTipIndex] = useState(0);
 
     useEffect(() => {
         onGetProfile?.();
     }, [onGetProfile]);
+
+    useEffect(() => {
+        const t = setInterval(() => setTipIndex(i => (i + 1) % TIPS.length), 4000);
+        return () => clearInterval(t);
+    }, []);
 
     // Parallax mouse tracking
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -156,58 +171,101 @@ export const Lobby = ({
         onReady();
     };
 
-    // ─── Waiting Room View ───
+    // ─── Waiting Room View — VS Card ───
     if (roomState) {
         const isSinglePlayer = roomState.opponentName === 'Training Bot';
 
         return (
-            <div className="flex-1 w-full flex items-center justify-center p-6 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #0f0e17 50%, #1a1a2e 100%)' }}>
+            <div className="flex-1 w-full flex items-center justify-center p-4 sm:p-6 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #0f0e17 50%, #1a1a2e 100%)' }}>
                 {/* Subtle stars */}
                 <div className="stars-layer absolute inset-0 opacity-40" />
+                <EmberParticles />
 
-                <div className="w-full max-w-md text-center relative z-10">
-                    <div className="flex items-center justify-center gap-3 mb-3">
+                <div className="w-full max-w-lg text-center relative z-10">
+                    {/* Title */}
+                    <div className="flex items-center justify-center gap-3 mb-6">
                         <Swords size={28} className="text-[var(--gold)]" />
-                        <h2 className="text-2xl font-bold text-[var(--gold)] font-heading text-glow-gold">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-[var(--gold)] font-heading text-glow-gold">
                             {isSinglePlayer ? 'Training Grounds' : 'War Room'}
                         </h2>
                         <Swords size={28} className="text-[var(--gold)]" />
                     </div>
 
+                    {/* Room Code for PvP */}
                     {!isSinglePlayer && (
                         <>
-                            <div className="text-5xl font-mono font-bold text-[var(--gold)] tracking-[0.3em] mb-4 select-all text-glow-gold">
+                            <div className="text-4xl font-mono font-bold text-[var(--gold)] tracking-[0.3em] mb-2 select-all text-glow-gold">
                                 {roomState.roomId}
                             </div>
-                            <p className="text-sm text-[var(--text-secondary)] mb-4">
+                            <p className="text-xs text-[var(--text-secondary)] mb-6">
                                 Share this code with your opponent
                             </p>
                         </>
                     )}
 
-                    <div className="card-dark p-4 rounded-xl w-full">
-                        <div className="flex items-center justify-center gap-2 text-base">
-                            <span className={`w-2.5 h-2.5 rounded-full ${roomState.opponentConnected ? 'bg-[var(--emerald)]' : 'bg-[var(--gold)] animate-pulse'}`} />
-                            <span className={roomState.opponentConnected ? 'text-[var(--emerald)]' : 'text-[var(--text-secondary)]'}>
-                                {roomState.opponentConnected
-                                    ? (isSinglePlayer ? 'Bot is ready' : 'Opponent has arrived')
-                                    : 'Awaiting challenger...'}
-                            </span>
+                    {/* VS Card */}
+                    <div className="card-dark rounded-2xl p-5 sm:p-6 mb-5" style={{ border: '1px solid rgba(255, 215, 0, 0.15)' }}>
+                        <div className="flex items-center justify-between gap-3">
+                            {/* Player Card */}
+                            <div className="flex-1 flex flex-col items-center gap-2">
+                                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl"
+                                    style={{ background: 'linear-gradient(135deg, rgba(46, 204, 113, 0.2), rgba(46, 204, 113, 0.05))', border: '2px solid rgba(46, 204, 113, 0.4)' }}>
+                                    <Shield size={32} className="text-[var(--emerald)]" />
+                                </div>
+                                <span className="text-sm sm:text-base font-bold text-[var(--text-primary)] font-display truncate max-w-[120px]">
+                                    {playerName || 'Knight'}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-display tracking-wider"
+                                    style={{ background: 'rgba(46, 204, 113, 0.15)', color: 'var(--emerald)', border: '1px solid rgba(46, 204, 113, 0.3)' }}>
+                                    {roomState.side.toUpperCase()}
+                                </span>
+                            </div>
+
+                            {/* VS Badge */}
+                            <div className="relative flex items-center justify-center">
+                                <div className="absolute w-16 h-16 rounded-full opacity-30 animate-pulse" style={{ background: 'radial-gradient(circle, var(--gold), transparent 70%)' }} />
+                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-heading text-lg font-bold text-[var(--gold)] z-10"
+                                    style={{ background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.05))', border: '2px solid rgba(255, 215, 0, 0.4)', boxShadow: '0 0 20px rgba(255, 215, 0, 0.15)' }}>
+                                    VS
+                                </div>
+                            </div>
+
+                            {/* Opponent Card */}
+                            <div className="flex-1 flex flex-col items-center gap-2">
+                                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl ${!roomState.opponentConnected ? 'animate-pulse' : ''}`}
+                                    style={{ background: roomState.opponentConnected ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(231, 76, 60, 0.05))' : 'linear-gradient(135deg, rgba(100, 100, 100, 0.2), rgba(100, 100, 100, 0.05))', border: `2px solid ${roomState.opponentConnected ? 'rgba(231, 76, 60, 0.4)' : 'rgba(100, 100, 100, 0.3)'}` }}>
+                                    {roomState.opponentConnected
+                                        ? <Swords size={32} className="text-[var(--crimson)]" />
+                                        : <div className="w-6 h-6 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
+                                    }
+                                </div>
+                                <span className={`text-sm sm:text-base font-bold font-display truncate max-w-[120px] ${roomState.opponentConnected ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+                                    {roomState.opponentConnected ? (roomState.opponentName || 'Challenger') : 'Awaiting...'}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-display tracking-wider"
+                                    style={{ background: 'rgba(231, 76, 60, 0.15)', color: 'var(--crimson)', border: '1px solid rgba(231, 76, 60, 0.3)' }}>
+                                    {roomState.side === 'left' ? 'RIGHT' : 'LEFT'}
+                                </span>
+                            </div>
                         </div>
-                        <p className="text-sm text-[var(--text-muted)] mt-2">
-                            You are: <span className="text-[var(--gold)] font-bold">{roomState.side.toUpperCase()}</span> kingdom
-                        </p>
                     </div>
 
+                    {/* Tip Carousel */}
+                    <div className="text-xs sm:text-sm text-[var(--text-secondary)] mb-5 h-6 flex items-center justify-center transition-opacity duration-500"
+                        style={{ fontStyle: 'italic' }}>
+                        {TIPS[tipIndex]}
+                    </div>
+
+                    {/* Ready Button */}
                     {roomState.opponentConnected && (
                         <button
                             onClick={handleReady}
                             disabled={isReady}
-                            className={`mt-6 w-full max-w-sm mx-auto min-h-[52px] py-3.5 rounded-xl text-lg touch-manipulation
+                            className={`w-full max-w-sm mx-auto min-h-[52px] py-3.5 rounded-xl text-lg touch-manipulation
                                 transition-all duration-300
                                 ${isReady
                                     ? 'card-dark text-[var(--emerald)] border-[var(--emerald)] cursor-default'
-                                    : 'btn-emerald cursor-pointer'
+                                    : 'btn-emerald cursor-pointer animate-pulse-subtle'
                                 }`}
                         >
                             {isReady ? (

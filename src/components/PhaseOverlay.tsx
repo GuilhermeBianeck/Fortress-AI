@@ -43,7 +43,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         return (
             <div className="w-full relative pointer-events-none">
                 {/* Build Banner - Centered, Two Lines */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-lg px-3 sm:px-6 py-1.5 sm:py-2 backdrop-blur-md border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-lg text-center" style={{ background: 'rgba(39,174,96,0.15)' }}>
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-2xl text-center" style={{ background: 'rgba(22, 33, 62, 0.85)' }}>
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         <Hammer size={14} className="text-[var(--emerald)]" />
                         <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
@@ -60,7 +60,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                 {/* Build Timer - Centered and Moved Down (below Done button) */}
                 {timeLeft !== null && (
                     <div className="absolute top-[110px] left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center">
-                        <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 10 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
+                        <div className={`font-mono font-bold text-sm sm:text-lg transition-all duration-300 ${timeLeft <= 10 ? 'timer-urgent' : 'text-[var(--text-primary)]'}`}>
                             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
                         </div>
                     </div>
@@ -78,7 +78,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         };
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-                <div className="rounded-lg px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-md text-center border border-[var(--border-medium)] pointer-events-auto shadow-2xl" style={{ background: 'rgba(10, 10, 18, 0.85)' }}>
+                <div className="rounded-xl px-5 sm:px-8 py-3 sm:py-4 backdrop-blur-xl text-center border border-[var(--border-accent)] pointer-events-auto shadow-2xl" style={{ background: 'rgba(22, 33, 62, 0.9)' }}>
                     <div className="flex items-center justify-center gap-2">
                         <Eye size={16} className="text-[var(--gold)]" />
                         <span className="text-[var(--gold)] font-bold text-sm sm:text-base font-display">REVEALING KINGDOMS</span>
@@ -103,10 +103,10 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         return (
             <div className="w-full relative pointer-events-none">
                 {/* Combat Banner - Centered */}
-                <div className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-lg px-3 sm:px-6 py-1.5 sm:py-2 backdrop-blur-md border pointer-events-auto shadow-lg text-center ${isMyTurn
+                <div className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border pointer-events-auto shadow-2xl text-center ${isMyTurn
                     ? 'border-[rgba(192,57,43,0.4)]'
                     : 'border-[var(--border-subtle)]'
-                    }`} style={{ background: isMyTurn ? 'rgba(192,57,43,0.15)' : 'rgba(15,14,23,0.7)' }}>
+                    }`} style={{ background: isMyTurn ? 'rgba(192,57,43,0.12)' : 'rgba(22, 33, 62, 0.85)' }}>
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         {isMyTurn ? <Flame size={14} className="text-[var(--crimson)]" /> : <Clock size={14} className="text-[var(--text-muted)]" />}
                         <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
@@ -130,7 +130,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                 {/* Combat Timer - Centered Below (similar position to Build timer) */}
                 {timeLeft !== null && (
                     <div className="absolute top-[110px] left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center">
-                        <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
+                        <div className={`font-mono font-bold text-sm sm:text-lg transition-all duration-300 ${timeLeft <= 5 ? 'timer-urgent' : 'text-[var(--text-primary)]'}`}>
                             {timeLeft}s
                         </div>
                     </div>
@@ -152,10 +152,10 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
         return (
             <div className="flex items-center justify-center w-full">
-                <div className={`rounded-xl sm:rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-md border text-center ${isWinner
+                <div className={`rounded-2xl px-6 sm:px-10 py-5 sm:py-8 backdrop-blur-xl border text-center shadow-2xl ${isWinner
                     ? 'border-[var(--border-accent)]'
                     : 'border-[rgba(192,57,43,0.4)]'
-                    }`} style={{ background: isWinner ? 'rgba(255,215,0,0.1)' : 'rgba(192,57,43,0.1)' }}>
+                    }`} style={{ background: isWinner ? 'rgba(22, 33, 62, 0.92)' : 'rgba(22, 20, 30, 0.92)' }}>
                     <div className={`text-xl sm:text-3xl font-bold mb-1 font-heading ${isWinner ? 'text-[var(--gold)] text-glow-gold' : 'text-[var(--crimson)] text-glow-ember'}`}>
                         <span className="flex items-center justify-center gap-2">
                             {isWinner ? <Crown size={28} /> : <Skull size={28} />}
