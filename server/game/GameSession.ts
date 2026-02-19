@@ -9,6 +9,7 @@ import type { KingState, PlayerInfo, PlayerState, Side, KingHpState, MatchPhase,
 import type { TerrainResult } from '../physics/terrain';
 import { MatchStateMachine } from './MatchStateMachine';
 import { ScoreManager } from './ScoreManager';
+import { BotAI } from './BotAI';
 import {
     MATERIAL_PROPS, DAMAGE_MULTIPLIERS, MATERIAL_BLOCK_HP,
     KING_MAX_HP, IMPACT_THRESHOLD, DAMAGE_SCALE,
@@ -19,6 +20,7 @@ import {
     LEFT_SIDE, RIGHT_SIDE, LEFT_CANNON_X, RIGHT_CANNON_X,
     FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS,
     COL_BLOCK, SHAPE_DIMS,
+    PHYSICS_GRAVITY, PHYSICS_MAX_SPEED, PHYSICS_POWER_MULTIPLIER, PHYSICS_AIR_FRICTION,
 } from '../config/constants';
 import { generateHazards, applyWindForce, checkLavaDamage } from '../physics/hazards';
 
@@ -38,6 +40,7 @@ export class GameSession {
     private hazards: HazardData[] = [];
     private hazardTimers: ReturnType<typeof setInterval>[] = [];
     private scoreManager: ScoreManager = new ScoreManager();
+    private botAI: BotAI | null = null;
 
     constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void, onRoundEnd?: (winner: Side, reason: string) => 'continue' | 'match_over') {
         this.onPhaseChangeCallback = onPhaseChange;
@@ -90,8 +93,15 @@ export class GameSession {
                     this.scoreManager.startCombatTimer();
                     this.startFallingRocks();
                 }
+                if (phase === 'build' && this.botAI) {
+                    this.botAI.buildFortress();
+                }
             },
-            onTurnStart: (_side) => { /* UI updates via socket events */ },
+            onTurnStart: (side) => {
+                if (this.botAI && this.getBotPlayer()?.side === side) {
+                    this.botAI.takeTurn();
+                }
+            },
             onMatchResult: (_winner, _reason) => { /* Room manager handles result */ },
             onRoundEnd: (winner, reason) => {
                 return this.onRoundEndCallback?.(winner, reason) ?? 'match_over';
@@ -99,6 +109,34 @@ export class GameSession {
             getKingState: (side: Side) => this.getKingStateBySide(side),
             getWorld: () => this.world,
         });
+
+        // Initialize BotAI if there's a bot player
+        const botPlayer = this.getBotPlayer();
+        if (botPlayer) {
+            const botSide = botPlayer.side;
+            const opponentSide: Side = botSide === 'left' ? 'right' : 'left';
+            this.botAI = new BotAI(botSide, {
+                getKingPosition: () => {
+                    const ps = this.getPlayerBySide(botSide);
+                    return ps ? { x: ps.kingBody.position.x, y: ps.kingBody.position.y } : { x: 0, y: 0 };
+                },
+                getFoundationTopY: () => {
+                    const ps = this.getPlayerBySide(botSide);
+                    if (!ps) return 0;
+                    return this.getFoundationTopY(ps.kingBody.position.x);
+                },
+                getOpponentKingPosition: () => {
+                    const ps = this.getPlayerBySide(opponentSide);
+                    return ps ? { x: ps.kingBody.position.x, y: ps.kingBody.position.y } : { x: 0, y: 0 };
+                },
+                spawnBlock: (shape, material, x, y, width, height) => {
+                    this.createBody(shape, material, x, y, [width, height]);
+                },
+                fireProjectile: (side, angle, power) => {
+                    this.fireProjectile(side, angle, power);
+                },
+            });
+        }
 
         // Generate hazards
         this.hazards = generateHazards(this.terrain, ws.seed);
@@ -266,11 +304,21 @@ export class GameSession {
         // Only the current turn's player can fire
         if (player.side !== this.stateMachine.getCurrentTurn()) return;
 
-        // Clamp angle to [10deg, 170deg] in radians, power to [5, 50]
+        this.fireProjectile(player.side, data.angle, data.power);
+    }
+
+    fireProjectile(side: Side, rawAngle: number, rawPower: number): void {
+        if (!this.stateMachine.canFire()) return;
+
+        const player = this.getPlayerBySide(side);
+        if (!player) return;
+
+        // Clamp angle to [10deg, 170deg] in radians, power to [5, 100]
         const minAngle = (10 * Math.PI) / 180;
         const maxAngle = (170 * Math.PI) / 180;
-        const angle = Math.max(minAngle, Math.min(maxAngle, data.angle));
-        const power = Math.max(5, Math.min(50, data.power));
+        const angle = Math.max(minAngle, Math.min(maxAngle, rawAngle));
+        // Ensure power is capped at 100
+        const power = Math.max(5, Math.min(100, rawPower));
 
         // Cannon position based on player's side
         const cannonX = player.cannonX;
@@ -280,7 +328,7 @@ export class GameSession {
             density: PROJECTILE_DENSITY,
             restitution: PROJECTILE_RESTITUTION,
             friction: PROJECTILE_FRICTION,
-            frictionAir: 0.005,
+            frictionAir: PHYSICS_AIR_FRICTION,
             label: 'projectile',
         });
 
@@ -290,12 +338,12 @@ export class GameSession {
         Matter.World.add(this.world, body);
 
         // Right player fires leftward (mirror velocity)
-        const directionMultiplier = player.side === 'right' ? -1 : 1;
-        const vx = directionMultiplier * power * Math.cos(angle);
-        const vy = -power * Math.sin(angle);
+        const directionMultiplier = side === 'right' ? -1 : 1;
+        const vx = directionMultiplier * (power * PHYSICS_POWER_MULTIPLIER) * Math.cos(angle);
+        const vy = -(power * PHYSICS_POWER_MULTIPLIER) * Math.sin(angle);
 
         // Cap velocity magnitude to prevent tunneling
-        const maxSpeed = 45;
+        const maxSpeed = PHYSICS_MAX_SPEED;
         const speed = Math.sqrt(vx * vx + vy * vy);
         const scale = speed > maxSpeed ? maxSpeed / speed : 1;
         Matter.Body.setVelocity(body, {
@@ -307,7 +355,7 @@ export class GameSession {
         const timer = setTimeout(() => this.removeProjectile(body), PROJECTILE_LIFESPAN_MS);
         this.projectileTimers.set(body.id, timer);
 
-        console.log(`Projectile fired by ${player.side}: angle=${(angle * 180 / Math.PI).toFixed(1)}deg power=${power.toFixed(1)}`);
+        console.log(`Projectile fired by ${side}: angle=${(angle * 180 / Math.PI).toFixed(1)}deg power=${power.toFixed(1)}`);
 
         // Tell state machine a projectile was fired, wait for settle
         this.stateMachine.onProjectileFired();
@@ -316,6 +364,13 @@ export class GameSession {
 
     handlePlayerBuildReady(socketId: string): void {
         this.stateMachine.handlePlayerBuildReady(socketId);
+        // Auto-ready the bot so build phase ends when the human clicks DONE
+        if (this.botAI) {
+            const botPlayer = this.getBotPlayer();
+            if (botPlayer) {
+                this.stateMachine.handlePlayerBuildReady(botPlayer.socketId);
+            }
+        }
     }
 
     handleForfeit(disconnectedSocketId: string): void {
@@ -324,6 +379,8 @@ export class GameSession {
     }
 
     destroy() {
+        this.botAI?.destroy();
+        this.botAI = null;
         this.gameLoop.stop();
         this.stateMachine.destroy();
         for (const timer of this.projectileTimers.values()) {
@@ -388,6 +445,32 @@ export class GameSession {
     }
 
     // --- Private ---
+
+    private getBotPlayer(): PlayerState | undefined {
+        for (const ps of this.players.values()) {
+            if (ps.socketId.startsWith('bot-')) return ps;
+        }
+        return undefined;
+    }
+
+    private getFoundationTopY(kingX: number): number {
+        // Replicate the foundation top calculation from spawnKing
+        const foundationWidth = 360;
+        const halfWidth = foundationWidth / 2;
+        const scanStart = Math.floor(kingX - halfWidth);
+        const scanEnd = Math.ceil(kingX + halfWidth);
+
+        let highestY = Infinity;
+        for (const pt of this.terrain.points) {
+            if (pt.x >= scanStart && pt.x <= scanEnd) {
+                if (pt.y < highestY) highestY = pt.y;
+            }
+        }
+        if (highestY === Infinity) highestY = this.interpolateTerrainY(kingX);
+
+        const foundationVisibleHeight = 20;
+        return highestY - foundationVisibleHeight;
+    }
 
     private getKingStateBySide(side: Side): KingState {
         for (const ps of this.players.values()) {
@@ -659,7 +742,7 @@ export class GameSession {
 
     private checkProjectileBounds() {
         const bodies = Matter.Composite.allBodies(this.world);
-        const tickMaxSpeed = 25;
+        const tickMaxSpeed = PHYSICS_MAX_SPEED;
         for (const body of bodies) {
             if (body.label !== 'projectile') continue;
             if (body.position.y > CANVAS_HEIGHT + 50 ||

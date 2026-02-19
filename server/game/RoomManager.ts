@@ -293,6 +293,11 @@ export class RoomManager {
 
         room.rematchRequests.add(socketId);
 
+        // Auto-accept for bot players
+        for (const [sid] of room.players) {
+            if (sid.startsWith('bot-')) room.rematchRequests.add(sid);
+        }
+
         // Notify everyone about the request
         this.io.to(room.id).emit('rematch_requested', { side: player.side });
 

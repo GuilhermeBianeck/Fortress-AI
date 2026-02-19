@@ -57,7 +57,7 @@ export const GodTools = ({
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 w-full">
+        <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3 w-full">
             {/* Mode Toggle - Mobile Only */}
             <div className="flex items-center border border-[var(--border-subtle)] rounded-lg p-0.5 sm:p-1 backdrop-blur-sm sm:hidden" style={{ background: 'var(--bg-card)' }}>
                 <button
@@ -73,20 +73,6 @@ export const GodTools = ({
                 >
                     <Hammer size={14} />
                     BUILD
-                </button>
-                <button
-                    onClick={() => onModeChange('fire')}
-                    className={`
-                        min-h-[36px] px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5
-                        transition-colors duration-200 touch-manipulation
-                        ${gameMode === 'fire'
-                            ? 'bg-[rgba(192,57,43,0.2)] text-[var(--crimson)] ring-1 ring-[rgba(192,57,43,0.4)]'
-                            : 'text-[var(--text-muted)] active:text-[var(--text-secondary)]'
-                        }
-                    `}
-                >
-                    <Eye size={14} />
-                    PREVIEW
                 </button>
             </div>
 

@@ -157,7 +157,7 @@ io.on('connection', (socket) => {
         }
 
         // During build phase: player finished building early
-        if (room.phase === 'build' && room.session) {
+        else if (room.phase === 'build' && room.session) {
             room.session.handlePlayerBuildReady(socket.id);
         }
     });

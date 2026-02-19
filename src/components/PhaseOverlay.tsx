@@ -41,21 +41,28 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
     // Build phase banner
     if (phase === 'build') {
         return (
-            <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-md border border-[rgba(39,174,96,0.3)]" style={{ background: 'rgba(39,174,96,0.15)' }}>
-                    <Hammer size={14} className="text-[var(--emerald)]" />
-                    <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
-                        {currentRound ? `R${currentRound} — ` : ''}BUILD
-                    </span>
+            <div className="w-full relative pointer-events-none">
+                {/* Build Banner - Centered, Two Lines */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-lg px-3 sm:px-6 py-1.5 sm:py-2 backdrop-blur-md border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-lg text-center" style={{ background: 'rgba(39,174,96,0.15)' }}>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Hammer size={14} className="text-[var(--emerald)]" />
+                        <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
+                            {currentRound ? `R${currentRound} — ` : ''}BUILD
+                        </span>
+                    </div>
                     {roundScore && (
-                        <span className="text-[var(--gold-dim)] text-[10px] sm:text-xs ml-1 sm:ml-2">
-                            [{roundScore.left} - {roundScore.right}]
+                        <span className="text-[var(--gold-dim)] text-[10px] sm:text-xs font-medium tracking-wider">
+                            {roundScore.left} — {roundScore.right}
                         </span>
                     )}
                 </div>
+
+                {/* Build Timer - Centered and Moved Down (below Done button) */}
                 {timeLeft !== null && (
-                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 10 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
-                        {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                    <div className="absolute top-[110px] left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center">
+                        <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 10 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
+                            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                        </div>
                     </div>
                 )}
             </div>
@@ -70,8 +77,8 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
             falling_rocks: 'Falling Rocks',
         };
         return (
-            <div className="flex items-center justify-center w-full">
-                <div className="rounded-lg px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-md text-center border border-[var(--border-medium)]" style={{ background: 'rgba(255,215,0,0.1)' }}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+                <div className="rounded-lg px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-md text-center border border-[var(--border-medium)] pointer-events-auto shadow-2xl" style={{ background: 'rgba(10, 10, 18, 0.85)' }}>
                     <div className="flex items-center justify-center gap-2">
                         <Eye size={16} className="text-[var(--gold)]" />
                         <span className="text-[var(--gold)] font-bold text-sm sm:text-base font-display">REVEALING KINGDOMS</span>
@@ -91,29 +98,41 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
     // Combat phase banner
     if (phase === 'combat') {
         const isMyTurn = turnPlayer === mySide;
+        const isBot = turnPlayer ? playerNames?.[turnPlayer] === 'Training Bot' : false;
         const windHazard = hazards?.find(h => h.type === 'wind_zone');
         return (
-            <div className="flex items-center justify-between w-full gap-2">
-                <div className={`flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-md border ${isMyTurn
+            <div className="w-full relative pointer-events-none">
+                {/* Combat Banner - Centered */}
+                <div className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-lg px-3 sm:px-6 py-1.5 sm:py-2 backdrop-blur-md border pointer-events-auto shadow-lg text-center ${isMyTurn
                     ? 'border-[rgba(192,57,43,0.4)]'
                     : 'border-[var(--border-subtle)]'
                     }`} style={{ background: isMyTurn ? 'rgba(192,57,43,0.15)' : 'rgba(15,14,23,0.7)' }}>
-                    {isMyTurn ? <Flame size={14} className="text-[var(--crimson)]" /> : <Clock size={14} className="text-[var(--text-muted)]" />}
-                    <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
-                        {isMyTurn ? 'YOUR TURN — FIRE!' : "OPPONENT'S TURN"}
-                    </span>
-                </div>
-                {windHazard && (
-                    <div className="flex items-center gap-1 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md border border-[rgba(52,152,219,0.3)]" style={{ background: 'rgba(52,152,219,0.1)' }}>
-                        <Wind size={14} className="text-[var(--royal-blue)]" />
-                        <span className="text-[var(--royal-blue)] text-[10px] sm:text-xs font-bold">
-                            {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'} {Math.round((windHazard.windStrength ?? 0.0003) * 20000)} KNOTS
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        {isMyTurn ? <Flame size={14} className="text-[var(--crimson)]" /> : <Clock size={14} className="text-[var(--text-muted)]" />}
+                        <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
+                            {isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? "BOT'S TURN..." : "OPPONENT'S TURN")}
                         </span>
                     </div>
+                </div>
+
+                {/* Wind Indicator - Centered Below Banner */}
+                {windHazard && (
+                    <div className="absolute top-[45px] left-1/2 -translate-x-1/2 pointer-events-auto">
+                        <div className="flex items-center gap-1 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md border border-[rgba(52,152,219,0.3)]" style={{ background: 'rgba(52,152,219,0.1)' }}>
+                            <Wind size={14} className="text-[var(--royal-blue)]" />
+                            <span className="text-[var(--royal-blue)] text-[10px] sm:text-xs font-bold">
+                                {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'} {Math.round((windHazard.windStrength ?? 0.0003) * 20000)} KNOTS
+                            </span>
+                        </div>
+                    </div>
                 )}
+
+                {/* Combat Timer - Centered Below (similar position to Build timer) */}
                 {timeLeft !== null && (
-                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
-                        {timeLeft}s
+                    <div className="absolute top-[110px] left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center">
+                        <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
+                            {timeLeft}s
+                        </div>
                     </div>
                 )}
             </div>

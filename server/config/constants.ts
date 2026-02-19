@@ -92,6 +92,10 @@ export const SCORE_TIME_THRESHOLD_MS = 120_000;  // combat time after which time
 export const SCORE_WIN_BONUS = 500;              // flat bonus for winning
 export const MAX_MATCH_HISTORY = 20;             // max history entries per player
 
+// === Bot AI ===
+export const BOT_FIRE_DELAY_MS = 1500;
+export const BOT_BUILD_DELAY_MS = 2000;
+
 // === Projectiles ===
 export const PROJECTILE_RADIUS = 8;
 export const PROJECTILE_DENSITY = 0.05;
@@ -100,3 +104,10 @@ export const PROJECTILE_FRICTION = 0.2;
 export const PROJECTILE_LIFESPAN_MS = 5000;
 export const PROJECTILE_BLOCK_DAMAGE_MULT = 2.0;
 export const PROJECTILE_MIN_IMPACT = 3;
+
+// === Physics ===
+export const PHYSICS_GRAVITY = 2.0;
+export const PHYSICS_GRAVITY_SCALE = 0.001;
+export const PHYSICS_MAX_SPEED = 1000;
+export const PHYSICS_POWER_MULTIPLIER = 4.0;
+export const PHYSICS_AIR_FRICTION = 0.005;

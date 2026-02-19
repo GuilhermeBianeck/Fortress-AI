@@ -182,11 +182,11 @@ function App() {
           <div className="flex flex-col items-center flex-1 w-full sm:gap-3 game-container safe-area-bottom">
 
             {/* Canvas + Chat row */}
-            <div className="flex gap-4 items-start w-full justify-center">
+            <div className="flex flex-1 sm:flex-initial gap-4 items-stretch sm:items-start w-full justify-center">
               <div className="relative group flex-1 min-w-0">
                 {/* Glow border — desktop only */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-[var(--gold)] to-[var(--ember)] rounded-xl blur opacity-10 group-hover:opacity-20 transition duration-1000 pointer-events-none hidden sm:block"></div>
-                <div className="relative">
+                <div className="relative h-full sm:h-auto">
                   <GameCanvas
                     gameState={gameState}
                     terrain={terrain}
@@ -227,8 +227,8 @@ function App() {
                     </div>
                   )}
 
-                  {/* Mobile: Chat button — top-right */}
-                  <div className="absolute top-1 right-1 z-20 sm:hidden">
+                  {/* Mobile: Chat button — top-right, moved down to clear header */}
+                  <div className="absolute top-20 right-1 z-20 sm:hidden">
                     <button
                       onClick={() => setShowChat(!showChat)}
                       className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation border
@@ -244,18 +244,18 @@ function App() {
                     </button>
                   </div>
 
-                  {/* Mobile: Done button */}
+                  {/* Mobile: Done button - moved down below centered banner */}
                   {phase === 'build' && (
-                    <div className="absolute top-10 inset-x-0 z-10 flex justify-center sm:hidden pointer-events-none">
+                    <div className="absolute top-[60px] inset-x-0 z-10 flex justify-center sm:hidden pointer-events-none">
                       <div className="pointer-events-auto">
                         <MobileDoneButton phase={phase} onReady={playerReady} />
                       </div>
                     </div>
                   )}
 
-                  {/* Mobile: God Tools overlaid at bottom of canvas */}
+                  {/* Mobile: God Tools overlaid at bottom of canvas (with spacing) */}
                   {phase === 'build' && (
-                    <div className="absolute bottom-0 inset-x-0 z-10 p-1.5 sm:hidden pointer-events-auto safe-area-bottom">
+                    <div className="absolute bottom-2 inset-x-0 z-10 p-1.5 sm:hidden pointer-events-auto safe-area-bottom">
                       <GodTools
                         selectedMaterial={selectedMaterial}
                         selectedShape={selectedShape}

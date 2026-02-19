@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHpState } from '../types';
 import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X } from '../types';
 import { ParticleSystem } from '../effects/particles';
@@ -67,6 +67,13 @@ function interpolateTerrainY(points: { x: number; y: number }[], x: number): num
     return points[points.length - 1]?.y ?? 500;
 }
 
+// === Physics Constants (Must match server) ===
+const PHYSICS_GRAVITY = 2.0;
+const PHYSICS_GRAVITY_SCALE = 0.001;
+const PHYSICS_MAX_SPEED = 1000;
+const PHYSICS_POWER_MULTIPLIER = 4.0;
+const PHYSICS_AIR_FRICTION = 0.005;
+
 export const GameCanvas = ({
     gameState, terrain, onSpawn, kingsHp, mySide,
     gameMode, phase, turnPlayer, onFire,
@@ -92,6 +99,43 @@ export const GameCanvas = ({
 
     // Camera state
     const cameraRef = useRef({ x: 0, targetX: 0 });
+
+    // Dynamic Canvas Size
+    const [canvasSize, setCanvasSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const updateSize = () => {
+            // Mobile breakpoint matches CSS (640px)
+            if (window.innerWidth < 640 && containerRef.current) {
+                // Use exact container size on mobile to prevent stretching
+                const { clientWidth, clientHeight } = containerRef.current;
+                if (clientWidth > 0 && clientHeight > 0) {
+                    setCanvasSize({ width: clientWidth, height: clientHeight });
+                }
+            } else {
+                // Fixed 4:3 on desktop
+                setCanvasSize({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+            }
+        };
+
+        const observer = new ResizeObserver(updateSize);
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+
+        // Also listen to window resize for the breakpoint switch
+        window.addEventListener('resize', updateSize);
+        updateSize(); // Initial setup
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateSize);
+        };
+    }, []);
+
+    // Helper for current dimensions (for effects/logic outside render loop)
+    const { width: currentCanvasWidth, height: currentCanvasHeight } = canvasSize;
 
     // Aim state
     const aimRef = useRef<{ active: boolean; angle: number; power: number; useKeyboard: boolean }>({
@@ -152,13 +196,13 @@ export const GameCanvas = ({
     // Set initial camera to own side
     useEffect(() => {
         if (mySide === 'right') {
-            cameraRef.current.x = WORLD_WIDTH - CANVAS_WIDTH;
-            cameraRef.current.targetX = WORLD_WIDTH - CANVAS_WIDTH;
+            cameraRef.current.x = WORLD_WIDTH - currentCanvasWidth;
+            cameraRef.current.targetX = WORLD_WIDTH - currentCanvasWidth;
         } else {
             cameraRef.current.x = 0;
             cameraRef.current.targetX = 0;
         }
-    }, [mySide]);
+    }, [mySide, currentCanvasWidth]);
 
     // Detect King HP decrease -> shake
     useEffect(() => {
@@ -224,16 +268,16 @@ export const GameCanvas = ({
         const cam = cameraRef.current;
         if (phase === 'build') {
             // Pan to own side during build
-            cam.targetX = mySide === 'left' ? 0 : WORLD_WIDTH - CANVAS_WIDTH;
+            cam.targetX = mySide === 'left' ? 0 : WORLD_WIDTH - currentCanvasWidth;
         } else if (phase === 'reveal') {
             // Auto-pan from left to right during reveal
             cam.targetX = 0;
             const panTimer = setTimeout(() => {
-                cam.targetX = WORLD_WIDTH - CANVAS_WIDTH;
+                cam.targetX = WORLD_WIDTH - currentCanvasWidth;
             }, 2500);
             return () => clearTimeout(panTimer);
         }
-    }, [phase, mySide]);
+    }, [phase, mySide, currentCanvasWidth]);
 
     // Auto-pan to own cannon when it's my turn
     useEffect(() => {
@@ -241,11 +285,11 @@ export const GameCanvas = ({
         if (turnPlayer === mySide) {
             const cannonX = mySide === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
             cameraRef.current.targetX = Math.max(0, Math.min(
-                WORLD_WIDTH - CANVAS_WIDTH,
-                cannonX - CANVAS_WIDTH / 2
+                WORLD_WIDTH - currentCanvasWidth,
+                cannonX - currentCanvasWidth / 2
             ));
         }
-    }, [phase, turnPlayer, mySide]);
+    }, [phase, turnPlayer, mySide, currentCanvasWidth]);
 
     // Track projectile during combat for auto-pan
     useEffect(() => {
@@ -253,11 +297,11 @@ export const GameCanvas = ({
         const projectile = gameState.bodies.find(b => b.label === 'projectile');
         if (projectile) {
             cameraRef.current.targetX = Math.max(0, Math.min(
-                WORLD_WIDTH - CANVAS_WIDTH,
-                projectile.position.x - CANVAS_WIDTH / 2
+                WORLD_WIDTH - currentCanvasWidth,
+                projectile.position.x - currentCanvasWidth / 2
             ));
         }
-    }, [phase, gameState]);
+    }, [phase, gameState, currentCanvasWidth]);
 
     // 60fps render loop
     useEffect(() => {
@@ -281,6 +325,14 @@ export const GameCanvas = ({
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        // Reset and scale for High DPI
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Logical dimensions (same as canvasSize state)
+        const width = canvas.width / dpr;
+        const height = canvas.height / dpr;
 
         const gs = gameStateRef.current;
         const terr = terrainRef.current;
@@ -314,7 +366,7 @@ export const GameCanvas = ({
         const keys = keysRef.current;
         if (keys.has('a') || keys.has('A')) cam.targetX -= 8;
         if (keys.has('d') || keys.has('D')) cam.targetX += 8;
-        cam.targetX = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, cam.targetX));
+        cam.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, cam.targetX));
         cam.x += (cam.targetX - cam.x) * 0.1;
 
         // Update particles
@@ -341,14 +393,14 @@ export const GameCanvas = ({
         bgGrad.addColorStop(0.88, '#2a1a1a');
         bgGrad.addColorStop(1, '#1a1008');
         ctx.fillStyle = bgGrad;
-        ctx.fillRect(-10, -10, canvas.width + 20, canvas.height + 20);
+        ctx.fillRect(-10, -10, width + 20, height + 20);
 
         // Twinkling stars (upper sky only)
         const starSeed = 42;
         const starTime = Date.now() / 1000;
         for (let i = 0; i < 60; i++) {
-            const sx = ((i * 137.508 + starSeed * 73) % (canvas.width + 200)) - 100;
-            const sy = ((i * 97.3 + starSeed * 31) % (canvas.height * 0.55));
+            const sx = ((i * 137.508 + starSeed * 73) % (width + 200)) - 100;
+            const sy = ((i * 97.3 + starSeed * 31) % (height * 0.55));
             const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(starTime * (0.5 + (i % 5) * 0.3) + i * 1.7));
             const size = 0.5 + (i % 3) * 0.5;
             ctx.beginPath();
@@ -358,11 +410,11 @@ export const GameCanvas = ({
         }
 
         // Subtle horizon glow
-        const horizonGlow = ctx.createRadialGradient(canvas.width / 2, canvas.height * 0.85, 0, canvas.width / 2, canvas.height * 0.85, canvas.width * 0.6);
+        const horizonGlow = ctx.createRadialGradient(width / 2, height * 0.85, 0, width / 2, height * 0.85, width * 0.6);
         horizonGlow.addColorStop(0, 'rgba(180, 100, 30, 0.08)');
         horizonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = horizonGlow;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, width, height);
 
         // Initialize dark storm clouds
         if (!cloudsRef.current) {
@@ -395,17 +447,17 @@ export const GameCanvas = ({
         }
 
         // Draw Background Parallax (Mountains/Hills)
-        const drawLayer = (color: string, height: number, parallaxFactor: number, seedOffset: number, verticalOffset: number, frequency: number) => {
+        const drawLayer = (color: string, layerHeight: number, parallaxFactor: number, seedOffset: number, verticalOffset: number, frequency: number) => {
             ctx.fillStyle = color;
             ctx.beginPath();
             const startX = -100;
-            const endX = canvas.width + 100;
+            const endX = width + 100;
             const camX = cam.x * parallaxFactor;
             // Use terrain seed if available, otherwise 0
             const baseSeed = terr?.seed ?? 0;
             const amplitude = 120; // Fixed amplitude for background layers
 
-            ctx.moveTo(startX, canvas.height);
+            ctx.moveTo(startX, height);
             for (let x = startX; x <= endX; x += 20) {
                 // Perlin-ish noise using sine waves with custom seed offset
                 const worldX = x + camX;
@@ -417,11 +469,11 @@ export const GameCanvas = ({
                 // VerticalOffset = additional shift (likely downwards if positive, or just an offset)
                 // User call: drawLayer('#A0BEDC', 250, 0.05, 123, 100, 0.002);
 
-                const y = canvas.height - height + noise + verticalOffset;
+                const y = height - layerHeight + noise + verticalOffset;
 
                 ctx.lineTo(x, y);
             }
-            ctx.lineTo(endX, canvas.height);
+            ctx.lineTo(endX, height);
             ctx.fill();
         };
 
@@ -486,7 +538,7 @@ export const GameCanvas = ({
             const drawY = cloud.y;
 
             // Check visibility
-            if (drawX > -300 && drawX < canvas.width + 300) {
+            if (drawX > -300 && drawX < width + 300) {
                 // Dark storm-grey clouds with slight purple tint
                 const cloudAlpha = 0.25 + cloud.depth * 0.15;
                 ctx.fillStyle = `rgba(35, 30, 50, ${cloudAlpha.toFixed(2)})`;
@@ -509,8 +561,7 @@ export const GameCanvas = ({
 
                 // Draw a flat bottom to make it look like a cumulus cloud
                 ctx.beginPath();
-                const bottomY = drawY + 15 * cloud.scale;
-                const width = 100 * cloud.scale;
+
                 // Gradient fade for bottom?
                 // Simple rect approximation for base
                 // ctx.roundRect(drawX - width/2, bottomY - 10, width, 20, 10);
@@ -589,7 +640,7 @@ export const GameCanvas = ({
                     // Organic wind particles — curved streaks with wobble
                     const dir = h.windDirection ?? 1;
                     const visibleLeft = cam.x - 100;
-                    const visibleRight = cam.x + CANVAS_WIDTH + 100;
+                    const visibleRight = cam.x + canvas.width + 100;
                     const particleCount = 50;
                     const wrapWidth = visibleRight - visibleLeft + 200;
 
@@ -700,49 +751,92 @@ export const GameCanvas = ({
 
                 // Trajectory preview (only for active cannon during fire mode)
                 if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
-                    // Match server physics: gravity.y=2, gravity.scale=0.001, delta=1000/60
-                    // gravityAccel = gravity.y * gravity.scale * delta^2 = 2 * 0.001 * (1000/60)^2 ≈ 0.556
-                    const gravityAccel = 0.556;
-                    const airDamp = 0.995; // matches server frictionAir=0.005
-                    const maxSpeed = 35;
+                    // Match server physics exactly
+                    // Server: delta = 1000/60
+                    // Update loop: 2 sub-steps of delta/2
+
+                    const dt = 1000 / 60 / 2; // ~8.3333ms
+
+                    // Gravity force = mass * gravity.y * gravity.scale
+                    // Acceleration = force / mass = gravity.y * gravity.scale
+                    // Velocity += acceleration * dt
+                    // But Matter.js applies gravity as: velocity.y += gravity.y * gravity.scale * dt
+                    // Wait, Matter.js Engine.update uses correction:
+                    // correction = delta / lastDelta
+                    // velocity += (force * dt / mass) + (gravity * dt)
+
+                    // Let's use the explicit trusted formula from Matter.js source logic:
+                    // position += velocity
+                    // velocity.x *= airFriction
+                    // velocity.y *= airFriction
+                    // velocity.y += gravity * scale * dt
+
+                    const gravityAccel = PHYSICS_GRAVITY * PHYSICS_GRAVITY_SCALE * dt;
+                    const airDamp = 1 - PHYSICS_AIR_FRICTION;
 
                     const dirMult = facingRight ? 1 : -1;
                     let px = cannonX + dirMult * Math.cos(currentAngle) * 24;
                     let py = cannonY - Math.sin(currentAngle) * 24;
-                    let vx = dirMult * aim.power * Math.cos(currentAngle);
-                    let vy = -aim.power * Math.sin(currentAngle);
 
-                    // Apply speed cap (same as server)
-                    const speed = Math.sqrt(vx * vx + vy * vy);
-                    if (speed > maxSpeed) {
-                        const s = maxSpeed / speed;
+                    // Initial velocity
+                    let vx = dirMult * (aim.power * PHYSICS_POWER_MULTIPLIER) * Math.cos(currentAngle);
+                    let vy = -(aim.power * PHYSICS_POWER_MULTIPLIER) * Math.sin(currentAngle);
+
+                    // Speed Cap
+                    let speed = Math.sqrt(vx * vx + vy * vy);
+                    if (speed > PHYSICS_MAX_SPEED) {
+                        const s = PHYSICS_MAX_SPEED / speed;
                         vx *= s;
                         vy *= s;
                     }
 
-                    // Short guide — shows direction only, not the full arc
-                    const steps = 25;
-                    for (let step = 0; step < steps; step++) {
-                        vx *= airDamp;
-                        vy *= airDamp;
-                        px += vx;
-                        py += vy;
-                        vy += gravityAccel;
+                    // Full trajectory arc preview
+                    const frames = 120;
+                    for (let f = 0; f < frames; f++) {
+                        // Simulate 2 sub-steps per frame to match server
+                        for (let sub = 0; sub < 2; sub++) {
+                            // Matter.js update order:
+                            // 1. Update position (x += vx)
+                            // 2. Apply forces/gravity (vy += g)
+                            // 3. Apply friction (vx *= friction)
 
-                        // Fast fade — disappears well before reaching target
-                        const alpha = 0.5 * (1 - step / steps) * (1 - step / steps);
+                            // Replicating Server tick order from previous observation or standard Matter.js
+                            // Standard Matter.js Newton-Euler:
+                            // velocity += forces * dt
+                            // position += velocity * dt  (Matter uses verlet or something, but position += velocity is effectively it for step)
+
+                            // Simple integration matching observation:
+                            vy += gravityAccel;
+
+                            vx *= airDamp;
+                            vy *= airDamp;
+
+                            px += vx; // * correction (1)
+                            py += vy;
+
+                            // Per-tick speed cap matching server
+                            speed = Math.sqrt(vx * vx + vy * vy);
+                            if (speed > PHYSICS_MAX_SPEED) {
+                                const cap = PHYSICS_MAX_SPEED / speed;
+                                vx *= cap;
+                                vy *= cap;
+                            }
+                        }
+
+                        // Gentle linear fade
+                        const alpha = 0.7 * (1 - f / frames);
                         if (alpha < 0.03) break;
 
-                        // Draw every other dot for a dashed look
-                        if (step % 2 === 0) {
+                        // Dashed dots every 2 frames
+                        if (f % 2 === 0) {
+                            const dotSize = f < 20 ? 2 : 1.5;
                             ctx.beginPath();
-                            ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-                            // Gold dots for dark sky visibility
-                            ctx.fillStyle = `rgba(255, 215, 0, ${Math.min(0.9, alpha + 0.3).toFixed(2)})`;
+                            ctx.arc(px, py, dotSize, 0, Math.PI * 2);
+                            ctx.fillStyle = `rgba(255, 215, 0, ${Math.min(0.9, alpha + 0.2).toFixed(2)})`;
                             ctx.fill();
                         }
 
-                        if (py > CANVAS_HEIGHT + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
+                        if (py > canvas.height + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
                     }
                 }
 
@@ -759,7 +853,7 @@ export const GameCanvas = ({
                     const barY = cannonY - 8;
                     const barW = 60;
                     const barH = 5;
-                    const powerRatio = (aim.power - 5) / 45;
+                    const powerRatio = (aim.power - 5) / 95;
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
                     ctx.fillRect(barX, barY, barW, barH);
                     const r = Math.round(255 * powerRatio);
@@ -953,7 +1047,7 @@ export const GameCanvas = ({
         drawKingHud(ctx, 12, 12, kings.left, leftLabel);
 
         // Right King HP bar (top-right)
-        drawKingHud(ctx, canvas.width - 132, 12, kings.right, rightLabel);
+        drawKingHud(ctx, width - 132, 12, kings.right, rightLabel);
 
         // Mode indicator and round score are shown by PhaseOverlay (HTML overlay)
         // so we don't draw them on canvas to avoid overlap
@@ -972,12 +1066,17 @@ export const GameCanvas = ({
         cam: { x: number; targetX: number },
         hzds?: HazardData[],
     ) {
+        const dpr = window.devicePixelRatio || 1;
+        const width = canvas.width / dpr;
+        const height = canvas.height / dpr;
+
+        // Minimap background (Moved up to clear tools)
         const mmW = 200;
         const mmH = 75;
-        const mmX = canvas.width - mmW - 10;
-        const mmY = canvas.height - mmH - 10;
+        const mmX = width - mmW - 10;
+        const mmY = height - mmH - 65; // Raised 65px (was 80)
         const scaleX = mmW / WORLD_WIDTH;
-        const scaleY = mmH / CANVAS_HEIGHT;
+        const scaleY = mmH / height;
 
         // Dark minimap background
         ctx.fillStyle = 'rgba(10, 10, 18, 0.8)';
@@ -1040,7 +1139,7 @@ export const GameCanvas = ({
 
         // Viewport rectangle
         const vpX = mmX + cam.x * scaleX;
-        const vpW = CANVAS_WIDTH * scaleX;
+        const vpW = width * scaleX;
         ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
         ctx.lineWidth = 1;
         ctx.strokeRect(vpX, mmY, vpW, mmH);
@@ -1082,11 +1181,10 @@ export const GameCanvas = ({
     const getWorldCoords = (e: React.MouseEvent): { x: number; y: number } => {
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
+        // Use logical coords directly
         return {
-            x: (e.clientX - rect.left) * scaleX + cameraRef.current.x,
-            y: (e.clientY - rect.top) * scaleY,
+            x: (e.clientX - rect.left) + cameraRef.current.x,
+            y: (e.clientY - rect.top),
         };
     };
 
@@ -1104,20 +1202,24 @@ export const GameCanvas = ({
         if (Date.now() - lastTouchRef.current < 500) return;
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const screenX = (e.clientX - rect.left) * scaleX;
-        const screenY = (e.clientY - rect.top) * scaleY;
+        // Logical coords
+        const screenX = (e.clientX - rect.left);
+        const screenY = (e.clientY - rect.top);
 
         // Minimap click detection
+        const dpr = window.devicePixelRatio || 1;
+        const width = canvas.width / dpr;
+        const height = canvas.height / dpr;
+
         const mmW = 200;
         const mmH = 75;
-        const mmX = canvas.width - mmW - 10;
-        const mmY = canvas.height - mmH - 10;
+        const mmX = width - mmW - 10;
+        const mmY = height - mmH - 65;
+
         if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
             const clickRatioX = (screenX - mmX) / mmW;
             const worldX = clickRatioX * WORLD_WIDTH;
-            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, worldX - CANVAS_WIDTH / 2));
+            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
             return;
         }
 
@@ -1140,7 +1242,7 @@ export const GameCanvas = ({
             aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
             aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
             const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-            aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
+            aim.power = Math.max(5, Math.min(100, 5 + (dist / 200) * 95));
         }
     };
 
@@ -1153,7 +1255,7 @@ export const GameCanvas = ({
         aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
         const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        aim.power = Math.max(5, Math.min(50, 5 + (dist / 200) * 45));
+        aim.power = Math.max(5, Math.min(100, 5 + (dist / 200) * 95));
     };
 
     const handleMouseUp = () => {
@@ -1167,10 +1269,9 @@ export const GameCanvas = ({
     const getTouchWorldCoords = (touch: React.Touch) => {
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const screenX = (touch.clientX - rect.left) * scaleX;
-        const screenY = (touch.clientY - rect.top) * scaleY;
+        // Use logical coords
+        const screenX = (touch.clientX - rect.left);
+        const screenY = (touch.clientY - rect.top);
         const cam = cameraRef.current;
         return { x: screenX + cam.x, y: screenY, screenX, screenY };
     };
@@ -1195,14 +1296,18 @@ export const GameCanvas = ({
 
         // Minimap tap detection
         const canvas = canvasRef.current!;
+        const dpr = window.devicePixelRatio || 1;
+        const width = canvas.width / dpr;
+        const height = canvas.height / dpr;
+
         const mmW = 200;
         const mmH = 75;
-        const mmX = canvas.width - mmW - 10;
-        const mmY = canvas.height - mmH - 10;
+        const mmX = width - mmW - 10;
+        const mmY = height - mmH - 65;
         if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
             const clickRatioX = (screenX - mmX) / mmW;
             const worldX = clickRatioX * WORLD_WIDTH;
-            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, worldX - CANVAS_WIDTH / 2));
+            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
             return;
         }
 
@@ -1236,12 +1341,11 @@ export const GameCanvas = ({
             e.preventDefault();
             const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
             const canvas = canvasRef.current!;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
+            // Use logical coords for pan
             const deltaScreen = panTouchRef.current.startX - midX;
-            const deltaWorld = deltaScreen * scaleX;
+            const deltaWorld = deltaScreen; // 1:1 movement
             cameraRef.current.targetX = Math.max(0, Math.min(
-                WORLD_WIDTH - CANVAS_WIDTH,
+                WORLD_WIDTH - (canvas.width / (window.devicePixelRatio || 1)),
                 panTouchRef.current.camStartX + deltaWorld
             ));
             return;
@@ -1256,20 +1360,9 @@ export const GameCanvas = ({
         aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
         // Power from drag distance (screen pixels from initial tap)
-        if (touchStartRef.current) {
-            const canvas = canvasRef.current!;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const curSX = (e.touches[0].clientX - rect.left) * scaleX;
-            const curSY = (e.touches[0].clientY - rect.top) * scaleY;
-            const dragDist = Math.sqrt(
-                (curSX - touchStartRef.current.sx) ** 2 +
-                (curSY - touchStartRef.current.sy) ** 2
-            );
-            // 0px drag = 25 power, 300px drag = 50 power
-            aim.power = Math.max(5, Math.min(50, 25 + (dragDist / 300) * 25));
-        }
+        // Power from distance between touch and cannon (same as mouse)
+        const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
+        aim.power = Math.max(5, Math.min(100, 5 + (dist / 200) * 95));
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
@@ -1317,7 +1410,7 @@ export const GameCanvas = ({
                         break;
                     case 'ArrowUp':
                         e.preventDefault();
-                        aim.power = Math.min(50, aim.power + 1);
+                        aim.power = Math.min(100, aim.power + 1);
                         aim.useKeyboard = true;
                         break;
                     case 'ArrowDown':
@@ -1351,28 +1444,29 @@ export const GameCanvas = ({
         e.preventDefault();
         const aim = aimRef.current;
         const delta = e.deltaY < 0 ? 2 : -2;
-        aim.power = Math.max(5, Math.min(50, aim.power + delta));
+        aim.power = Math.max(5, Math.min(100, aim.power + delta));
         aim.useKeyboard = true;
     };
 
     const cursorClass = (phase === 'build' && gameMode === 'build') ? 'cursor-crosshair' : 'cursor-default';
 
     return (
-        <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
-            onWheel={handleWheel}
-            className={`w-full sm:border sm:border-[rgba(255,215,0,0.2)] sm:rounded-lg sm:shadow-2xl touch-none ${cursorClass}`}
-            style={{ aspectRatio: '4 / 3' }}
-        />
+        <div ref={containerRef} className="w-full h-full relative">
+            <canvas
+                ref={canvasRef}
+                width={currentCanvasWidth * (window.devicePixelRatio || 1)}
+                height={currentCanvasHeight * (window.devicePixelRatio || 1)}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                onWheel={handleWheel}
+                className={`w-full h-full sm:h-auto game-canvas-responsive sm:border sm:border-[rgba(255,215,0,0.2)] sm:rounded-lg sm:shadow-2xl touch-none ${cursorClass}`}
+            />
+        </div>
     );
 };

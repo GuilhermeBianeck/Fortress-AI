@@ -98,6 +98,13 @@ body {
   }
 }
 
+/* Canvas: full-screen on mobile, 4:3 on desktop */
+@media (min-width: 640px) {
+  .game-canvas-responsive {
+    aspect-ratio: 4 / 3;
+  }
+}
+
 /* ═══════════════════════
    Medieval Scrollbar
    ═══════════════════════ */
