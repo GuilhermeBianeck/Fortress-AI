@@ -82,7 +82,9 @@ export const GameCanvas = ({
 }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Persistent state in refs (no re-render thrashing)
+    // Refs for minimap drag state
+    const isDraggingMinimapRef = useRef(false);
+
     const gameStateRef = useRef(gameState);
     const terrainRef = useRef(terrain);
     const kingsHpRef = useRef(kingsHp);
@@ -1223,6 +1225,7 @@ export const GameCanvas = ({
         const mmY = height - mmH - 65;
 
         if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
+            isDraggingMinimapRef.current = true;
             const clickRatioX = (screenX - mmX) / mmW;
             const worldX = clickRatioX * WORLD_WIDTH;
             cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
@@ -1256,6 +1259,25 @@ export const GameCanvas = ({
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (Date.now() - lastTouchRef.current < 500) return;
+
+        // Minimap drag handling
+        if (isDraggingMinimapRef.current && canvasRef.current) {
+            const canvas = canvasRef.current;
+            const rect = canvas.getBoundingClientRect();
+            const screenX = (e.clientX - rect.left);
+
+            const dpr = window.devicePixelRatio || 1;
+            const width = canvas.width / dpr;
+            const mmW = 200;
+            const mmX = width - mmW - 10;
+
+            // Allow dragging slightly outside bounds for forgiving UX
+            const clickRatioX = Math.max(0, Math.min(1, (screenX - mmX) / mmW));
+            const worldX = clickRatioX * WORLD_WIDTH;
+            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
+            return;
+        }
+
         if (!aimRef.current.active) return;
         const { x: mx, y: my } = getWorldCoords(e);
         const cannon = getMyCannonPos();
@@ -1269,6 +1291,10 @@ export const GameCanvas = ({
     };
 
     const handleMouseUp = () => {
+        if (isDraggingMinimapRef.current) {
+            isDraggingMinimapRef.current = false;
+        }
+
         const aim = aimRef.current;
         if (!aim.active) return;
         aim.active = false;
@@ -1315,6 +1341,7 @@ export const GameCanvas = ({
         const mmX = width - mmW - 10;
         const mmY = height - mmH - 65;
         if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
+            isDraggingMinimapRef.current = true;
             const clickRatioX = (screenX - mmX) / mmW;
             const worldX = clickRatioX * WORLD_WIDTH;
             cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
@@ -1361,6 +1388,24 @@ export const GameCanvas = ({
             return;
         }
 
+        if (isDraggingMinimapRef.current && e.touches.length === 1 && canvasRef.current) {
+            e.preventDefault();
+            const canvas = canvasRef.current;
+            const rect = canvas.getBoundingClientRect();
+            // Use clientX since we care about screen position over the minimap
+            const screenX = (e.touches[0].clientX - rect.left);
+
+            const dpr = window.devicePixelRatio || 1;
+            const width = canvas.width / dpr;
+            const mmW = 200;
+            const mmX = width - mmW - 10;
+
+            const clickRatioX = Math.max(0, Math.min(1, (screenX - mmX) / mmW));
+            const worldX = clickRatioX * WORLD_WIDTH;
+            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
+            return;
+        }
+
         if (!aimRef.current.active || e.touches.length !== 1) return;
         e.preventDefault();
         const { x: mx, y: my } = getTouchWorldCoords(e.touches[0]);
@@ -1377,6 +1422,10 @@ export const GameCanvas = ({
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
+        if (isDraggingMinimapRef.current) {
+            isDraggingMinimapRef.current = false;
+        }
+
         // End two-finger pan when fingers are lifted
         if (panTouchRef.current) {
             if (e.touches.length < 2) {
