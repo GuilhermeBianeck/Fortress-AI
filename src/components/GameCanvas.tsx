@@ -31,24 +31,24 @@ export interface HazardData {
     windStrength?: number;
 }
 
-// Material color map (fallback if server doesn't send color)
+// Material color map (dark medieval theme)
 const MATERIAL_COLORS: Record<string, string> = {
-    wood: '#A67C52',
-    stone: '#7D7D7D',
-    ice: '#A5F2F3',
-    rubber: '#FF69B4',
-    steel: '#434B4D',
+    wood: '#8B6B42',
+    stone: '#5A5A6A',
+    ice: '#7EC8D0',
+    rubber: '#D45090',
+    steel: '#4A5560',
     king: '#FFD700',
-    Terrain: '#4a8c3f',
+    Terrain: '#2a4a2f',
 };
 
 const MATERIAL_STROKE: Record<string, string> = {
-    wood: '#8B6914',
-    stone: '#5a5a5a',
-    ice: '#7FD4D5',
-    rubber: '#D4508A',
-    steel: '#2e3436',
-    king: '#DAA520',
+    wood: '#6B4D14',
+    stone: '#3a3a4a',
+    ice: '#5AA8B0',
+    rubber: '#A03868',
+    steel: '#1e2226',
+    king: '#B8860B',
 };
 
 function getHpColor(ratio: number): string {
@@ -332,45 +332,64 @@ export const GameCanvas = ({
             shake.remaining--;
         }
 
-        // Clear with bright cheerful sky gradient
+        // Dark twilight sky gradient
         const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        bgGrad.addColorStop(0, '#5aa0e8');
-        bgGrad.addColorStop(0.25, '#7dbcf0');
-        bgGrad.addColorStop(0.5, '#a0d4f8');
-        bgGrad.addColorStop(0.75, '#c8e8fc');
-        bgGrad.addColorStop(1, '#d4efd8');
+        bgGrad.addColorStop(0, '#0a0a14');
+        bgGrad.addColorStop(0.2, '#0d0d1a');
+        bgGrad.addColorStop(0.45, '#141428');
+        bgGrad.addColorStop(0.7, '#1a1a3e');
+        bgGrad.addColorStop(0.88, '#2a1a1a');
+        bgGrad.addColorStop(1, '#1a1008');
         ctx.fillStyle = bgGrad;
         ctx.fillRect(-10, -10, canvas.width + 20, canvas.height + 20);
 
-        // Initialize clouds if they don't exist
+        // Twinkling stars (upper sky only)
+        const starSeed = 42;
+        const starTime = Date.now() / 1000;
+        for (let i = 0; i < 60; i++) {
+            const sx = ((i * 137.508 + starSeed * 73) % (canvas.width + 200)) - 100;
+            const sy = ((i * 97.3 + starSeed * 31) % (canvas.height * 0.55));
+            const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(starTime * (0.5 + (i % 5) * 0.3) + i * 1.7));
+            const size = 0.5 + (i % 3) * 0.5;
+            ctx.beginPath();
+            ctx.arc(sx, sy, size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(200, 210, 255, ${(twinkle * 0.6).toFixed(2)})`;
+            ctx.fill();
+        }
+
+        // Subtle horizon glow
+        const horizonGlow = ctx.createRadialGradient(canvas.width / 2, canvas.height * 0.85, 0, canvas.width / 2, canvas.height * 0.85, canvas.width * 0.6);
+        horizonGlow.addColorStop(0, 'rgba(180, 100, 30, 0.08)');
+        horizonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = horizonGlow;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Initialize dark storm clouds
         if (!cloudsRef.current) {
             const generateCloud = (layer: 'far' | 'mid' | 'near') => {
                 const depth = layer === 'far' ? 0.2 : layer === 'mid' ? 0.5 : 0.8;
-                const baseScale = layer === 'far' ? 0.6 : layer === 'mid' ? 1.0 : 1.5;
-                const speed = layer === 'far' ? 0.1 : layer === 'mid' ? 0.2 : 0.35;
+                const baseScale = layer === 'far' ? 0.7 : layer === 'mid' ? 1.1 : 1.6;
+                const speed = layer === 'far' ? 0.08 : layer === 'mid' ? 0.15 : 0.25;
 
                 return {
                     x: Math.random() * (WORLD_WIDTH * 1.5),
-                    y: (Math.random() * 150) + (layer === 'far' ? 20 : layer === 'mid' ? 50 : 80),
-                    speed: speed + Math.random() * 0.1,
+                    y: (Math.random() * 120) + (layer === 'far' ? 10 : layer === 'mid' ? 40 : 70),
+                    speed: speed + Math.random() * 0.08,
                     scale: baseScale * (0.8 + Math.random() * 0.4),
                     depth,
                     puffs: Array.from({ length: 4 + Math.floor(Math.random() * 4) }, () => ({
                         dx: (Math.random() - 0.5) * 80,
-                        dy: (Math.random() * 20), // Biased down for flat bottom look
+                        dy: (Math.random() * 20),
                         rx: 30 + Math.random() * 20,
-                        ry: 15 + Math.random() * 15 // Flattened
+                        ry: 15 + Math.random() * 15
                     }))
                 };
             };
 
             const clouds: Cloud[] = [];
-            // Far layer
-            for (let i = 0; i < 8; i++) clouds.push(generateCloud('far'));
-            // Mid layer
-            for (let i = 0; i < 6; i++) clouds.push(generateCloud('mid'));
-            // Near layer
-            for (let i = 0; i < 4; i++) clouds.push(generateCloud('near'));
+            for (let i = 0; i < 10; i++) clouds.push(generateCloud('far'));
+            for (let i = 0; i < 7; i++) clouds.push(generateCloud('mid'));
+            for (let i = 0; i < 5; i++) clouds.push(generateCloud('near'));
 
             cloudsRef.current = clouds;
         }
@@ -406,16 +425,14 @@ export const GameCanvas = ({
             ctx.fill();
         };
 
-        // Layer 1: Far Mountains (Atmospheric, simple, jagged)
-        // Solid color (no alpha) to prevent "see-through" effect.
-        // Light blue/grey to simulate distance (atmospheric perspective).
-        drawLayer('#A0BEDC', 250, 0.05, 123, 100, 0.002);
+        // Layer 1: Far Mountains — dark misty silhouettes
+        drawLayer('#1a1e2e', 250, 0.05, 123, 100, 0.002);
 
-        // Layer 2: Mid Hills (Greener but desaturated)
-        drawLayer('#6EA08C', 150, 0.15, 456, 60, 0.005);
+        // Layer 2: Mid Hills — dark forest silhouettes
+        drawLayer('#141e18', 150, 0.15, 456, 60, 0.005);
 
-        // Layer 3: Near Hills (Darker ground color, more detail)
-        drawLayer('#5A8264', 80, 0.3, 789, 40, 0.008);
+        // Layer 3: Near Hills — darkest foreground
+        drawLayer('#0e1610', 80, 0.3, 789, 40, 0.008);
 
 
         // Update and draw clouds (sorted by depth for correct occlusion if they overlap, though purely additive here)
@@ -470,7 +487,9 @@ export const GameCanvas = ({
 
             // Check visibility
             if (drawX > -300 && drawX < canvas.width + 300) {
-                ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + cloud.depth * 0.2})`;
+                // Dark storm-grey clouds with slight purple tint
+                const cloudAlpha = 0.25 + cloud.depth * 0.15;
+                ctx.fillStyle = `rgba(35, 30, 50, ${cloudAlpha.toFixed(2)})`;
 
                 for (const puff of cloud.puffs) {
                     const px = drawX + puff.dx * cloud.scale;
@@ -513,28 +532,30 @@ export const GameCanvas = ({
             ctx.lineTo(WORLD_WIDTH, canvas.height);
             ctx.closePath();
 
+            // Dark earth terrain gradient
             const terrainGrad = ctx.createLinearGradient(0, 400, 0, canvas.height);
-            terrainGrad.addColorStop(0, '#5da84a');
-            terrainGrad.addColorStop(0.15, '#4d9240');
-            terrainGrad.addColorStop(0.4, '#7a5530');
-            terrainGrad.addColorStop(1, '#5a3d20');
+            terrainGrad.addColorStop(0, '#2a3a20');
+            terrainGrad.addColorStop(0.15, '#1e2a18');
+            terrainGrad.addColorStop(0.4, '#1e1510');
+            terrainGrad.addColorStop(1, '#0e0a08');
             ctx.fillStyle = terrainGrad;
             ctx.fill();
 
+            // Gold-tinted terrain edge
             ctx.beginPath();
             ctx.moveTo(terr.points[0].x, terr.points[0].y);
             for (let i = 1; i < terr.points.length; i++) {
                 ctx.lineTo(terr.points[i].x, terr.points[i].y);
             }
-            ctx.strokeStyle = 'rgba(80, 160, 60, 0.5)';
+            ctx.strokeStyle = 'rgba(180, 150, 80, 0.25)';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Build zone overlays
+            // Build zone overlays (gold-tinted)
             for (const zone of terr.buildZones) {
-                ctx.fillStyle = 'rgba(80, 160, 60, 0.08)';
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.04)';
                 ctx.fillRect(zone.x, zone.y - 100, zone.width, 100);
-                ctx.strokeStyle = 'rgba(80, 160, 60, 0.2)';
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.12)';
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
@@ -544,8 +565,8 @@ export const GameCanvas = ({
                 ctx.setLineDash([]);
             }
 
-            // Draw center divider line
-            ctx.strokeStyle = 'rgba(180, 120, 60, 0.3)';
+            // Center divider — subtle gold dashed line
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.12)';
             ctx.lineWidth = 1;
             ctx.setLineDash([8, 8]);
             ctx.beginPath();
@@ -644,26 +665,38 @@ export const GameCanvas = ({
                 const cannonY = interpolateTerrainY(terr.points, cannonX) - 20;
                 const currentAngle = isActive ? aim.angle : Math.PI / 4;
 
-                // Barrel
+                // Barrel — dark iron with gold accent
                 ctx.save();
                 ctx.translate(cannonX, cannonY);
                 const barrelAngle = facingRight ? -currentAngle : -(Math.PI - currentAngle);
                 ctx.rotate(barrelAngle);
-                ctx.fillStyle = isActive ? '#5a4a3a' : '#4a3a2a';
+                ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
                 ctx.fillRect(0, -4, 24, 8);
-                ctx.strokeStyle = isActive ? '#8b7355' : '#6b5b45';
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
+                ctx.lineWidth = 1.5;
                 ctx.strokeRect(0, -4, 24, 8);
+                // Gold rivet at muzzle
+                if (isActive) {
+                    ctx.beginPath();
+                    ctx.arc(22, 0, 1.5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fill();
+                }
                 ctx.restore();
 
-                // Base
+                // Base — dark iron wheel
                 ctx.beginPath();
-                ctx.arc(cannonX, cannonY, 6, 0, Math.PI * 2);
-                ctx.fillStyle = isActive ? '#5a4a3a' : '#4a3a2a';
+                ctx.arc(cannonX, cannonY, 7, 0, Math.PI * 2);
+                ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
                 ctx.fill();
-                ctx.strokeStyle = isActive ? '#8b7355' : '#6b5b45';
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
+                ctx.lineWidth = 1.5;
                 ctx.stroke();
+                // Gold center dot
+                ctx.beginPath();
+                ctx.arc(cannonX, cannonY, 2, 0, Math.PI * 2);
+                ctx.fillStyle = isActive ? '#FFD700' : '#6a6a7a';
+                ctx.fill();
 
                 // Trajectory preview (only for active cannon during fire mode)
                 if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
@@ -704,8 +737,8 @@ export const GameCanvas = ({
                         if (step % 2 === 0) {
                             ctx.beginPath();
                             ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-                            // Brownish color for better visibility against light sky/clouds
-                            ctx.fillStyle = `rgba(139, 69, 19, ${Math.min(0.8, alpha + 0.2).toFixed(2)})`;
+                            // Gold dots for dark sky visibility
+                            ctx.fillStyle = `rgba(255, 215, 0, ${Math.min(0.9, alpha + 0.3).toFixed(2)})`;
                             ctx.fill();
                         }
 
@@ -716,7 +749,7 @@ export const GameCanvas = ({
                 // Aim readout (always show when aiming)
                 if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
                     ctx.font = 'bold 10px monospace';
-                    ctx.fillStyle = '#fff';
+                    ctx.fillStyle = '#FFD700';
                     ctx.textAlign = 'left';
                     const labelX = facingRight ? cannonX + 14 : cannonX - 90;
                     ctx.fillText(`${(currentAngle * 180 / Math.PI).toFixed(0)}° P:${aim.power.toFixed(0)}`, labelX, cannonY - 18);
@@ -752,10 +785,10 @@ export const GameCanvas = ({
         const trails = trailsRef.current;
         for (const [, positions] of trails) {
             for (let i = 0; i < positions.length - 1; i++) {
-                const alpha = (i + 1) / positions.length * 0.4;
+                const alpha = (i + 1) / positions.length * 0.5;
                 ctx.beginPath();
                 ctx.arc(positions[i].x, positions[i].y, 3, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(200, 150, 100, ${alpha})`;
+                ctx.fillStyle = `rgba(255, 180, 80, ${alpha})`;
                 ctx.fill();
             }
         }
@@ -806,8 +839,8 @@ export const GameCanvas = ({
                     // Projectile glow
                     if (body.label === 'projectile') {
                         ctx.beginPath();
-                        ctx.arc(0, 0, body.circleRadius + 3, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(255, 150, 50, 0.15)';
+                        ctx.arc(0, 0, body.circleRadius + 4, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255, 180, 50, 0.25)';
                         ctx.fill();
                     }
                 } else if (!body.isStatic || body.label === 'foundation') {
@@ -823,8 +856,8 @@ export const GameCanvas = ({
                     ctx.lineWidth = 1.5;
                     ctx.strokeRect(-w / 2, -h / 2, w, h);
 
-                    // Inner highlight
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                    // Inner highlight — warm gold tint
+                    ctx.fillStyle = 'rgba(255, 215, 0, 0.06)';
                     ctx.fillRect(-w / 2 + 2, -h / 2 + 2, w - 4, h / 3);
 
                     // Block damage visuals (cracks + desaturation)
@@ -875,9 +908,12 @@ export const GameCanvas = ({
                         const barY = body.position.y - (body.circleRadius || 12) - 10;
                         const hpRatio = Math.max(0, kHp / kMaxHp);
 
-                        ctx.fillStyle = 'rgba(240, 230, 210, 0.8)';
+                        ctx.fillStyle = 'rgba(10, 10, 18, 0.7)';
                         ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                        ctx.fillStyle = '#e8dcc0';
+                        ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+                        ctx.lineWidth = 0.5;
+                        ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+                        ctx.fillStyle = '#1a1a2e';
                         ctx.fillRect(barX, barY, barWidth, barHeight);
                         ctx.fillStyle = getHpColor(hpRatio);
                         ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
@@ -892,9 +928,9 @@ export const GameCanvas = ({
                     const barY = body.position.y - (body.height || 30) / 2 - 6;
                     const hpRatio = Math.max(0, body.blockHp / body.blockMaxHp);
 
-                    ctx.fillStyle = 'rgba(240, 230, 210, 0.7)';
+                    ctx.fillStyle = 'rgba(10, 10, 18, 0.6)';
                     ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                    ctx.fillStyle = '#e8dcc0';
+                    ctx.fillStyle = '#1a1a2e';
                     ctx.fillRect(barX, barY, barWidth, barHeight);
                     ctx.fillStyle = getHpColor(hpRatio);
                     ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
@@ -943,10 +979,10 @@ export const GameCanvas = ({
         const scaleX = mmW / WORLD_WIDTH;
         const scaleY = mmH / CANVAS_HEIGHT;
 
-        // Background
-        ctx.fillStyle = 'rgba(255, 248, 230, 0.85)';
+        // Dark minimap background
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.8)';
         ctx.fillRect(mmX, mmY, mmW, mmH);
-        ctx.strokeStyle = 'rgba(200, 160, 80, 0.5)';
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.25)';
         ctx.lineWidth = 1;
         ctx.strokeRect(mmX, mmY, mmW, mmH);
 
@@ -959,7 +995,7 @@ export const GameCanvas = ({
             }
             ctx.lineTo(mmX + mmW, mmY + mmH);
             ctx.closePath();
-            ctx.fillStyle = 'rgba(74, 140, 63, 0.5)';
+            ctx.fillStyle = 'rgba(42, 74, 47, 0.6)';
             ctx.fill();
         }
 
@@ -1005,7 +1041,7 @@ export const GameCanvas = ({
         // Viewport rectangle
         const vpX = mmX + cam.x * scaleX;
         const vpW = CANVAS_WIDTH * scaleX;
-        ctx.strokeStyle = 'rgba(180, 130, 50, 0.7)';
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
         ctx.lineWidth = 1;
         ctx.strokeRect(vpX, mmY, vpW, mmH);
     }
@@ -1015,25 +1051,29 @@ export const GameCanvas = ({
         const hudHeight = 14;
         const hpRatio = king.maxHp > 0 ? Math.max(0, king.hp / king.maxHp) : 0;
 
-        ctx.fillStyle = 'rgba(255, 248, 230, 0.85)';
+        // Dark translucent HUD panel
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.8)';
         ctx.fillRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(hudX - 2, hudY - 2, hudWidth + 4, hudHeight + 18);
 
         ctx.font = 'bold 10px monospace';
-        ctx.fillStyle = '#b8860b';
+        ctx.fillStyle = '#FFD700';
         ctx.textAlign = 'left';
         ctx.fillText(`\u265A ${label}`, hudX, hudY + 10);
 
         const barY = hudY + 14;
-        ctx.fillStyle = '#e8dcc0';
+        ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(hudX, barY, hudWidth, hudHeight);
         ctx.fillStyle = getHpColor(hpRatio);
         ctx.fillRect(hudX, barY, hudWidth * hpRatio, hudHeight);
-        ctx.strokeStyle = 'rgba(180, 130, 50, 0.5)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+        ctx.lineWidth = 0.5;
         ctx.strokeRect(hudX, barY, hudWidth, hudHeight);
 
         ctx.font = 'bold 9px monospace';
-        ctx.fillStyle = '#3d2b14';
+        ctx.fillStyle = '#e0d0b0';
         ctx.textAlign = 'center';
         ctx.fillText(`${Math.ceil(king.hp)} / ${king.maxHp}`, hudX + hudWidth / 2, barY + 11);
     }
@@ -1331,7 +1371,7 @@ export const GameCanvas = ({
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
             onWheel={handleWheel}
-            className={`w-full sm:border sm:border-white/20 sm:rounded-lg sm:shadow-2xl touch-none ${cursorClass}`}
+            className={`w-full sm:border sm:border-[rgba(255,215,0,0.2)] sm:rounded-lg sm:shadow-2xl touch-none ${cursorClass}`}
             style={{ aspectRatio: '4 / 3' }}
         />
     );
