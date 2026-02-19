@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle } from 'lucide-react';
 import type { MatchPhase, Side, MatchScores } from '../types';
 
 interface PhaseOverlayProps {
@@ -40,19 +41,20 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
     // Build phase banner
     if (phase === 'build') {
         return (
-            <div className="flex items-center justify-between w-full w-full">
-                <div className="flex items-center gap-1.5 sm:gap-2 bg-green-100/80 border border-green-300/50 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm">
-                    <span className="text-green-700 font-bold text-xs sm:text-sm">
-                        {currentRound ? `R${currentRound} — ` : ''}🔨 BUILD
+            <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-md border border-[rgba(39,174,96,0.3)]" style={{ background: 'rgba(39,174,96,0.15)' }}>
+                    <Hammer size={14} className="text-[var(--emerald)]" />
+                    <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
+                        {currentRound ? `R${currentRound} — ` : ''}BUILD
                     </span>
                     {roundScore && (
-                        <span className="text-amber-600 text-[10px] sm:text-xs ml-1 sm:ml-2">
+                        <span className="text-[var(--gold-dim)] text-[10px] sm:text-xs ml-1 sm:ml-2">
                             [{roundScore.left} - {roundScore.right}]
                         </span>
                     )}
                 </div>
                 {timeLeft !== null && (
-                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-amber-700'}`}>
+                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 10 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
                         {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
                     </div>
                 )}
@@ -68,13 +70,17 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
             falling_rocks: 'Falling Rocks',
         };
         return (
-            <div className="flex items-center justify-center w-full w-full">
-                <div className="bg-amber-100/80 border border-amber-300/50 rounded-lg px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-sm text-center">
-                    <span className="text-amber-700 font-bold text-sm sm:text-base">🔭 REVEALING KINGDOMS</span>
-                    <p className="text-[10px] sm:text-xs text-amber-500 mt-0.5">The scout surveys the battlefield...</p>
+            <div className="flex items-center justify-center w-full">
+                <div className="rounded-lg px-4 sm:px-6 py-2 sm:py-3 backdrop-blur-md text-center border border-[var(--border-medium)]" style={{ background: 'rgba(255,215,0,0.1)' }}>
+                    <div className="flex items-center justify-center gap-2">
+                        <Eye size={16} className="text-[var(--gold)]" />
+                        <span className="text-[var(--gold)] font-bold text-sm sm:text-base font-display">REVEALING KINGDOMS</span>
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">The scout surveys the battlefield...</p>
                     {hazards && hazards.length > 0 && (
-                        <p className="text-xs text-amber-600 mt-1">
-                            ⚠️ Hazards: {hazards.map(h => hazardNames[h.type] || h.type).join(', ')}
+                        <p className="text-xs text-[var(--ember)] mt-1 flex items-center justify-center gap-1">
+                            <AlertTriangle size={12} />
+                            Hazards: {hazards.map(h => hazardNames[h.type] || h.type).join(', ')}
                         </p>
                     )}
                 </div>
@@ -87,27 +93,26 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const isMyTurn = turnPlayer === mySide;
         const windHazard = hazards?.find(h => h.type === 'wind_zone');
         return (
-            <div className="flex items-center justify-between w-full w-full gap-2">
-                <div className={`flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-sm border ${isMyTurn
-                        ? 'bg-red-100/80 border-red-300/50'
-                        : 'bg-amber-100/70 border-amber-300/40'
-                    }`}>
-                    <span className={`font-bold text-xs sm:text-sm ${isMyTurn ? 'text-red-600' : 'text-amber-600'}`}>
-                        {isMyTurn ? '💥 YOUR TURN — FIRE!' : "⏳ OPPONENT'S TURN"}
+            <div className="flex items-center justify-between w-full gap-2">
+                <div className={`flex items-center gap-1.5 sm:gap-2 rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 backdrop-blur-md border ${isMyTurn
+                    ? 'border-[rgba(192,57,43,0.4)]'
+                    : 'border-[var(--border-subtle)]'
+                    }`} style={{ background: isMyTurn ? 'rgba(192,57,43,0.15)' : 'rgba(15,14,23,0.7)' }}>
+                    {isMyTurn ? <Flame size={14} className="text-[var(--crimson)]" /> : <Clock size={14} className="text-[var(--text-muted)]" />}
+                    <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
+                        {isMyTurn ? 'YOUR TURN — FIRE!' : "OPPONENT'S TURN"}
                     </span>
                 </div>
                 {windHazard && (
-                    <div className="flex items-center gap-1 bg-cyan-100/80 border border-cyan-300/50 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-sm">
-                        <span className="text-cyan-600 text-sm sm:text-base">
-                            {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'}
-                        </span>
-                        <span className="text-cyan-700 text-[10px] sm:text-xs font-bold">
-                            {Math.round((windHazard.windStrength ?? 0.0003) * 20000)} KNOTS
+                    <div className="flex items-center gap-1 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md border border-[rgba(52,152,219,0.3)]" style={{ background: 'rgba(52,152,219,0.1)' }}>
+                        <Wind size={14} className="text-[var(--royal-blue)]" />
+                        <span className="text-[var(--royal-blue)] text-[10px] sm:text-xs font-bold">
+                            {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'} {Math.round((windHazard.windStrength ?? 0.0003) * 20000)} KNOTS
                         </span>
                     </div>
                 )}
                 {timeLeft !== null && (
-                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-amber-700'}`}>
+                    <div className={`font-mono font-bold text-sm sm:text-lg ${timeLeft <= 5 ? 'text-[var(--crimson)] animate-pulse' : 'text-[var(--text-primary)]'}`}>
                         {timeLeft}s
                     </div>
                 )}
@@ -127,45 +132,48 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const myScore = matchScores?.[mySide];
 
         return (
-            <div className="flex items-center justify-center w-full w-full">
-                <div className={`rounded-xl sm:rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-sm border text-center ${isWinner
-                        ? 'bg-amber-100/80 border-amber-400/50'
-                        : 'bg-red-100/80 border-red-300/50'
-                    }`}>
-                    <div className={`text-xl sm:text-3xl font-bold mb-1 ${isWinner ? 'text-amber-600' : 'text-red-500'}`} style={{ fontFamily: "'MedievalSharp', cursive" }}>
-                        {isWinner ? '👑 VICTORY' : '💀 DEFEAT'}
+            <div className="flex items-center justify-center w-full">
+                <div className={`rounded-xl sm:rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-md border text-center ${isWinner
+                    ? 'border-[var(--border-accent)]'
+                    : 'border-[rgba(192,57,43,0.4)]'
+                    }`} style={{ background: isWinner ? 'rgba(255,215,0,0.1)' : 'rgba(192,57,43,0.1)' }}>
+                    <div className={`text-xl sm:text-3xl font-bold mb-1 font-heading ${isWinner ? 'text-[var(--gold)] text-glow-gold' : 'text-[var(--crimson)] text-glow-ember'}`}>
+                        <span className="flex items-center justify-center gap-2">
+                            {isWinner ? <Crown size={28} /> : <Skull size={28} />}
+                            {isWinner ? 'VICTORY' : 'DEFEAT'}
+                        </span>
                     </div>
-                    <p className="text-xs sm:text-sm text-amber-700 mb-1">{winnerName} conquers!</p>
+                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-1">{winnerName} conquers!</p>
                     {roundScore && (
-                        <p className="text-xs sm:text-sm text-amber-500 mb-1">
+                        <p className="text-xs sm:text-sm text-[var(--text-muted)] mb-1">
                             Rounds: {roundScore.left} - {roundScore.right}
                         </p>
                     )}
                     {reasonText && (
-                        <p className="text-[10px] sm:text-sm text-amber-500">{reasonText}</p>
+                        <p className="text-[10px] sm:text-sm text-[var(--text-muted)]">{reasonText}</p>
                     )}
 
                     {/* Score breakdown */}
                     {myScore && (
-                        <div className="mt-2 sm:mt-3 border-t border-amber-300/40 pt-2 sm:pt-3">
-                            <p className="text-xs sm:text-sm font-bold text-amber-600 mb-1.5">
+                        <div className="mt-2 sm:mt-3 border-t border-[var(--border-subtle)] pt-2 sm:pt-3">
+                            <p className="text-xs sm:text-sm font-bold text-[var(--gold)] mb-1.5 font-display">
                                 YOUR SCORE: {myScore.totalScore}
                             </p>
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-amber-500">
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-[var(--text-muted)]">
                                 <span className="text-right">Damage dealt:</span>
-                                <span className="text-left text-amber-700">+{myScore.damagePoints}</span>
+                                <span className="text-left text-[var(--text-secondary)]">+{myScore.damagePoints}</span>
                                 <span className="text-right">Resource bonus:</span>
-                                <span className="text-left text-amber-700">+{myScore.resourceBonus}</span>
+                                <span className="text-left text-[var(--text-secondary)]">+{myScore.resourceBonus}</span>
                                 <span className="text-right">Time bonus:</span>
-                                <span className="text-left text-amber-700">+{myScore.timeBonus}</span>
+                                <span className="text-left text-[var(--text-secondary)]">+{myScore.timeBonus}</span>
                                 {myScore.winBonus > 0 && (
                                     <>
                                         <span className="text-right">Win bonus:</span>
-                                        <span className="text-left text-green-600">+{myScore.winBonus}</span>
+                                        <span className="text-left text-[var(--emerald)]">+{myScore.winBonus}</span>
                                     </>
                                 )}
                             </div>
-                            <p className="text-[10px] sm:text-xs text-amber-400 mt-1">
+                            <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-1">
                                 {myScore.resourcesUsed} blocks · {Math.round(myScore.combatTimeMs / 1000)}s combat · {myScore.damageDealt.toFixed(1)} dmg
                             </p>
                         </div>
@@ -177,25 +185,26 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             {rematchState === 'none' && (
                                 <button
                                     onClick={onRequestRematch}
-                                    className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 active:from-amber-600 active:to-amber-700 text-white font-bold rounded-lg text-sm
-                                        transition-colors duration-200 touch-manipulation shadow-md shadow-amber-400/30"
+                                    className="btn-primary min-h-[44px] min-w-[120px] px-6 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 mx-auto"
                                 >
-                                    ⚔️ REMATCH
+                                    <RotateCcw size={16} />
+                                    REMATCH
                                 </button>
                             )}
                             {rematchState === 'requested' && (
                                 <div className="flex items-center justify-center gap-2">
-                                    <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                                    <p className="text-xs sm:text-sm text-amber-600">Awaiting opponent&apos;s response...</p>
+                                    <div className="w-3 h-3 border-2 border-[var(--gold)] border-t-transparent rounded-full animate-spin" />
+                                    <p className="text-xs sm:text-sm text-[var(--text-muted)]">Awaiting opponent&apos;s response...</p>
                                 </div>
                             )}
                             {rematchState === 'opponent_requested' && (
                                 <div>
-                                    <p className="text-xs sm:text-sm text-green-600 mb-2 animate-pulse">⚔️ The enemy demands a rematch!</p>
+                                    <p className="text-xs sm:text-sm text-[var(--ember)] mb-2 animate-pulse flex items-center justify-center gap-1">
+                                        <Swords size={14} /> The enemy demands a rematch!
+                                    </p>
                                     <button
                                         onClick={onRequestRematch}
-                                        className="min-h-[44px] min-w-[120px] px-6 sm:px-6 py-2.5 sm:py-2 bg-gradient-to-b from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 active:from-green-600 active:to-green-700 text-white font-bold rounded-lg text-sm
-                                            transition-colors duration-200 touch-manipulation shadow-md shadow-green-400/30"
+                                        className="btn-emerald min-h-[44px] min-w-[120px] px-6 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 mx-auto"
                                     >
                                         ACCEPT CHALLENGE
                                     </button>

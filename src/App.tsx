@@ -6,7 +6,7 @@ import { GodTools, MobileDoneButton } from './components/GodTools';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
-import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle } from 'lucide-react';
+import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, Crown } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 
 function App() {
@@ -88,17 +88,17 @@ function App() {
   } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
-    <div className="h-[100dvh] bg-[#fdf6e3] text-[#3d2b14] selection:bg-amber-300/40 flex flex-col overflow-hidden safe-area-top" style={{ fontFamily: "'Cinzel', Georgia, serif" }}>
+    <div className="h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top" style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: 'var(--bg-deepest)' }}>
       {/* Header — hidden on mobile when in-game */}
-      <header className={`px-4 py-2 border-b border-amber-300/50 flex justify-between items-center bg-gradient-to-r from-[#faf0d7]/95 via-[#fff8e7]/95 to-[#faf0d7]/95 backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`}>
+      <header className={`px-4 py-2 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`} style={{ background: 'rgba(10, 10, 18, 0.85)' }}>
         <div className="flex items-center gap-2">
-          <div className="bg-gradient-to-br from-amber-400 to-amber-500 p-1.5 rounded-lg shadow-md shadow-amber-400/30">
-            <span className="text-xl">🏰</span>
+          <div className="p-1.5 rounded-lg" style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05))' }}>
+            <Crown size={20} className="text-[var(--gold)]" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-amber-800" style={{ fontFamily: "'MedievalSharp', cursive" }}>FORTRESS AI</h1>
-            <div className="text-[10px] text-amber-600 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            <h1 className="text-base font-bold tracking-tight text-[var(--gold)] font-heading">FORTRESS AI</h1>
+            <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--emerald)] animate-pulse"></span>
               {inGame && roomState ? `Room: ${roomState.roomId}` : 'ONLINE'}
             </div>
           </div>
@@ -112,14 +112,14 @@ function App() {
               className={`xl:hidden min-w-[44px] min-h-[44px] px-2 py-1.5 text-sm rounded-lg transition-colors duration-200 touch-manipulation
                 border flex items-center justify-center gap-1.5
                 ${showChat
-                  ? 'bg-amber-200/60 border-amber-400/50 text-amber-700'
-                  : 'bg-white/60 border-amber-300/40 hover:bg-amber-100/60 active:bg-amber-200/60 text-amber-700'
+                  ? 'bg-[var(--bg-elevated)] border-[var(--border-accent)] text-[var(--gold)]'
+                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
                 }`}
             >
               <MessageCircle size={16} />
               <span className="hidden sm:inline text-xs">Chat</span>
               {chatMessages.length > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--ember)]"></span>
               )}
             </button>
           )}
@@ -127,8 +127,11 @@ function App() {
           <button
             onClick={() => setShowApiKey(!showApiKey)}
             className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors duration-200 touch-manipulation flex items-center justify-center gap-1.5
-                       ${apiKey ? 'text-green-700 bg-green-100/60 border border-green-300/50' : 'text-amber-600 bg-amber-100/60 border border-amber-300/50'}
-                       hover:bg-amber-200/40 active:bg-amber-200/60`}
+                       ${apiKey
+                ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
+                : 'text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]'
+              }
+                       hover:bg-[var(--bg-elevated)]`}
           >
             <Key size={14} />
             <span className="hidden sm:inline">{apiKey ? 'Key Set' : 'Set API Key'}</span>
@@ -139,20 +142,19 @@ function App() {
       <main className={`flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto min-h-0 ${inGame ? 'sm:p-3 sm:gap-3' : ''}`}>
         {/* API Key Input (collapsible) */}
         {showApiKey && (
-          <div className="w-full bg-white/70 border border-amber-300/50 rounded-xl p-3 sm:p-4 backdrop-blur-sm">
-            <label className="text-xs text-amber-600 mb-2 block">Gemini API Key (stored locally)</label>
+          <div className="w-full card-dark rounded-xl p-3 sm:p-4">
+            <label className="text-xs text-[var(--text-muted)] mb-2 block">Gemini API Key (stored locally)</label>
             <div className="flex gap-2">
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => handleApiKeyChange(e.target.value)}
                 placeholder="AIzaSy..."
-                className="flex-1 min-w-0 bg-[#fdf6e3]/80 border border-amber-300/40 rounded-lg px-3 py-2 text-sm text-amber-900 placeholder:text-amber-400/60 outline-none focus:border-amber-500/60 transition-all font-mono"
+                className="input-medieval flex-1 min-w-0 rounded-lg px-3 py-2 text-sm font-mono"
               />
               <button
                 onClick={() => setShowApiKey(false)}
-                className="shrink-0 min-h-[44px] px-4 py-2 bg-gradient-to-b from-amber-400 to-amber-500 text-white text-sm font-medium rounded-lg hover:from-amber-500 hover:to-amber-600 active:from-amber-600 active:to-amber-700
-                    transition-colors duration-200 touch-manipulation shadow-md shadow-amber-400/30"
+                className="btn-primary shrink-0 min-h-[44px] px-4 py-2 rounded-lg text-sm"
               >
                 Save
               </button>
@@ -183,7 +185,7 @@ function App() {
             <div className="flex gap-4 items-start w-full justify-center">
               <div className="relative group flex-1 min-w-0">
                 {/* Glow border — desktop only */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-amber-300 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-1000 pointer-events-none hidden sm:block"></div>
+                <div className="absolute -inset-1 bg-gradient-to-r from-[var(--gold)] to-[var(--ember)] rounded-xl blur opacity-10 group-hover:opacity-20 transition duration-1000 pointer-events-none hidden sm:block"></div>
                 <div className="relative">
                   <GameCanvas
                     gameState={gameState}
@@ -204,9 +206,8 @@ function App() {
                   />
                   {/* Phase overlay — on top of canvas */}
                   {phase && (
-                    <div className={`absolute inset-x-0 z-10 flex justify-center pointer-events-none ${
-                      phase === 'result' ? 'inset-0 items-center' : 'top-0 pt-1 sm:pt-2'
-                    }`}>
+                    <div className={`absolute inset-x-0 z-10 flex justify-center pointer-events-none ${phase === 'result' ? 'inset-0 items-center' : 'top-0 pt-1 sm:pt-2'
+                      }`}>
                       <div className="pointer-events-auto max-w-[calc(100%-5rem)] sm:max-w-none">
                         <PhaseOverlay
                           phase={phase}
@@ -226,24 +227,24 @@ function App() {
                     </div>
                   )}
 
-                  {/* Mobile: Chat button — top-right, clear of HP bars, min 44px touch target */}
+                  {/* Mobile: Chat button — top-right */}
                   <div className="absolute top-1 right-1 z-20 sm:hidden">
                     <button
                       onClick={() => setShowChat(!showChat)}
                       className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation border
                         ${showChat
-                          ? 'bg-amber-200/50 border-amber-400/50'
-                          : 'bg-white/60 border-amber-300/30 active:bg-amber-100/80'
+                          ? 'bg-[var(--bg-elevated)] border-[var(--border-accent)]'
+                          : 'bg-[rgba(10,10,18,0.6)] border-[var(--border-subtle)] active:bg-[var(--bg-elevated)]'
                         }`}
                     >
-                      <MessageCircle size={18} className="text-white" />
+                      <MessageCircle size={18} className="text-[var(--gold)]" />
                       {chatMessages.length > 0 && (
-                        <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--ember)]"></span>
                       )}
                     </button>
                   </div>
 
-                  {/* Mobile: Done button — top-center, below phase overlay, properly sized for touch */}
+                  {/* Mobile: Done button */}
                   {phase === 'build' && (
                     <div className="absolute top-10 inset-x-0 z-10 flex justify-center sm:hidden pointer-events-none">
                       <div className="pointer-events-auto">
@@ -252,7 +253,7 @@ function App() {
                     </div>
                   )}
 
-                  {/* Mobile: God Tools overlaid at bottom of canvas — above minimap */}
+                  {/* Mobile: God Tools overlaid at bottom of canvas */}
                   {phase === 'build' && (
                     <div className="absolute bottom-0 inset-x-0 z-10 p-1.5 sm:hidden pointer-events-auto safe-area-bottom">
                       <GodTools
@@ -280,7 +281,7 @@ function App() {
               </div>
             </div>
 
-            {/* Desktop: God Tools (build phase only) — above canvas on sm+ */}
+            {/* Desktop: God Tools (build phase only) */}
             {phase === 'build' && (
               <div className="hidden sm:block w-full order-first">
                 <GodTools
@@ -300,10 +301,10 @@ function App() {
             {buildStatus.status !== 'idle' && (
               <div className={`w-full border rounded-xl p-2 sm:p-3 backdrop-blur-sm flex items-center gap-2 sm:gap-3 transition-all order-first
                 ${buildStatus.status === 'error'
-                  ? 'bg-red-50/80 border-red-300/50 text-red-600'
+                  ? 'bg-[rgba(192,57,43,0.15)] border-[rgba(192,57,43,0.3)] text-[var(--crimson)]'
                   : buildStatus.status === 'success'
-                    ? 'bg-green-50/80 border-green-300/50 text-green-700'
-                    : 'bg-amber-50/80 border-amber-300/50 text-amber-700'
+                    ? 'bg-[rgba(39,174,96,0.15)] border-[rgba(39,174,96,0.3)] text-[var(--emerald)]'
+                    : 'bg-[rgba(255,215,0,0.1)] border-[var(--border-medium)] text-[var(--gold)]'
                 }`}
               >
                 {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" />}
@@ -315,7 +316,7 @@ function App() {
 
             {/* Mobile chat overlay */}
             {showChat && (
-              <div className="fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-[#fdf6e3]/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
+              <div className="fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-[rgba(10,10,18,0.7)] backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
                 <div className="w-full max-w-md mb-0 sm:mb-4 safe-area-bottom">
                   <ChatPanel
                     messages={chatMessages}
@@ -330,33 +331,33 @@ function App() {
 
             {/* Prompt Input — only in build mode during build phase */}
             {phase === 'build' && gameMode === 'build' && (
-              <form onSubmit={handleSubmitPrompt} className="w-full bg-white/60 border border-amber-300/40 rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3 backdrop-blur-sm hidden sm:flex">
-                <div className="p-2 sm:p-2.5 bg-[#fdf6e3] rounded-lg shrink-0">
-                  <Terminal size={16} className="text-amber-500" />
+              <form onSubmit={handleSubmitPrompt} className="w-full card-dark rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3 hidden sm:flex">
+                <div className="p-2 sm:p-2.5 bg-[var(--bg-deep)] rounded-lg shrink-0">
+                  <Terminal size={16} className="text-[var(--gold)]" />
                 </div>
                 <input
                   type="text"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Describe your fortress..."
-                  className="w-full min-w-0 bg-transparent outline-none text-amber-900 placeholder:text-amber-400/60 font-mono text-xs sm:text-sm"
+                  className="w-full min-w-0 bg-transparent outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)] font-mono text-xs sm:text-sm"
                   disabled={isBuilding}
                 />
                 <button
                   type="submit"
                   disabled={isBuilding || !prompt.trim()}
-                  className="p-2 sm:p-2.5 bg-gradient-to-b from-amber-400 to-amber-500 rounded-lg shrink-0 hover:from-amber-500 hover:to-amber-600 active:from-amber-600 active:to-amber-700
-                      transition-colors duration-200 touch-manipulation shadow-md shadow-amber-400/30
-                      disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-2 sm:p-2.5 bg-gradient-to-b from-[var(--gold)] to-[var(--gold-dim)] rounded-lg shrink-0
+                      transition-all duration-200 touch-manipulation shadow-md shadow-[var(--gold-glow)]
+                      disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-lg"
                 >
-                  {isBuilding ? <Loader2 size={16} className="animate-spin text-white" /> : <Send size={16} className="text-white" />}
+                  {isBuilding ? <Loader2 size={16} className="animate-spin text-[var(--bg-deepest)]" /> : <Send size={16} className="text-[var(--bg-deepest)]" />}
                 </button>
               </form>
             )}
 
             {/* Combat hint — desktop only */}
             {phase === 'combat' && turnPlayer === mySide && (
-              <div className="hidden sm:block text-[10px] sm:text-xs text-amber-500 font-mono text-center">
+              <div className="hidden sm:block text-[10px] sm:text-xs text-[var(--text-muted)] font-mono text-center">
                 Drag to aim &amp; fire &middot; Scroll / &uarr;&darr; to adjust power &middot; &larr;&rarr; to adjust angle &middot; Space to fire &middot; A/D to pan
               </div>
             )}
