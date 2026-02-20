@@ -120,3 +120,46 @@ export interface PlayerProfile {
     matchesWon: number;
     history: MatchHistoryEntry[];
 }
+
+// === Ranking ===
+
+export interface RankTier {
+    name: string;
+    minScore: number;
+    color: string;
+    description: string;
+    emoji: string;
+}
+
+export const RANK_TIERS: readonly RankTier[] = [
+    { name: 'Wanderer',        minScore: 0,     color: '#9CA3AF', description: 'Beginning the journey',          emoji: '⚔️'  },
+    { name: 'Builder',         minScore: 500,   color: '#60A5FA', description: 'Mastering the art of walls',     emoji: '🏗️'  },
+    { name: 'Architect',       minScore: 2000,  color: '#34D399', description: 'Designing with purpose',         emoji: '📐'  },
+    { name: 'AI Initiate',     minScore: 5000,  color: '#F59E0B', description: 'Awakening to AI potential',      emoji: '🤖'  },
+    { name: 'Synergist',       minScore: 10000, color: '#F97316', description: 'Human creativity + AI precision', emoji: '🔗'  },
+    { name: 'Nexus Commander', minScore: 20000, color: '#EF4444', description: 'Commanding the fusion of minds', emoji: '⚡'  },
+    { name: 'Transcendent',    minScore: 40000, color: '#06B6D4', description: 'Human and AI become one',        emoji: '✨'  },
+] as const;
+
+export function getRankTier(totalScore: number): RankTier {
+    for (let i = RANK_TIERS.length - 1; i >= 0; i--) {
+        if (totalScore >= RANK_TIERS[i].minScore) return RANK_TIERS[i];
+    }
+    return RANK_TIERS[0];
+}
+
+export function getNextRankProgress(totalScore: number): {
+    nextRank: RankTier | null;
+    progress: number;
+    pointsNeeded: number;
+} {
+    for (let i = 1; i < RANK_TIERS.length; i++) {
+        if (totalScore < RANK_TIERS[i].minScore) {
+            const prevMin = RANK_TIERS[i - 1].minScore;
+            const nextMin = RANK_TIERS[i].minScore;
+            const progress = (totalScore - prevMin) / (nextMin - prevMin);
+            return { nextRank: RANK_TIERS[i], progress, pointsNeeded: nextMin - totalScore };
+        }
+    }
+    return { nextRank: null, progress: 1, pointsNeeded: 0 };
+}

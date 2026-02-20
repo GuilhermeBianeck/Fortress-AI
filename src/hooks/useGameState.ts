@@ -4,6 +4,44 @@ import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vect
 
 const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`;
 
+const PROFILE_STORAGE_KEY = 'fortress_player_profile';
+const UUID_STORAGE_KEY = 'fortress_player_uuid';
+
+function getOrCreateUuid(): string {
+    let uuid = localStorage.getItem(UUID_STORAGE_KEY);
+    if (!uuid) {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            uuid = crypto.randomUUID();
+        } else {
+            // Fallback: RFC 4122 v4 UUID using Math.random
+            uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            });
+        }
+        localStorage.setItem(UUID_STORAGE_KEY, uuid);
+    }
+    return uuid;
+}
+
+function loadStoredProfile(): PlayerProfile | null {
+    try {
+        const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+        return raw ? (JSON.parse(raw) as PlayerProfile) : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveProfileToStorage(profile: PlayerProfile): void {
+    try {
+        localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    } catch {
+        // storage quota exceeded -- ignore
+    }
+}
+
 export const useGameState = () => {
     const [gameState, setGameState] = useState<GameState | null>(null);
     const [terrain, setTerrain] = useState<TerrainData | null>(null);
@@ -26,7 +64,7 @@ export const useGameState = () => {
     const [currentRound, setCurrentRound] = useState(1);
     const [hazards, setHazards] = useState<{ type: string; id: string; position: { x: number; y: number }; width: number; height: number; windDirection?: number; windStrength?: number }[]>([]);
     const [matchScores, setMatchScores] = useState<MatchScores | null>(null);
-    const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
+    const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(() => loadStoredProfile());
 
     const socketRef = useRef<Socket | null>(null);
     const mySideRef = useRef<Side>('left');
@@ -36,7 +74,8 @@ export const useGameState = () => {
     const projectileImpactCbRef = useRef<((data: { position: Vector }) => void) | null>(null);
 
     useEffect(() => {
-        socketRef.current = io(SERVER_URL);
+        const playerUuid = getOrCreateUuid();
+        socketRef.current = io(SERVER_URL, { auth: { uuid: playerUuid } });
 
         socketRef.current.on('connect', () => {
             console.log('Connected to Game Server');
@@ -229,6 +268,7 @@ export const useGameState = () => {
 
         socketRef.current.on('profile_update', (data: PlayerProfile | null) => {
             setPlayerProfile(data);
+            if (data) saveProfileToStorage(data);
         });
 
         socketRef.current.on('disconnect', () => {

@@ -6,8 +6,10 @@ import { GodTools, MobileDoneButton } from './components/GodTools';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
+import { RankBadge } from './components/RankBadge';
 import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, Crown } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
+import { getRankTier } from './types';
 
 function App() {
   const {
@@ -38,6 +40,7 @@ function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('fortress_api_key') || '');
   const [prompt, setPrompt] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showRankPanel, setShowRankPanel] = useState(false);
 
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
@@ -80,6 +83,12 @@ function App() {
 
   const isBuilding = buildStatus.status === 'generating' || buildStatus.status === 'building';
   const mySide = roomState?.side ?? 'left';
+  const myRank = playerProfile ? getRankTier(playerProfile.totalScore) : null;
+
+  // Derive pre-match score from post-match data for rank-up detection
+  const prevTotalScore = (playerProfile && matchScores)
+    ? playerProfile.totalScore - matchScores[mySide].totalScore
+    : undefined;
 
   // Build name map: left/right → name
   const playerNamesMap = roomState ? {
@@ -105,6 +114,18 @@ function App() {
         </div>
 
         <div className="flex gap-2 items-center">
+          {/* Rank indicator (non-game, desktop) */}
+          {!inGame && myRank && (
+            <button
+              onClick={() => setShowRankPanel(!showRankPanel)}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors duration-200 hover:bg-[var(--bg-elevated)]"
+              style={{ borderColor: `${myRank.color}44`, background: `${myRank.color}0d` }}
+              title="Your Rank"
+            >
+              <span className="text-sm">{myRank.emoji}</span>
+              <span className="text-xs font-bold" style={{ color: myRank.color }}>{myRank.name}</span>
+            </button>
+          )}
           {/* Chat toggle (mobile only, in-game) */}
           {inGame && (
             <button
@@ -138,6 +159,13 @@ function App() {
           </button>
         </div>
       </header>
+
+      {/* Rank panel dropdown (desktop, lobby) */}
+      {showRankPanel && !inGame && playerProfile && (
+        <div className="w-full max-w-sm mx-auto px-4 pt-2 z-40">
+          <RankBadge profile={playerProfile} showProgress />
+        </div>
+      )}
 
       <main className={`flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto min-h-0 ${inGame ? 'sm:p-3 sm:gap-3' : ''}`}>
         {/* API Key Input (collapsible) */}
@@ -222,6 +250,8 @@ function App() {
                           onRequestRematch={requestRematch}
                           hazards={hazards}
                           matchScores={matchScores}
+                          playerProfile={playerProfile}
+                          prevTotalScore={prevTotalScore}
                         />
                       </div>
                     </div>

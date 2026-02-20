@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Trophy, Shield, Crown, Crosshair, Users, LogIn, ChevronRight } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight } from 'lucide-react';
+import { RankBadge } from './RankBadge';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -478,37 +479,21 @@ export const Lobby = ({
                     </button>
 
                     {/* Player Profile & History */}
-                    {playerProfile && playerProfile.matchesPlayed > 0 && (
-                        <div className="card-dark mt-2 p-4 rounded-xl">
-                            <div className="flex items-center gap-2 mb-3">
-                                <Trophy size={16} className="text-[var(--gold)]" />
-                                <span className="text-sm font-bold text-[var(--gold)] font-display">Your Stats</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                                <div>
-                                    <p className="text-lg font-bold text-[var(--gold)]">{playerProfile.totalScore}</p>
-                                    <p className="text-[10px] text-[var(--text-muted)]">Total Score</p>
-                                </div>
-                                <div>
-                                    <p className="text-lg font-bold text-[var(--text-primary)]">{playerProfile.matchesPlayed}</p>
-                                    <p className="text-[10px] text-[var(--text-muted)]">Matches</p>
-                                </div>
-                                <div>
-                                    <p className="text-lg font-bold text-[var(--emerald)]">{playerProfile.matchesWon}</p>
-                                    <p className="text-[10px] text-[var(--text-muted)]">Wins</p>
-                                </div>
-                            </div>
+                    {playerProfile && (
+                        <div className="mt-2">
+                            <RankBadge profile={playerProfile} showProgress />
                             {playerProfile.history.length > 0 && (
-                                <div>
-                                    <p className="text-xs text-[var(--text-muted)] mb-1.5">Recent Matches</p>
-                                    <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
+                                <div className="mt-2 card-dark rounded-xl p-3">
+                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Recent Battles</p>
+                                    <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
                                         {playerProfile.history.slice(0, 5).map((entry, i) => (
-                                            <div key={`${entry.matchId}-${i}`} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-[var(--bg-elevated)]">
-                                                <span className={entry.won ? 'text-[var(--emerald)] font-medium' : 'text-[var(--crimson)] font-medium'}>
+                                            <div key={`${entry.matchId}-${i}`} className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                                                <span className={`font-bold w-5 ${entry.won ? 'text-[var(--emerald)]' : 'text-[var(--crimson)]'}`}>
                                                     {entry.won ? 'W' : 'L'}
                                                 </span>
-                                                <span className="text-[var(--text-secondary)] truncate mx-2">vs {entry.opponentName}</span>
-                                                <span className="text-[var(--gold)] font-mono">{entry.score.totalScore}</span>
+                                                <span className="text-[var(--text-secondary)] truncate flex-1 mx-2">vs {entry.opponentName}</span>
+                                                <span className="text-[var(--text-muted)] text-[10px] mr-2">{entry.rounds.left}–{entry.rounds.right}</span>
+                                                <span className="text-[var(--gold)] font-mono font-bold">+{entry.score.totalScore}</span>
                                             </div>
                                         ))}
                                     </div>
