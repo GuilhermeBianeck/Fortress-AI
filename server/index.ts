@@ -25,6 +25,12 @@ const roomManager = new RoomManager(io);
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
+    // Register player UUID for persistent profiles
+    const playerUuid = socket.handshake.auth?.uuid;
+    if (playerUuid && typeof playerUuid === 'string') {
+        roomManager.registerUuid(socket.id, playerUuid);
+    }
+
     // --- Lobby events ---
 
     socket.on('create_room', (data?: { name?: string; mode?: 'pvp' | 'single' }) => {

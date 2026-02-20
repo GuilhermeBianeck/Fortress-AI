@@ -25,7 +25,8 @@ function generateRoomId(): string {
 export class RoomManager {
     rooms: Map<string, Room> = new Map();
     playerRoomMap: Map<string, string> = new Map(); // socketId → roomId
-    private playerProfiles: Map<string, PlayerProfile> = new Map(); // socketId → profile
+    private playerProfiles: Map<string, PlayerProfile> = new Map(); // uuid → profile
+    private socketUuids: Map<string, string> = new Map(); // socketId → uuid
     private matchmakingQueue: string[] = [];
     private queueNames: Map<string, string> = new Map(); // socketId → name
     private io: Server;
@@ -36,6 +37,14 @@ export class RoomManager {
 
         // Periodic cleanup of empty/stale rooms
         this.cleanupInterval = setInterval(() => this.cleanupStaleRooms(), 60_000);
+    }
+
+    registerUuid(socketId: string, uuid: string): void {
+        if (!uuid || typeof uuid !== 'string') return;
+        // Validate UUID v4 format to prevent arbitrary key injection
+        const uuidV4Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidV4Pattern.test(uuid)) return;
+        this.socketUuids.set(socketId, uuid);
     }
 
     createRoom(hostSocketId: string, name?: string, mode: 'pvp' | 'single' = 'pvp'): Room {
@@ -177,6 +186,8 @@ export class RoomManager {
             room.session?.destroy();
             this.rooms.delete(roomId);
         }
+
+        this.socketUuids.delete(socketId);
     }
 
     getRoom(socketId: string): Room | null {
@@ -350,11 +361,14 @@ export class RoomManager {
     }
 
     getProfile(socketId: string): PlayerProfile | null {
-        return this.playerProfiles.get(socketId) ?? null;
+        const uuid = this.socketUuids.get(socketId);
+        if (uuid) return this.playerProfiles.get(uuid) ?? null;
+        return null;
     }
 
     private getOrCreateProfile(socketId: string, name: string): PlayerProfile {
-        let profile = this.playerProfiles.get(socketId);
+        const uuid = this.socketUuids.get(socketId) ?? socketId;
+        let profile = this.playerProfiles.get(uuid);
         if (!profile) {
             profile = {
                 name,
@@ -362,8 +376,9 @@ export class RoomManager {
                 matchesPlayed: 0,
                 matchesWon: 0,
                 history: [],
+                uuid,
             };
-            this.playerProfiles.set(socketId, profile);
+            this.playerProfiles.set(uuid, profile);
         }
         profile.name = name;
         return profile;

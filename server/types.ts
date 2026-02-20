@@ -102,4 +102,5 @@ export interface PlayerProfile {
     matchesPlayed: number;
     matchesWon: number;
     history: MatchHistoryEntry[];
+    uuid?: string;
 }

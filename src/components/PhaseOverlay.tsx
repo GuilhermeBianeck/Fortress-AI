@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle } from 'lucide-react';
-import type { MatchPhase, Side, MatchScores } from '../types';
+import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle, TrendingUp } from 'lucide-react';
+import type { MatchPhase, Side, MatchScores, PlayerProfile } from '../types';
+import { getRankTier, getNextRankProgress } from '../types';
 
 interface PhaseOverlayProps {
     phase: MatchPhase;
@@ -15,9 +16,11 @@ interface PhaseOverlayProps {
     onRequestRematch?: () => void;
     hazards?: { type: string; id: string; windDirection?: number; windStrength?: number }[];
     matchScores?: MatchScores | null;
+    playerProfile?: PlayerProfile | null;
+    prevTotalScore?: number;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards, matchScores }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards, matchScores, playerProfile, prevTotalScore }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
     useEffect(() => {
@@ -150,6 +153,12 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const winnerName = playerNames?.[matchResult.winner] || (isWinner ? 'You' : 'Opponent');
         const myScore = matchScores?.[mySide];
 
+        // Rank progression
+        const currentRankInfo = playerProfile ? getRankTier(playerProfile.totalScore) : null;
+        const prevRankInfo = (prevTotalScore !== undefined) ? getRankTier(prevTotalScore) : null;
+        const didRankUp = currentRankInfo && prevRankInfo && currentRankInfo.name !== prevRankInfo.name;
+        const rankProgress = playerProfile ? getNextRankProgress(playerProfile.totalScore) : null;
+
         return (
             <div className="flex items-center justify-center w-full">
                 <div className={`rounded-2xl px-6 sm:px-10 py-5 sm:py-8 backdrop-blur-xl border text-center shadow-2xl ${isWinner
@@ -176,7 +185,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     {myScore && (
                         <div className="mt-2 sm:mt-3 border-t border-[var(--border-subtle)] pt-2 sm:pt-3">
                             <p className="text-xs sm:text-sm font-bold text-[var(--gold)] mb-1.5 font-display">
-                                YOUR SCORE: {myScore.totalScore}
+                                YOUR SCORE: +{myScore.totalScore}
                             </p>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-[var(--text-muted)]">
                                 <span className="text-right">Damage dealt:</span>
@@ -195,6 +204,49 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-1">
                                 {myScore.resourcesUsed} blocks · {Math.round(myScore.combatTimeMs / 1000)}s combat · {myScore.damageDealt.toFixed(1)} dmg
                             </p>
+                        </div>
+                    )}
+
+                    {/* Rank progression */}
+                    {currentRankInfo && (
+                        <div className="mt-2 sm:mt-3 border-t border-[var(--border-subtle)] pt-2 sm:pt-3">
+                            {didRankUp ? (
+                                <div className="text-center animate-pulse mb-2">
+                                    <p className="text-xs font-bold text-[var(--emerald)]">🎉 RANK UP!</p>
+                                    <p className="text-sm font-bold" style={{ color: currentRankInfo.color }}>
+                                        {currentRankInfo.emoji} {currentRankInfo.name}
+                                    </p>
+                                    <p className="text-[10px] text-[var(--text-muted)] italic">{currentRankInfo.description}</p>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                    <span className="text-base">{currentRankInfo.emoji}</span>
+                                    <span className="text-xs font-bold" style={{ color: currentRankInfo.color }}>{currentRankInfo.name}</span>
+                                    {playerProfile && (
+                                        <span className="text-[10px] text-[var(--text-muted)] font-mono">{playerProfile.totalScore.toLocaleString()} pts</span>
+                                    )}
+                                </div>
+                            )}
+                            {rankProgress && rankProgress.nextRank && (
+                                <div>
+                                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] mb-1">
+                                        <span>Next: <span style={{ color: rankProgress.nextRank.color }}>{rankProgress.nextRank.emoji} {rankProgress.nextRank.name}</span></span>
+                                        <span className="flex items-center gap-1">
+                                            <TrendingUp size={10} />
+                                            {rankProgress.pointsNeeded.toLocaleString()} pts needed
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                        <div
+                                            className="h-full rounded-full transition-all duration-700"
+                                            style={{
+                                                width: `${Math.round(rankProgress.progress * 100)}%`,
+                                                background: `linear-gradient(90deg, ${currentRankInfo.color}, ${rankProgress.nextRank.color})`,
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
