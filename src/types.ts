@@ -121,6 +121,19 @@ export interface PlayerProfile {
     history: MatchHistoryEntry[];
 }
 
+export interface GamificationStats {
+    level: number;
+    levelProgress: number;
+    pointsToNextLevel: number;
+    currentStreak: number;
+    bestStreak: number;
+    momentum: number;
+    dailyMatches: number;
+    dailyWins: number;
+    dailyMatchTarget: number;
+    dailyWinTarget: number;
+}
+
 // === Ranking ===
 
 export interface RankTier {
@@ -162,4 +175,56 @@ export function getNextRankProgress(totalScore: number): {
         }
     }
     return { nextRank: null, progress: 1, pointsNeeded: 0 };
+}
+
+export function getGamificationStats(profile: PlayerProfile): GamificationStats {
+    const LEVEL_SIZE = 750;
+    const dailyMatchTarget = 3;
+    const dailyWinTarget = 2;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    const level = Math.floor(profile.totalScore / LEVEL_SIZE) + 1;
+    const levelRemainder = profile.totalScore % LEVEL_SIZE;
+    const levelProgress = levelRemainder / LEVEL_SIZE;
+    const pointsToNextLevel = LEVEL_SIZE - levelRemainder;
+
+    let currentStreak = 0;
+    for (const entry of profile.history) {
+        if (!entry.won) break;
+        currentStreak++;
+    }
+
+    let bestStreak = 0;
+    let running = 0;
+    for (const entry of profile.history) {
+        if (entry.won) {
+            running++;
+            bestStreak = Math.max(bestStreak, running);
+        } else {
+            running = 0;
+        }
+    }
+
+    const recent = profile.history.slice(0, 5);
+    const momentum = recent.length > 0
+        ? Math.round((recent.filter(entry => entry.won).length / recent.length) * 100)
+        : 0;
+
+    const todayEntries = profile.history.filter(entry => entry.timestamp >= todayStart);
+    const dailyMatches = todayEntries.length;
+    const dailyWins = todayEntries.filter(entry => entry.won).length;
+
+    return {
+        level,
+        levelProgress,
+        pointsToNextLevel,
+        currentStreak,
+        bestStreak,
+        momentum,
+        dailyMatches,
+        dailyWins,
+        dailyMatchTarget,
+        dailyWinTarget,
+    };
 }

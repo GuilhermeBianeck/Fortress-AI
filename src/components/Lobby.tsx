@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
 import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight } from 'lucide-react';
 import { RankBadge } from './RankBadge';
+import { getGamificationStats } from '../types';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -140,6 +141,7 @@ export const Lobby = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [tipIndex, setTipIndex] = useState(0);
+    const gamification = playerProfile ? getGamificationStats(playerProfile) : null;
 
     useEffect(() => {
         onGetProfile?.();
@@ -482,6 +484,31 @@ export const Lobby = ({
                     {playerProfile && (
                         <div className="mt-2">
                             <RankBadge profile={playerProfile} showProgress />
+                            {gamification && (
+                                <div className="mt-2 card-dark rounded-xl p-3">
+                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Campaign Board</p>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(255,215,0,0.06)' }}>
+                                            <p className="text-[var(--gold)] font-bold">Level {gamification.level}</p>
+                                            <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                                <div className="h-full rounded-full" style={{ width: `${Math.round(gamification.levelProgress * 100)}%`, background: 'linear-gradient(90deg, var(--gold-dim), var(--gold))' }} />
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(231,76,60,0.08)' }}>
+                                            <p className="text-[var(--ember)] font-bold">Streak x{gamification.currentStreak}</p>
+                                            <p className="text-[10px] text-[var(--text-muted)] mt-1">Best x{gamification.bestStreak}</p>
+                                        </div>
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(46,204,113,0.08)' }}>
+                                            <p className="text-[var(--emerald)] font-bold">Daily Battles</p>
+                                            <p className="text-[10px] text-[var(--text-muted)] mt-1">{gamification.dailyMatches}/{gamification.dailyMatchTarget} matches</p>
+                                        </div>
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(52,152,219,0.08)' }}>
+                                            <p className="text-[var(--royal-blue)] font-bold">Daily Victories</p>
+                                            <p className="text-[10px] text-[var(--text-muted)] mt-1">{gamification.dailyWins}/{gamification.dailyWinTarget} wins</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {playerProfile.history.length > 0 && (
                                 <div className="mt-2 card-dark rounded-xl p-3">
                                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Recent Battles</p>
