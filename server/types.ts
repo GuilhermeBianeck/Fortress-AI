@@ -78,6 +78,8 @@ export interface MatchScoreBreakdown {
     resourceBonus: number;
     timeBonus: number;
     winBonus: number;
+    aiBlocksUsed: number;
+    aiSynergyBonus: number;
     totalScore: number;
 }
 

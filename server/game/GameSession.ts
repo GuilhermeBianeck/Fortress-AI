@@ -296,6 +296,7 @@ export class GameSession {
 
             socket.emit('build_success', { count: spawnedCount, thought: plan.thought_chain });
             this.scoreManager.recordResourceUsed(player.side, spawnedCount);
+            this.scoreManager.recordAIBuild(player.side, spawnedCount);
         } catch (err: any) {
             console.error("Build Error:", err);
             socket.emit('build_error', { message: err.message || "AI Generation Failed" });

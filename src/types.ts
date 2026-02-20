@@ -95,6 +95,8 @@ export interface MatchScoreBreakdown {
     resourceBonus: number;
     timeBonus: number;
     winBonus: number;
+    aiBlocksUsed?: number;
+    aiSynergyBonus?: number;
     totalScore: number;
 }
 
@@ -291,4 +293,109 @@ export function getDailyMissions(profile: PlayerProfile): { missions: DailyMissi
         .reduce((sum, mission) => sum + mission.reward, 0);
 
     return { missions, claimableEmbers };
+}
+
+// === Achievements ===
+
+export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
+
+export interface Achievement {
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    rarity: AchievementRarity;
+}
+
+export const ACHIEVEMENT_RARITY_COLORS: Record<AchievementRarity, string> = {
+    common:    '#9CA3AF',
+    rare:      '#60A5FA',
+    epic:      '#A78BFA',
+    legendary: '#F59E0B',
+};
+
+export const ACHIEVEMENTS: readonly Achievement[] = [
+    { id: 'first_match',    title: 'First Steps',        description: 'Fought your first battle',             icon: '⚔️',  rarity: 'common'    },
+    { id: 'first_win',      title: 'First Victory',      description: 'Claimed your first conquest',          icon: '🏆',  rarity: 'common'    },
+    { id: 'on_fire',        title: 'On Fire',            description: 'Achieved a 3-win streak',              icon: '🔥',  rarity: 'rare'      },
+    { id: 'unstoppable',    title: 'Unstoppable',        description: 'Achieved a 5-win streak',              icon: '🌪️', rarity: 'epic'      },
+    { id: 'veteran',        title: 'Seasoned Warrior',   description: 'Played 10 matches',                    icon: '🛡️', rarity: 'rare'      },
+    { id: 'champion',       title: 'Champion',           description: 'Won 10 matches',                       icon: '👑',  rarity: 'epic'      },
+    { id: 'ai_pioneer',     title: 'AI Pioneer',         description: 'Built your first AI-designed fortress', icon: '🤖',  rarity: 'rare'      },
+    { id: 'ai_synergy',     title: 'Human+AI Synergy',   description: 'Won 3 matches with AI builds',         icon: '🔗',  rarity: 'epic'      },
+    { id: 'full_auto',      title: 'Full Automation',    description: 'Won using only AI-placed blocks',      icon: '✨',  rarity: 'legendary' },
+    { id: 'minimalist',     title: 'Minimalist',         description: 'Won with 10 or fewer blocks',          icon: '🎯',  rarity: 'rare'      },
+    { id: 'siege_breaker',  title: 'Siege Breaker',      description: 'Dealt 300+ damage in one match',       icon: '💥',  rarity: 'rare'      },
+    { id: 'lightning',      title: 'Lightning Strike',   description: 'Won in under 30s of combat',           icon: '⚡',  rarity: 'epic'      },
+    { id: 'score_master',   title: 'Score Master',       description: 'Earned 1500+ pts in one match',        icon: '📈',  rarity: 'epic'      },
+    { id: 'synergist_rank', title: 'Ascendant',          description: 'Reached Synergist rank',               icon: '🌟',  rarity: 'legendary' },
+    { id: 'ai_overlord',    title: 'AI Overlord',        description: 'Won 10 matches with AI builds',        icon: '🧠',  rarity: 'legendary' },
+] as const;
+
+export function getUnlockedAchievements(profile: PlayerProfile): Achievement[] {
+    const stats = getGamificationStats(profile);
+    const history = profile.history;
+
+    return ACHIEVEMENTS.filter(achievement => {
+        switch (achievement.id) {
+            case 'first_match':
+                return profile.matchesPlayed >= 1;
+            case 'first_win':
+                return profile.matchesWon >= 1;
+            case 'on_fire':
+                return stats.bestStreak >= 3;
+            case 'unstoppable':
+                return stats.bestStreak >= 5;
+            case 'veteran':
+                return profile.matchesPlayed >= 10;
+            case 'champion':
+                return profile.matchesWon >= 10;
+            case 'ai_pioneer':
+                return history.some(e => (e.score.aiBlocksUsed ?? 0) > 0);
+            case 'ai_synergy':
+                return history.filter(e => e.won && (e.score.aiBlocksUsed ?? 0) > 0).length >= 3;
+            case 'full_auto':
+                return history.some(e =>
+                    e.won &&
+                    (e.score.aiBlocksUsed ?? 0) > 0 &&
+                    e.score.resourcesUsed > 0 &&
+                    (e.score.aiBlocksUsed ?? 0) >= e.score.resourcesUsed
+                );
+            case 'minimalist':
+                return history.some(e => e.won && e.score.resourcesUsed > 0 && e.score.resourcesUsed <= 10);
+            case 'siege_breaker':
+                return history.some(e => e.score.damageDealt >= 300);
+            case 'lightning':
+                return history.some(e => e.won && e.score.combatTimeMs > 0 && e.score.combatTimeMs <= 30000);
+            case 'score_master':
+                return history.some(e => e.score.totalScore >= 1500);
+            case 'synergist_rank':
+                return profile.totalScore >= 10000;
+            case 'ai_overlord':
+                return history.filter(e => e.won && (e.score.aiBlocksUsed ?? 0) > 0).length >= 10;
+            default:
+                return false;
+        }
+    });
+}
+
+// === Performance Grade ===
+
+export type PerformanceGrade = 'S' | 'A' | 'B' | 'C' | 'D';
+
+export const PERFORMANCE_GRADE_COLORS: Record<PerformanceGrade, string> = {
+    S: '#FFD700',
+    A: '#34D399',
+    B: '#60A5FA',
+    C: '#F59E0B',
+    D: '#EF4444',
+};
+
+export function getPerformanceGrade(score: MatchScoreBreakdown): PerformanceGrade {
+    const total = score.totalScore;
+    if (total >= 1500) return 'S';
+    if (total >= 900)  return 'A';
+    if (total >= 500)  return 'B';
+    if (total >= 200)  return 'C';
+    return 'D';
 }

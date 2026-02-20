@@ -6,11 +6,14 @@ import {
     SCORE_TIME_MAX_BONUS,
     SCORE_TIME_THRESHOLD_MS,
     SCORE_WIN_BONUS,
+    SCORE_AI_SYNERGY_BASE,
+    SCORE_AI_SYNERGY_MAX_BONUS,
 } from '../config/constants';
 
 export class ScoreManager {
     private damageDealt: { left: number; right: number } = { left: 0, right: 0 };
     private resourcesUsed: { left: number; right: number } = { left: 0, right: 0 };
+    private aiBlocksUsed: { left: number; right: number } = { left: 0, right: 0 };
     private combatStartTime: number = 0;
     private combatEndTime: number = 0;
 
@@ -20,6 +23,10 @@ export class ScoreManager {
 
     recordResourceUsed(side: Side, count: number = 1): void {
         this.resourcesUsed[side] += count;
+    }
+
+    recordAIBuild(side: Side, blockCount: number): void {
+        this.aiBlocksUsed[side] += blockCount;
     }
 
     startCombatTimer(): void {
@@ -42,6 +49,7 @@ export class ScoreManager {
         const computeForSide = (side: Side): MatchScoreBreakdown => {
             const damage = this.damageDealt[side];
             const resources = this.resourcesUsed[side];
+            const aiBlocks = this.aiBlocksUsed[side];
             const isWinner = side === winner;
 
             // Damage points: proportional to damage dealt
@@ -60,7 +68,16 @@ export class ScoreManager {
 
             const winBonus = isWinner ? SCORE_WIN_BONUS : 0;
 
-            const totalScore = damagePoints + resourceBonus + timeBonus + winBonus;
+            // AI synergy bonus: rewarded for using AI to build the fortress
+            let aiSynergyBonus = 0;
+            if (aiBlocks > 0 && resources > 0) {
+                const aiRatio = aiBlocks / resources;
+                aiSynergyBonus = Math.round(
+                    SCORE_AI_SYNERGY_BASE + aiRatio * (SCORE_AI_SYNERGY_MAX_BONUS - SCORE_AI_SYNERGY_BASE)
+                );
+            }
+
+            const totalScore = damagePoints + resourceBonus + timeBonus + winBonus + aiSynergyBonus;
 
             return {
                 damageDealt: Math.round(damage * 10) / 10,
@@ -70,6 +87,8 @@ export class ScoreManager {
                 resourceBonus,
                 timeBonus,
                 winBonus,
+                aiBlocksUsed: aiBlocks,
+                aiSynergyBonus,
                 totalScore,
             };
         };
@@ -83,6 +102,7 @@ export class ScoreManager {
     reset(): void {
         this.damageDealt = { left: 0, right: 0 };
         this.resourcesUsed = { left: 0, right: 0 };
+        this.aiBlocksUsed = { left: 0, right: 0 };
         this.combatStartTime = 0;
         this.combatEndTime = 0;
     }

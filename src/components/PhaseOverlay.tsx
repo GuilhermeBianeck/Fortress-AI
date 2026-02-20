@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import type { MatchPhase, Side, MatchScores, PlayerProfile } from '../types';
-import { getRankTier, getNextRankProgress } from '../types';
+import { getRankTier, getNextRankProgress, getUnlockedAchievements, getPerformanceGrade, PERFORMANCE_GRADE_COLORS, ACHIEVEMENT_RARITY_COLORS } from '../types';
 
 interface PhaseOverlayProps {
     phase: MatchPhase;
@@ -18,9 +18,10 @@ interface PhaseOverlayProps {
     matchScores?: MatchScores | null;
     playerProfile?: PlayerProfile | null;
     prevTotalScore?: number;
+    prevPlayerProfile?: PlayerProfile | null;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards, matchScores, playerProfile, prevTotalScore }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
     useEffect(() => {
@@ -153,37 +154,75 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const winnerName = playerNames?.[matchResult.winner] || (isWinner ? 'You' : 'Opponent');
         const myScore = matchScores?.[mySide];
 
+        // Performance grade
+        const grade = myScore ? getPerformanceGrade(myScore) : null;
+        const gradeColor = grade ? PERFORMANCE_GRADE_COLORS[grade] : '#9CA3AF';
+
+        // AI synergy
+        const aiBlocksUsed = myScore?.aiBlocksUsed ?? 0;
+        const aiSynergyBonus = myScore?.aiSynergyBonus ?? 0;
+        const aiRatio = (myScore && myScore.resourcesUsed > 0) ? Math.min(100, Math.round((aiBlocksUsed / myScore.resourcesUsed) * 100)) : 0;
+
         // Rank progression
         const currentRankInfo = playerProfile ? getRankTier(playerProfile.totalScore) : null;
         const prevRankInfo = (prevTotalScore !== undefined) ? getRankTier(prevTotalScore) : null;
         const didRankUp = currentRankInfo && prevRankInfo && currentRankInfo.name !== prevRankInfo.name;
         const rankProgress = playerProfile ? getNextRankProgress(playerProfile.totalScore) : null;
 
+        // Achievement unlocks
+        const currentAchievements = playerProfile ? getUnlockedAchievements(playerProfile) : [];
+        const prevAchievements = prevPlayerProfile ? getUnlockedAchievements(prevPlayerProfile) : [];
+        const prevAchievementIds = new Set(prevAchievements.map(a => a.id));
+        const newlyUnlocked = currentAchievements.filter(a => !prevAchievementIds.has(a.id));
+
         return (
             <div className="flex items-center justify-center w-full">
-                <div className={`rounded-2xl px-6 sm:px-10 py-5 sm:py-8 backdrop-blur-xl border text-center shadow-2xl ${isWinner
+                <div className={`rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-xl border text-center shadow-2xl w-full max-w-sm ${isWinner
                     ? 'border-[var(--border-accent)]'
                     : 'border-[rgba(192,57,43,0.4)]'
-                    }`} style={{ background: isWinner ? 'rgba(22, 33, 62, 0.92)' : 'rgba(22, 20, 30, 0.92)' }}>
-                    <div className={`text-xl sm:text-3xl font-bold mb-1 font-heading ${isWinner ? 'text-[var(--gold)] text-glow-gold' : 'text-[var(--crimson)] text-glow-ember'}`}>
-                        <span className="flex items-center justify-center gap-2">
-                            {isWinner ? <Crown size={28} /> : <Skull size={28} />}
-                            {isWinner ? 'VICTORY' : 'DEFEAT'}
-                        </span>
+                    }`} style={{ background: isWinner ? 'rgba(22, 33, 62, 0.95)' : 'rgba(22, 20, 30, 0.95)' }}>
+
+                    {/* Header row: Grade + Result + AI badge */}
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                        {/* Performance grade */}
+                        {grade && (
+                            <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl shrink-0"
+                                style={{ background: `${gradeColor}18`, border: `2px solid ${gradeColor}66` }}>
+                                <span className="text-xl font-black font-mono leading-none" style={{ color: gradeColor }}>{grade}</span>
+                                <span className="text-[8px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">Grade</span>
+                            </div>
+                        )}
+
+                        {/* Victory / Defeat */}
+                        <div className="flex-1">
+                            <div className={`text-lg sm:text-2xl font-bold font-heading ${isWinner ? 'text-[var(--gold)] text-glow-gold' : 'text-[var(--crimson)] text-glow-ember'}`}>
+                                <span className="flex items-center justify-center gap-1.5">
+                                    {isWinner ? <Crown size={22} /> : <Skull size={22} />}
+                                    {isWinner ? 'VICTORY' : 'DEFEAT'}
+                                </span>
+                            </div>
+                            <p className="text-[10px] sm:text-xs text-[var(--text-secondary)]">{winnerName} conquers!</p>
+                            {roundScore && (
+                                <p className="text-[10px] text-[var(--text-muted)]">Rounds: {roundScore.left}–{roundScore.right}</p>
+                            )}
+                            {reasonText && (
+                                <p className="text-[9px] sm:text-xs text-[var(--text-muted)]">{reasonText}</p>
+                            )}
+                        </div>
+
+                        {/* AI Synergy indicator */}
+                        <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl shrink-0"
+                            style={{ background: aiBlocksUsed > 0 ? 'rgba(168,139,250,0.12)' : 'rgba(255,255,255,0.04)', border: `2px solid ${aiBlocksUsed > 0 ? 'rgba(168,139,250,0.4)' : 'rgba(255,255,255,0.1)'}` }}>
+                            <span className="text-base leading-none">{aiBlocksUsed > 0 ? '🤖' : '🔨'}</span>
+                            <span className="text-[8px] mt-0.5 font-bold" style={{ color: aiBlocksUsed > 0 ? '#A78BFA' : 'var(--text-muted)' }}>
+                                {aiBlocksUsed > 0 ? `${aiRatio}% AI` : 'Manual'}
+                            </span>
+                        </div>
                     </div>
-                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-1">{winnerName} conquers!</p>
-                    {roundScore && (
-                        <p className="text-xs sm:text-sm text-[var(--text-muted)] mb-1">
-                            Rounds: {roundScore.left} - {roundScore.right}
-                        </p>
-                    )}
-                    {reasonText && (
-                        <p className="text-[10px] sm:text-sm text-[var(--text-muted)]">{reasonText}</p>
-                    )}
 
                     {/* Score breakdown */}
                     {myScore && (
-                        <div className="mt-2 sm:mt-3 border-t border-[var(--border-subtle)] pt-2 sm:pt-3">
+                        <div className="border-t border-[var(--border-subtle)] pt-2 mt-1">
                             <p className="text-xs sm:text-sm font-bold text-[var(--gold)] mb-1.5 font-display">
                                 YOUR SCORE: +{myScore.totalScore}
                             </p>
@@ -192,6 +231,12 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                 <span className="text-left text-[var(--text-secondary)]">+{myScore.damagePoints}</span>
                                 <span className="text-right">Resource bonus:</span>
                                 <span className="text-left text-[var(--text-secondary)]">+{myScore.resourceBonus}</span>
+                                {aiSynergyBonus > 0 && (
+                                    <>
+                                        <span className="text-right" style={{ color: '#A78BFA' }}>AI synergy:</span>
+                                        <span className="text-left font-bold" style={{ color: '#A78BFA' }}>+{aiSynergyBonus} 🤖</span>
+                                    </>
+                                )}
                                 <span className="text-right">Time bonus:</span>
                                 <span className="text-left text-[var(--text-secondary)]">+{myScore.timeBonus}</span>
                                 {myScore.winBonus > 0 && (
@@ -201,17 +246,36 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                     </>
                                 )}
                             </div>
-                            <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-1">
+                            <p className="text-[10px] text-[var(--text-muted)] mt-1">
                                 {myScore.resourcesUsed} blocks · {Math.round(myScore.combatTimeMs / 1000)}s combat · {myScore.damageDealt.toFixed(1)} dmg
                             </p>
                         </div>
                     )}
 
+                    {/* Newly unlocked achievements */}
+                    {newlyUnlocked.length > 0 && (
+                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
+                            <p className="text-[10px] font-bold text-[var(--emerald)] uppercase tracking-wider mb-1.5 flex items-center justify-center gap-1">
+                                <Zap size={10} />
+                                Achievement{newlyUnlocked.length > 1 ? 's' : ''} Unlocked!
+                            </p>
+                            <div className="flex flex-wrap justify-center gap-1.5">
+                                {newlyUnlocked.map(a => (
+                                    <div key={a.id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold"
+                                        style={{ background: `${ACHIEVEMENT_RARITY_COLORS[a.rarity]}18`, border: `1px solid ${ACHIEVEMENT_RARITY_COLORS[a.rarity]}55`, color: ACHIEVEMENT_RARITY_COLORS[a.rarity] }}>
+                                        <span>{a.icon}</span>
+                                        <span>{a.title}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Rank progression */}
                     {currentRankInfo && (
-                        <div className="mt-2 sm:mt-3 border-t border-[var(--border-subtle)] pt-2 sm:pt-3">
+                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
                             {didRankUp ? (
-                                <div className="text-center animate-pulse mb-2">
+                                <div className="text-center animate-pulse mb-1.5">
                                     <p className="text-xs font-bold text-[var(--emerald)]">🎉 RANK UP!</p>
                                     <p className="text-sm font-bold" style={{ color: currentRankInfo.color }}>
                                         {currentRankInfo.emoji} {currentRankInfo.name}
@@ -219,7 +283,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                     <p className="text-[10px] text-[var(--text-muted)] italic">{currentRankInfo.description}</p>
                                 </div>
                             ) : (
-                                <div className="flex items-center justify-center gap-2 mb-2">
+                                <div className="flex items-center justify-center gap-2 mb-1.5">
                                     <span className="text-base">{currentRankInfo.emoji}</span>
                                     <span className="text-xs font-bold" style={{ color: currentRankInfo.color }}>{currentRankInfo.name}</span>
                                     {playerProfile && (
@@ -233,7 +297,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                         <span>Next: <span style={{ color: rankProgress.nextRank.color }}>{rankProgress.nextRank.emoji} {rankProgress.nextRank.name}</span></span>
                                         <span className="flex items-center gap-1">
                                             <TrendingUp size={10} />
-                                            {rankProgress.pointsNeeded.toLocaleString()} pts needed
+                                            {rankProgress.pointsNeeded.toLocaleString()} pts
                                         </span>
                                     </div>
                                     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
@@ -252,7 +316,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
                     {/* Rematch button */}
                     {onRequestRematch && (
-                        <div className="mt-3 sm:mt-4">
+                        <div className="mt-3">
                             {rematchState === 'none' && (
                                 <button
                                     onClick={onRequestRematch}

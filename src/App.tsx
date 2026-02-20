@@ -16,7 +16,7 @@ function App() {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards,
-    matchScores, playerProfile,
+    matchScores, playerProfile, prevPlayerProfile,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
     sendChatMessage, requestRematch, getProfile,
@@ -252,6 +252,7 @@ function App() {
                           matchScores={matchScores}
                           playerProfile={playerProfile}
                           prevTotalScore={prevTotalScore}
+                          prevPlayerProfile={prevPlayerProfile}
                         />
                       </div>
                     </div>
