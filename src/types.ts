@@ -134,6 +134,10 @@ export interface GamificationStats {
     dailyWinTarget: number;
 }
 
+export const GAMIFICATION_LEVEL_SIZE = 750;
+export const GAMIFICATION_DAILY_MATCH_TARGET = 3;
+export const GAMIFICATION_DAILY_WIN_TARGET = 2;
+
 // === Ranking ===
 
 export interface RankTier {
@@ -178,40 +182,41 @@ export function getNextRankProgress(totalScore: number): {
 }
 
 export function getGamificationStats(profile: PlayerProfile): GamificationStats {
-    const LEVEL_SIZE = 750;
-    const dailyMatchTarget = 3;
-    const dailyWinTarget = 2;
+    const dailyMatchTarget = GAMIFICATION_DAILY_MATCH_TARGET;
+    const dailyWinTarget = GAMIFICATION_DAILY_WIN_TARGET;
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const isUnordered = profile.history.some((entry, idx, arr) => idx > 0 && arr[idx - 1].timestamp < entry.timestamp);
+    const orderedHistory = !isUnordered
+        ? profile.history
+        : [...profile.history].sort((a, b) => b.timestamp - a.timestamp);
 
-    const level = Math.floor(profile.totalScore / LEVEL_SIZE) + 1;
-    const levelRemainder = profile.totalScore % LEVEL_SIZE;
-    const levelProgress = levelRemainder / LEVEL_SIZE;
-    const pointsToNextLevel = LEVEL_SIZE - levelRemainder;
+    const level = Math.floor(profile.totalScore / GAMIFICATION_LEVEL_SIZE) + 1;
+    const levelRemainder = profile.totalScore % GAMIFICATION_LEVEL_SIZE;
+    const levelProgress = levelRemainder / GAMIFICATION_LEVEL_SIZE;
+    const pointsToNextLevel = GAMIFICATION_LEVEL_SIZE - levelRemainder;
 
     let currentStreak = 0;
-    for (const entry of profile.history) {
-        if (!entry.won) break;
-        currentStreak++;
-    }
-
     let bestStreak = 0;
-    let running = 0;
-    for (const entry of profile.history) {
+    let streakCounter = 0;
+    let trackingCurrentStreak = true;
+    for (const entry of orderedHistory) {
         if (entry.won) {
-            running++;
-            bestStreak = Math.max(bestStreak, running);
+            streakCounter++;
+            bestStreak = Math.max(bestStreak, streakCounter);
+            if (trackingCurrentStreak) currentStreak++;
         } else {
-            running = 0;
+            streakCounter = 0;
+            trackingCurrentStreak = false;
         }
     }
 
-    const recent = profile.history.slice(0, 5);
+    const recent = orderedHistory.slice(0, 5);
     const momentum = recent.length > 0
         ? Math.round((recent.filter(entry => entry.won).length / recent.length) * 100)
         : 0;
 
-    const todayEntries = profile.history.filter(entry => entry.timestamp >= todayStart);
+    const todayEntries = orderedHistory.filter(entry => entry.timestamp >= todayStart);
     const dailyMatches = todayEntries.length;
     const dailyWins = todayEntries.filter(entry => entry.won).length;
 
