@@ -46,13 +46,18 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
     if (phase === 'build') {
         return (
             <div className="w-full relative pointer-events-none">
-                {/* Build Banner - Centered, Two Lines */}
+                {/* Build Banner - Centered, inline timer */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-2xl text-center" style={{ background: 'rgba(22, 33, 62, 0.85)' }}>
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         <Hammer size={14} className="text-[var(--emerald)]" />
                         <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
                             {currentRound ? `R${currentRound} — ` : ''}BUILD
                         </span>
+                        {timeLeft !== null && (
+                            <span className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${timeLeft <= 10 ? 'timer-urgent' : 'text-[var(--text-secondary)]'}`}>
+                                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                            </span>
+                        )}
                     </div>
                     {roundScore && (
                         <span className="text-[var(--gold-dim)] text-[10px] sm:text-xs font-medium tracking-wider">
@@ -60,15 +65,6 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         </span>
                     )}
                 </div>
-
-                {/* Build Timer - Centered and Moved Down (below Done button) */}
-                {timeLeft !== null && (
-                    <div className="absolute top-[110px] left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center">
-                        <div className={`font-mono font-bold text-sm sm:text-lg transition-all duration-300 ${timeLeft <= 10 ? 'timer-urgent' : 'text-[var(--text-primary)]'}`}>
-                            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-                        </div>
-                    </div>
-                )}
             </div>
         );
     }
@@ -106,7 +102,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const windHazard = hazards?.find(h => h.type === 'wind_zone');
         return (
             <div className="w-full relative pointer-events-none">
-                {/* Combat Banner - Centered */}
+                {/* Combat Banner - Centered, inline timer */}
                 <div className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border pointer-events-auto shadow-2xl text-center ${isMyTurn
                     ? 'border-[rgba(192,57,43,0.4)]'
                     : 'border-[var(--border-subtle)]'
@@ -116,27 +112,35 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
                             {isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? "BOT'S TURN..." : "OPPONENT'S TURN")}
                         </span>
+                        {timeLeft !== null && (
+                            <span className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${timeLeft <= 5 ? 'timer-urgent' : isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
+                                {timeLeft}s
+                            </span>
+                        )}
                     </div>
+                    {/* Mobile: compact controls hint when it's your turn */}
+                    {isMyTurn && (
+                        <p className="sm:hidden text-[9px] text-[var(--text-muted)] mt-0.5">
+                            Tap and drag to aim · release to fire
+                        </p>
+                    )}
                 </div>
 
                 {/* Wind Indicator - Centered Below Banner */}
                 {windHazard && (
-                    <div className="absolute top-[45px] left-1/2 -translate-x-1/2 pointer-events-auto">
-                        <div className="flex items-center gap-1 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md border border-[rgba(52,152,219,0.3)]" style={{ background: 'rgba(52,152,219,0.1)' }}>
-                            <Wind size={14} className="text-[var(--royal-blue)]" />
-                            <span className="text-[var(--royal-blue)] text-[10px] sm:text-xs font-bold">
-                                {(windHazard.windDirection ?? 1) > 0 ? '\u2192' : '\u2190'} {Math.round((windHazard.windStrength ?? 0.0003) * 20000)} KNOTS
-                            </span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Combat Timer - Centered Below (similar position to Build timer) */}
-                {timeLeft !== null && (
-                    <div className="absolute top-[110px] left-1/2 -translate-x-1/2 pointer-events-auto flex flex-col items-center">
-                        <div className={`font-mono font-bold text-sm sm:text-lg transition-all duration-300 ${timeLeft <= 5 ? 'timer-urgent' : 'text-[var(--text-primary)]'}`}>
-                            {timeLeft}s
-                        </div>
+                    <div className="absolute top-[52px] sm:top-[45px] left-1/2 -translate-x-1/2 pointer-events-auto">
+                        {(() => {
+                            const windSpeed = Math.round((windHazard.windStrength ?? 0.0003) * 20000);
+                            const windLabel = windSpeed < 4 ? 'Light' : windSpeed < 8 ? 'Moderate' : 'Strong';
+                            return (
+                                <div className="flex items-center gap-1 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md border border-[rgba(52,152,219,0.3)]" style={{ background: 'rgba(52,152,219,0.1)' }}>
+                                    <Wind size={14} className="text-[var(--royal-blue)]" />
+                                    <span className="text-[var(--royal-blue)] text-[10px] sm:text-xs font-bold">
+                                        {(windHazard.windDirection ?? 1) > 0 ? '→' : '←'} Wind · {windLabel}
+                                    </span>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
