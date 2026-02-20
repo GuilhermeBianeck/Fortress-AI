@@ -90,6 +90,8 @@ export const SCORE_RESOURCE_THRESHOLD = 50;      // max blocks before bonus drop
 export const SCORE_TIME_MAX_BONUS = 300;         // max bonus for fast kills
 export const SCORE_TIME_THRESHOLD_MS = 120_000;  // combat time after which time bonus is 0
 export const SCORE_WIN_BONUS = 500;              // flat bonus for winning
+export const SCORE_AI_SYNERGY_BASE = 80;         // base bonus for using AI at all
+export const SCORE_AI_SYNERGY_MAX_BONUS = 200;   // max bonus when all blocks are AI-placed
 export const MAX_MATCH_HISTORY = 20;             // max history entries per player
 
 // === Bot AI ===

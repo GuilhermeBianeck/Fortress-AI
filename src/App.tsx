@@ -16,7 +16,7 @@ function App() {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards,
-    matchScores, playerProfile,
+    matchScores, playerProfile, prevPlayerProfile,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
     sendChatMessage, requestRematch, getProfile,
@@ -28,6 +28,7 @@ function App() {
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
   const [gameMode, setGameMode] = useState<GameMode>('build');
   const [showChat, setShowChat] = useState(false);
+  const [spawnCount, setSpawnCount] = useState(0);
 
   // Player name state (persisted)
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('fortress_player_name') || '');
@@ -59,6 +60,13 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [phase]);
 
+  // Reset spawn counter when build phase starts
+  useEffect(() => {
+    if (phase === 'build') {
+      setSpawnCount(0);
+    }
+  }, [phase]);
+
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
     localStorage.setItem('fortress_api_key', value);
@@ -66,6 +74,7 @@ function App() {
 
   const handleSpawn = (x: number, y: number) => {
     spawnBox(x, y, selectedMaterial, selectedShape);
+    setSpawnCount(c => c + 1);
   };
 
   const handleSubmitPrompt = (e: FormEvent) => {
@@ -252,6 +261,7 @@ function App() {
                           matchScores={matchScores}
                           playerProfile={playerProfile}
                           prevTotalScore={prevTotalScore}
+                          prevPlayerProfile={prevPlayerProfile}
                         />
                       </div>
                     </div>
@@ -295,6 +305,7 @@ function App() {
                         onModeChange={setGameMode}
                         phase={phase}
                         onReady={playerReady}
+                        blockCount={spawnCount}
                       />
                     </div>
                   )}
@@ -323,6 +334,7 @@ function App() {
                   onModeChange={setGameMode}
                   phase={phase}
                   onReady={playerReady}
+                  blockCount={spawnCount}
                 />
               </div>
             )}
@@ -361,7 +373,7 @@ function App() {
 
             {/* Prompt Input — only in build mode during build phase */}
             {phase === 'build' && gameMode === 'build' && (
-              <form onSubmit={handleSubmitPrompt} className="w-full card-dark rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3 hidden sm:flex">
+              <form onSubmit={handleSubmitPrompt} className="w-full card-dark rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3">
                 <div className="p-2 sm:p-2.5 bg-[var(--bg-deep)] rounded-lg shrink-0">
                   <Terminal size={16} className="text-[var(--gold)]" />
                 </div>
@@ -369,7 +381,7 @@ function App() {
                   type="text"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your fortress..."
+                  placeholder="Describe your fortress to AI..."
                   className="w-full min-w-0 bg-transparent outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)] font-mono text-xs sm:text-sm"
                   disabled={isBuilding}
                 />
@@ -385,7 +397,7 @@ function App() {
               </form>
             )}
 
-            {/* Combat hint — desktop only */}
+            {/* Combat hint — desktop only (mobile hint is shown in PhaseOverlay) */}
             {phase === 'combat' && turnPlayer === mySide && (
               <div className="hidden sm:block text-[10px] sm:text-xs text-[var(--text-muted)] font-mono text-center">
                 Drag to aim &amp; fire &middot; Scroll / &uarr;&darr; to adjust power &middot; &larr;&rarr; to adjust angle &middot; Space to fire &middot; A/D to pan

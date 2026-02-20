@@ -65,6 +65,8 @@ export const useGameState = () => {
     const [hazards, setHazards] = useState<{ type: string; id: string; position: { x: number; y: number }; width: number; height: number; windDirection?: number; windStrength?: number }[]>([]);
     const [matchScores, setMatchScores] = useState<MatchScores | null>(null);
     const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(() => loadStoredProfile());
+    const [prevPlayerProfile, setPrevPlayerProfile] = useState<PlayerProfile | null>(null);
+    const playerProfileRef = useRef<PlayerProfile | null>(loadStoredProfile());
 
     const socketRef = useRef<Socket | null>(null);
     const mySideRef = useRef<Side>('left');
@@ -267,6 +269,8 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('profile_update', (data: PlayerProfile | null) => {
+            setPrevPlayerProfile(playerProfileRef.current);
+            playerProfileRef.current = data;
             setPlayerProfile(data);
             if (data) saveProfileToStorage(data);
         });
@@ -348,7 +352,7 @@ export const useGameState = () => {
         gameState, terrain, buildStatus, kingsHp,
         roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
         chatMessages, rematchState, roundScore, currentRound, hazards,
-        matchScores, playerProfile,
+        matchScores, playerProfile, prevPlayerProfile,
         createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
         spawnBox, requestBuild, fireProjectile,
         sendChatMessage, requestRematch, getProfile,

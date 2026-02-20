@@ -12,6 +12,7 @@ interface GodToolsProps {
     onModeChange: (m: GameMode) => void;
     phase: MatchPhase;
     onReady: () => void;
+    blockCount?: number;
 }
 
 const MATERIALS: { key: MaterialType; label: string; icon: string }[] = [
@@ -44,6 +45,7 @@ export const GodTools = ({
     onModeChange,
     phase,
     onReady,
+    blockCount = 0,
 }: GodToolsProps) => {
     const [isReady, setIsReady] = useState(false);
 
@@ -162,6 +164,17 @@ export const GodTools = ({
                 <div className="flex items-center gap-2 border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
                     <Eye size={14} className="text-[var(--text-muted)]" />
                     <span className="text-xs font-medium text-[var(--text-muted)]">Preview mode — survey the battlefield</span>
+                </div>
+            )}
+
+            {/* Block counter badge */}
+            {blockCount > 0 && (
+                <div
+                    aria-label={`${blockCount} blocks placed`}
+                    className="flex items-center gap-1 border border-[var(--border-subtle)] rounded-lg px-2 sm:px-2.5 py-1 sm:py-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
+                    <span className="text-[10px] sm:text-xs font-mono font-bold text-[var(--gold)]">{blockCount}</span>
+                    <span className="text-[9px] sm:text-[10px] text-[var(--text-muted)] hidden sm:inline">blocks</span>
+                    <span aria-hidden="true" className="text-[9px] text-[var(--text-muted)] sm:hidden">blk</span>
                 </div>
             )}
 
