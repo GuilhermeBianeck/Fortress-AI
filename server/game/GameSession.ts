@@ -34,6 +34,8 @@ export class GameSession {
     private io: Server;
     private roomId: string;
     private projectileTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
+    private projectileBodies: Set<Matter.Body> = new Set();
+    private kingsMap: Map<Side, KingState> = new Map();
     private stateMachine: MatchStateMachine;
     private onPhaseChangeCallback?: (phase: MatchPhase) => void;
     private onRoundEndCallback?: (winner: Side, reason: string) => 'continue' | 'match_over';
@@ -71,6 +73,11 @@ export class GameSession {
             };
 
             this.players.set(info.socketId, playerState);
+        }
+
+        // Pre-build kingsMap for use in tickHazards (avoids per-tick allocation)
+        for (const ps of this.players.values()) {
+            this.kingsMap.set(ps.side, ps.kingState);
         }
 
         this.setupCollisionHandlers();
@@ -354,6 +361,7 @@ export class GameSession {
         // Auto-remove after lifespan
         const timer = setTimeout(() => this.removeProjectile(body), PROJECTILE_LIFESPAN_MS);
         this.projectileTimers.set(body.id, timer);
+        this.projectileBodies.add(body);
 
         console.log(`Projectile fired by ${side}: angle=${(angle * 180 / Math.PI).toFixed(1)}deg power=${power.toFixed(1)}`);
 
@@ -387,6 +395,7 @@ export class GameSession {
             clearTimeout(timer);
         }
         this.projectileTimers.clear();
+        this.projectileBodies.clear();
         for (const timer of this.hazardTimers) {
             clearInterval(timer);
         }
@@ -422,15 +431,14 @@ export class GameSession {
     private tickHazards(): void {
         if (this.hazards.length === 0) return;
 
-        // Wind
-        applyWindForce(this.world, this.hazards);
+        // Fetch all bodies once and share between hazard helpers
+        const bodies = Matter.Composite.allBodies(this.world);
 
-        // Lava
-        const kingsMap = new Map<Side, KingState>();
-        for (const ps of this.players.values()) {
-            kingsMap.set(ps.side, ps.kingState);
-        }
-        checkLavaDamage(this.world, this.hazards, kingsMap, (side, damage) => {
+        // Wind
+        applyWindForce(bodies, this.hazards);
+
+        // Lava — reuse the pre-built kingsMap member variable
+        checkLavaDamage(bodies, this.world, this.hazards, this.kingsMap, (side, damage) => {
             const ps = this.getPlayerBySide(side);
             if (ps) {
                 this.io.to(this.roomId).emit('king_damage', {
@@ -508,8 +516,6 @@ export class GameSession {
         });
 
         // Tag with side for collision identification
-        (body as any).side = side;
-
         (body as any).side = side;
 
         Matter.World.add(this.world, body);
@@ -741,10 +747,8 @@ export class GameSession {
     }
 
     private checkProjectileBounds() {
-        const bodies = Matter.Composite.allBodies(this.world);
         const tickMaxSpeed = PHYSICS_MAX_SPEED;
-        for (const body of bodies) {
-            if (body.label !== 'projectile') continue;
+        for (const body of this.projectileBodies) {
             if (body.position.y > CANVAS_HEIGHT + 50 ||
                 body.position.x < -50 ||
                 body.position.x > WORLD_WIDTH + 50) {
@@ -764,10 +768,10 @@ export class GameSession {
     }
 
     private removeProjectile(body: Matter.Body) {
-        // Check if body is still in the world
-        const bodies = Matter.Composite.allBodies(this.world);
-        if (bodies.includes(body)) {
+        // Use the projectile Set for O(1) membership check
+        if (this.projectileBodies.has(body)) {
             Matter.Composite.remove(this.world, body);
+            this.projectileBodies.delete(body);
         }
 
         const timer = this.projectileTimers.get(body.id);

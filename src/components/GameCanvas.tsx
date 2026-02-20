@@ -171,6 +171,15 @@ export const GameCanvas = ({
     // Projectile trails: bodyId -> last N positions
     const trailsRef = useRef<Map<number, Vector[]>>(new Map());
 
+    // Gradient cache: recreated only when canvas logical dimensions change
+    const gradientCacheRef = useRef<{
+        skyBg: CanvasGradient | null;
+        horizonGlow: CanvasGradient | null;
+        terrainFill: CanvasGradient | null;
+        canvasW: number;
+        canvasH: number;
+    }>({ skyBg: null, horizonGlow: null, terrainFill: null, canvasW: 0, canvasH: 0 });
+
     // Previous kings HP for shake detection
     const prevKingsHpRef = useRef(kingsHp);
 
@@ -397,20 +406,41 @@ export const GameCanvas = ({
             shake.remaining--;
         }
 
-        // Dark twilight sky gradient
-        const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        bgGrad.addColorStop(0, '#0a0a14');
-        bgGrad.addColorStop(0.2, '#0d0d1a');
-        bgGrad.addColorStop(0.45, '#141428');
-        bgGrad.addColorStop(0.7, '#1a1a3e');
-        bgGrad.addColorStop(0.88, '#2a1a1a');
-        bgGrad.addColorStop(1, '#1a1008');
-        ctx.fillStyle = bgGrad;
+        // Single timestamp for the entire frame — avoids multiple Date.now() calls
+        const nowMs = Date.now();
+
+        // Rebuild gradients only when canvas logical size changes
+        const gradCache = gradientCacheRef.current;
+        if (gradCache.canvasW !== width || gradCache.canvasH !== height) {
+            gradCache.skyBg = ctx.createLinearGradient(0, 0, 0, height);
+            gradCache.skyBg.addColorStop(0, '#0a0a14');
+            gradCache.skyBg.addColorStop(0.2, '#0d0d1a');
+            gradCache.skyBg.addColorStop(0.45, '#141428');
+            gradCache.skyBg.addColorStop(0.7, '#1a1a3e');
+            gradCache.skyBg.addColorStop(0.88, '#2a1a1a');
+            gradCache.skyBg.addColorStop(1, '#1a1008');
+
+            gradCache.horizonGlow = ctx.createRadialGradient(width / 2, height * 0.85, 0, width / 2, height * 0.85, width * 0.6);
+            gradCache.horizonGlow.addColorStop(0, 'rgba(180, 100, 30, 0.08)');
+            gradCache.horizonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+            gradCache.terrainFill = ctx.createLinearGradient(0, 400, 0, height);
+            gradCache.terrainFill.addColorStop(0, '#2a3a20');
+            gradCache.terrainFill.addColorStop(0.15, '#1e2a18');
+            gradCache.terrainFill.addColorStop(0.4, '#1e1510');
+            gradCache.terrainFill.addColorStop(1, '#0e0a08');
+
+            gradCache.canvasW = width;
+            gradCache.canvasH = height;
+        }
+
+        // Dark twilight sky gradient (cached)
+        ctx.fillStyle = gradCache.skyBg!;
         ctx.fillRect(-10, -10, width + 20, height + 20);
 
         // Twinkling stars (upper sky only)
         const starSeed = 42;
-        const starTime = Date.now() / 1000;
+        const starTime = nowMs / 1000;
         for (let i = 0; i < 60; i++) {
             const sx = ((i * 137.508 + starSeed * 73) % (width + 200)) - 100;
             const sy = ((i * 97.3 + starSeed * 31) % (height * 0.55));
@@ -422,11 +452,8 @@ export const GameCanvas = ({
             ctx.fill();
         }
 
-        // Subtle horizon glow
-        const horizonGlow = ctx.createRadialGradient(width / 2, height * 0.85, 0, width / 2, height * 0.85, width * 0.6);
-        horizonGlow.addColorStop(0, 'rgba(180, 100, 30, 0.08)');
-        horizonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = horizonGlow;
+        // Subtle horizon glow (cached)
+        ctx.fillStyle = gradCache.horizonGlow!;
         ctx.fillRect(0, 0, width, height);
 
         // Initialize dark storm clouds
@@ -596,13 +623,8 @@ export const GameCanvas = ({
             ctx.lineTo(WORLD_WIDTH, canvas.height);
             ctx.closePath();
 
-            // Dark earth terrain gradient
-            const terrainGrad = ctx.createLinearGradient(0, 400, 0, canvas.height);
-            terrainGrad.addColorStop(0, '#2a3a20');
-            terrainGrad.addColorStop(0.15, '#1e2a18');
-            terrainGrad.addColorStop(0.4, '#1e1510');
-            terrainGrad.addColorStop(1, '#0e0a08');
-            ctx.fillStyle = terrainGrad;
+            // Dark earth terrain gradient (cached)
+            ctx.fillStyle = gradCache.terrainFill!;
             ctx.fill();
 
             // Gold-tinted terrain edge
@@ -643,7 +665,7 @@ export const GameCanvas = ({
         // Draw hazard zones
         const hzds = hazardsRef.current;
         if (hzds) {
-            const animPhase = Date.now() / 1000;
+            const animPhase = nowMs / 1000;
             for (const h of hzds) {
                 if (h.type === 'wind_zone') {
                     // Subtle blue tint
@@ -914,17 +936,13 @@ export const GameCanvas = ({
 
                 if (body.circleRadius > 0) {
                     if (body.label === 'king') {
-                        // King: golden glow instead of drop shadow
+                        // King: golden glow drop shadow
                         ctx.shadowColor = 'rgba(255, 215, 0, 0.4)';
                         ctx.shadowBlur = 8;
                         ctx.shadowOffsetX = 0;
                         ctx.shadowOffsetY = 0;
-                    } else {
-                        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                        ctx.shadowBlur = 6;
-                        ctx.shadowOffsetX = 2;
-                        ctx.shadowOffsetY = 2;
                     }
+                    // Skip shadowBlur for projectiles and other circles — they use the glow effect below
 
                     ctx.beginPath();
                     ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
@@ -956,10 +974,6 @@ export const GameCanvas = ({
                         ctx.fill();
                     }
                 } else if (!body.isStatic || body.label === 'foundation') {
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                    ctx.shadowBlur = 6;
-                    ctx.shadowOffsetX = 2;
-                    ctx.shadowOffsetY = 2;
                     const w = body.width || 50;
                     const h = body.height || 50;
                     ctx.fillStyle = fillColor;
@@ -975,8 +989,6 @@ export const GameCanvas = ({
                     // Block damage visuals (cracks + desaturation)
                     if (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0) {
                         const hpRatio = body.blockHp / body.blockMaxHp;
-                        ctx.shadowColor = 'transparent';
-                        ctx.shadowBlur = 0;
 
                         if (hpRatio <= 0.66) {
                             // Draw cracks
