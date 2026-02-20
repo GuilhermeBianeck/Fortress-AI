@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift } from 'lucide-react';
 import { RankBadge } from './RankBadge';
+import { getGamificationStats, getDailyMissions, getUtcDayStartMs } from '../types';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -140,6 +141,19 @@ export const Lobby = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [tipIndex, setTipIndex] = useState(0);
+    const [missionDayKey, setMissionDayKey] = useState(() => String(getUtcDayStartMs(new Date())));
+    const [missionToast, setMissionToast] = useState<string | null>(null);
+    const [claimedMissionDay, setClaimedMissionDay] = useState(() => localStorage.getItem('fortress_missions_claim_day') || '');
+    const claimToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const gamification = playerProfile ? getGamificationStats(playerProfile) : null;
+    const dailyMissions = playerProfile ? getDailyMissions(playerProfile) : null;
+    const claimedMissionRewards = claimedMissionDay === missionDayKey;
+    const claimableEmbers = dailyMissions && !claimedMissionRewards ? dailyMissions.claimableEmbers : 0;
+    const claimButtonLabel = claimedMissionRewards
+        ? 'Rewards claimed today'
+        : claimableEmbers > 0
+            ? `Claim ${claimableEmbers} Embers`
+            : 'Complete missions to claim rewards';
 
     useEffect(() => {
         onGetProfile?.();
@@ -148,6 +162,22 @@ export const Lobby = ({
     useEffect(() => {
         const t = setInterval(() => setTipIndex(i => (i + 1) % TIPS.length), 4000);
         return () => clearInterval(t);
+    }, []);
+
+    useEffect(() => {
+        const t = setInterval(() => {
+            const nextDayKey = String(getUtcDayStartMs(new Date()));
+            setMissionDayKey(prev => prev === nextDayKey ? prev : nextDayKey);
+        }, 60000);
+        return () => clearInterval(t);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (claimToastTimeoutRef.current) {
+                clearTimeout(claimToastTimeoutRef.current);
+            }
+        };
     }, []);
 
     // Parallax mouse tracking
@@ -170,6 +200,22 @@ export const Lobby = ({
         if (isReady) return;
         setIsReady(true);
         onReady();
+    };
+
+    const handleClaimMissionRewards = () => {
+        if (!dailyMissions || dailyMissions.claimableEmbers <= 0 || claimedMissionRewards) return;
+        // Client-only interim claim state; backend reward persistence can replace this flow later.
+        setClaimedMissionDay(missionDayKey);
+        localStorage.setItem('fortress_missions_claim_day', missionDayKey);
+        setMissionToast(`+${dailyMissions.claimableEmbers} Embers claimed!`);
+        if (claimToastTimeoutRef.current) clearTimeout(claimToastTimeoutRef.current);
+        claimToastTimeoutRef.current = setTimeout(() => setMissionToast(null), 2500);
+    };
+
+    const getMissionStatus = (mission: { completed: boolean; current: number; target: number }) => {
+        if (mission.completed && claimedMissionRewards) return { label: 'CLAIMED', className: 'text-[var(--gold)]' };
+        if (mission.completed) return { label: 'COMPLETED', className: 'text-[var(--emerald)]' };
+        return { label: `${mission.current}/${mission.target}`, className: 'text-[var(--text-muted)]' };
     };
 
     // ─── Waiting Room View — VS Card ───
@@ -482,6 +528,81 @@ export const Lobby = ({
                     {playerProfile && (
                         <div className="mt-2">
                             <RankBadge profile={playerProfile} showProgress />
+                            {gamification && (
+                                <div className="mt-2 card-dark rounded-xl p-3">
+                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Campaign Board</p>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(255,215,0,0.06)' }}>
+                                            <p className="text-[var(--gold)] font-bold">Level {gamification.level}</p>
+                                            <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                                <div className="h-full rounded-full" style={{ width: `${Math.round(gamification.levelProgress * 100)}%`, background: 'linear-gradient(90deg, var(--gold-dim), var(--gold))' }} />
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(231,76,60,0.08)' }}>
+                                            <p className="text-[var(--ember)] font-bold">Streak x{gamification.currentStreak}</p>
+                                            <p className="text-[10px] text-[var(--text-muted)] mt-1">Best x{gamification.bestStreak}</p>
+                                        </div>
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(46,204,113,0.08)' }}>
+                                            <p className="text-[var(--emerald)] font-bold">Daily Battles</p>
+                                            <p className="text-[10px] text-[var(--text-muted)] mt-1">{gamification.dailyMatches}/{gamification.dailyMatchTarget} matches</p>
+                                        </div>
+                                        <div className="rounded-lg p-2" style={{ background: 'rgba(52,152,219,0.08)' }}>
+                                            <p className="text-[var(--royal-blue)] font-bold">Daily Victories</p>
+                                            <p className="text-[10px] text-[var(--text-muted)] mt-1">{gamification.dailyWins}/{gamification.dailyWinTarget} wins</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {dailyMissions && (
+                                <div className="mt-2 card-dark rounded-xl p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                                            <Target size={12} />
+                                            Daily Missions
+                                        </p>
+                                        <span className="text-[10px] text-[var(--gold)] font-bold flex items-center gap-1">
+                                            <Gift size={11} />
+                                            {claimableEmbers} Embers
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        {dailyMissions.missions.map((mission) => {
+                                            const missionStatus = getMissionStatus(mission);
+                                            return (
+                                            <div key={mission.id} className="rounded-lg px-2 py-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <p className="text-xs text-[var(--text-secondary)]">{mission.title}</p>
+                                                    <span className={`text-[10px] font-bold ${missionStatus.className}`}>
+                                                        {missionStatus.label}
+                                                    </span>
+                                                </div>
+                                                <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-500"
+                                                        style={{ width: `${Math.round(mission.progress * 100)}%`, background: mission.completed ? 'linear-gradient(90deg, var(--emerald), #9be7b3)' : 'linear-gradient(90deg, var(--royal-blue), #75b8ff)' }}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-[var(--gold)] font-mono">Reward: {mission.reward} Embers</p>
+                                            </div>
+                                        )})}
+                                    </div>
+                                    <div className="mt-2">
+                                        <button
+                                            onClick={handleClaimMissionRewards}
+                                            disabled={claimableEmbers <= 0 || claimedMissionRewards}
+                                            className="btn-emerald w-full min-h-[40px] rounded-lg text-xs touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                                        >
+                                            {claimButtonLabel}
+                                        </button>
+                                        <p className="text-[9px] text-[var(--text-muted)] mt-1 text-center">Resets at 00:00 UTC</p>
+                                    </div>
+                                </div>
+                            )}
+                            {missionToast && (
+                                <div className="mt-2 rounded-lg px-3 py-2 text-xs text-center font-bold border border-[rgba(46,204,113,0.35)] text-[var(--emerald)]" style={{ background: 'rgba(46,204,113,0.12)' }}>
+                                    {missionToast}
+                                </div>
+                            )}
                             {playerProfile.history.length > 0 && (
                                 <div className="mt-2 card-dark rounded-xl p-3">
                                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Recent Battles</p>

@@ -1,4 +1,4 @@
-import { getRankTier, getNextRankProgress } from '../types';
+import { getRankTier, getNextRankProgress, getGamificationStats } from '../types';
 import type { PlayerProfile } from '../types';
 
 interface RankBadgeProps {
@@ -10,6 +10,7 @@ interface RankBadgeProps {
 export const RankBadge = ({ profile, compact = false, showProgress = false }: RankBadgeProps) => {
     const rank = getRankTier(profile.totalScore);
     const { nextRank, progress, pointsNeeded } = getNextRankProgress(profile.totalScore);
+    const gamification = getGamificationStats(profile);
     const winRate = profile.matchesPlayed > 0
         ? Math.round((profile.matchesWon / profile.matchesPlayed) * 100)
         : 0;
@@ -81,6 +82,23 @@ export const RankBadge = ({ profile, compact = false, showProgress = false }: Ra
                             <span className="text-[10px] font-bold" style={{ color: rank.color }}>MAX RANK ✨</span>
                         </div>
                     )}
+                </div>
+            )}
+
+            {showProgress && (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg px-2 py-1.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                        <p className="text-base font-bold text-[var(--gold)]">Lv {gamification.level}</p>
+                        <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">{gamification.pointsToNextLevel} to next</p>
+                    </div>
+                    <div className="rounded-lg px-2 py-1.5" style={{ background: 'rgba(231,76,60,0.08)' }}>
+                        <p className="text-base font-bold text-[var(--ember)]">{gamification.currentStreak}</p>
+                        <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">Win Streak</p>
+                    </div>
+                    <div className="rounded-lg px-2 py-1.5" style={{ background: 'rgba(52,152,219,0.08)' }}>
+                        <p className="text-base font-bold text-[var(--royal-blue)]">{gamification.momentum}%</p>
+                        <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">Momentum</p>
+                    </div>
                 </div>
             )}
         </div>
