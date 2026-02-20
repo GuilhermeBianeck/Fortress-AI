@@ -134,9 +134,26 @@ export interface GamificationStats {
     dailyWinTarget: number;
 }
 
+export interface DailyMission {
+    id: string;
+    title: string;
+    current: number;
+    target: number;
+    reward: number;
+    unit: 'matches' | 'wins' | 'damage' | 'points';
+    completed: boolean;
+    progress: number;
+}
+
 export const GAMIFICATION_LEVEL_SIZE = 750;
 export const GAMIFICATION_DAILY_MATCH_TARGET = 3;
 export const GAMIFICATION_DAILY_WIN_TARGET = 2;
+export const GAMIFICATION_DAILY_DAMAGE_TARGET = 250;
+export const GAMIFICATION_DAILY_SCORE_TARGET = 900;
+
+export function getUtcDayStartMs(date: Date): number {
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
 
 // === Ranking ===
 
@@ -185,7 +202,7 @@ export function getGamificationStats(profile: PlayerProfile): GamificationStats 
     const dailyMatchTarget = GAMIFICATION_DAILY_MATCH_TARGET;
     const dailyWinTarget = GAMIFICATION_DAILY_WIN_TARGET;
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const todayStart = getUtcDayStartMs(now);
     const isUnordered = profile.history.some((entry, idx, arr) => idx > 0 && arr[idx - 1].timestamp < entry.timestamp);
     const orderedHistory = !isUnordered
         ? profile.history
@@ -232,4 +249,46 @@ export function getGamificationStats(profile: PlayerProfile): GamificationStats 
         dailyMatchTarget,
         dailyWinTarget,
     };
+}
+
+export function getDailyMissions(profile: PlayerProfile): { missions: DailyMission[]; claimableEmbers: number } {
+    const createMission = (
+        id: DailyMission['id'],
+        title: DailyMission['title'],
+        current: DailyMission['current'],
+        target: DailyMission['target'],
+        reward: DailyMission['reward'],
+        unit: DailyMission['unit'],
+    ): DailyMission => ({
+        id,
+        title,
+        current,
+        target,
+        reward,
+        unit,
+        completed: current >= target,
+        progress: target > 0 ? Math.min(1, current / target) : 0,
+    });
+
+    const now = new Date();
+    const todayStart = getUtcDayStartMs(now);
+    const todayEntries = profile.history.filter(entry => entry.timestamp >= todayStart);
+
+    const dailyMatches = todayEntries.length;
+    const dailyWins = todayEntries.filter(entry => entry.won).length;
+    const dailyDamage = Math.round(todayEntries.reduce((sum, entry) => sum + entry.score.damageDealt, 0));
+    const dailyScore = Math.round(todayEntries.reduce((sum, entry) => sum + entry.score.totalScore, 0));
+
+    const missions: DailyMission[] = [
+        createMission('play_matches', 'Fight daily battles', dailyMatches, GAMIFICATION_DAILY_MATCH_TARGET, 120, 'matches'),
+        createMission('win_matches', 'Claim daily victories', dailyWins, GAMIFICATION_DAILY_WIN_TARGET, 200, 'wins'),
+        createMission('deal_damage', 'Deal King damage', dailyDamage, GAMIFICATION_DAILY_DAMAGE_TARGET, 160, 'damage'),
+        createMission('earn_points', 'Earn score points', dailyScore, GAMIFICATION_DAILY_SCORE_TARGET, 220, 'points'),
+    ];
+
+    const claimableEmbers = missions
+        .filter(mission => mission.completed)
+        .reduce((sum, mission) => sum + mission.reward, 0);
+
+    return { missions, claimableEmbers };
 }

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift } from 'lucide-react';
 import { RankBadge } from './RankBadge';
-import { getGamificationStats } from '../types';
+import { getGamificationStats, getDailyMissions } from '../types';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -142,6 +142,7 @@ export const Lobby = ({
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [tipIndex, setTipIndex] = useState(0);
     const gamification = playerProfile ? getGamificationStats(playerProfile) : null;
+    const dailyMissions = playerProfile ? getDailyMissions(playerProfile) : null;
 
     useEffect(() => {
         onGetProfile?.();
@@ -506,6 +507,39 @@ export const Lobby = ({
                                             <p className="text-[var(--royal-blue)] font-bold">Daily Victories</p>
                                             <p className="text-[10px] text-[var(--text-muted)] mt-1">{gamification.dailyWins}/{gamification.dailyWinTarget} wins</p>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+                            {dailyMissions && (
+                                <div className="mt-2 card-dark rounded-xl p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                                            <Target size={12} />
+                                            Daily Missions
+                                        </p>
+                                        <span className="text-[10px] text-[var(--gold)] font-bold flex items-center gap-1">
+                                            <Gift size={11} />
+                                            {dailyMissions.claimableEmbers} Embers
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        {dailyMissions.missions.map((mission) => (
+                                            <div key={mission.id} className="rounded-lg px-2 py-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <p className="text-xs text-[var(--text-secondary)]">{mission.title}</p>
+                                                    <span className={`text-[10px] font-bold ${mission.completed ? 'text-[var(--emerald)]' : 'text-[var(--text-muted)]'}`}>
+                                                        {mission.completed ? 'COMPLETED' : `${mission.current}/${mission.target}`}
+                                                    </span>
+                                                </div>
+                                                <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-500"
+                                                        style={{ width: `${Math.round(mission.progress * 100)}%`, background: mission.completed ? 'linear-gradient(90deg, var(--emerald), #9be7b3)' : 'linear-gradient(90deg, var(--royal-blue), #75b8ff)' }}
+                                                    />
+                                                </div>
+                                                <p className="text-[10px] text-[var(--gold)] font-mono">Reward: {mission.reward} Embers</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
