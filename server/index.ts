@@ -222,6 +222,20 @@ io.on('connection', (socket) => {
         });
     });
 
+    // --- Leave Room (without disconnecting) ---
+
+    socket.on('leave_room', () => {
+        const room = roomManager.getRoom(socket.id);
+        if (room) {
+            socket.leave(room.id);
+            roomManager.handleDisconnect(socket.id);
+            // Re-register UUID since handleDisconnect clears it
+            if (playerUuid && typeof playerUuid === 'string') {
+                roomManager.registerUuid(socket.id, playerUuid);
+            }
+        }
+    });
+
     // --- Disconnect ---
 
     socket.on('disconnect', () => {

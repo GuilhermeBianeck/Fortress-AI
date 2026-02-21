@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { RankBadge } from './RankBadge';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 
@@ -152,6 +152,7 @@ export const Lobby = ({
     const [claimedMissionDay, setClaimedMissionDay] = useState(() => localStorage.getItem('fortress_missions_claim_day') || '');
     const claimToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [codeCopied, setCodeCopied] = useState(false);
+    const [showHowToPlay, setShowHowToPlay] = useState(false);
 
     // Check-in state
     const [checkinStreak, setCheckinStreak] = useState(() => parseInt(localStorage.getItem('fortress_checkin_streak') || '0', 10));
@@ -598,6 +599,64 @@ export const Lobby = ({
                         <span>Quick Battle</span>
                         <ChevronRight size={16} className="opacity-50" />
                     </button>
+
+                    {/* How to Play */}
+                    <div className="card-dark rounded-xl overflow-hidden">
+                        <button
+                            onClick={() => setShowHowToPlay(!showHowToPlay)}
+                            className="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors touch-manipulation"
+                        >
+                            <span className="flex items-center gap-2 font-display font-bold tracking-wider">
+                                <HelpCircle size={16} className="text-[var(--gold-dim)]" />
+                                HOW TO PLAY
+                            </span>
+                            {showHowToPlay ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                        {showHowToPlay && (
+                            <div className="px-4 pb-4 text-xs text-[var(--text-secondary)] flex flex-col gap-3 animate-scale-in">
+                                <div className="flex gap-3 items-start">
+                                    <span className="text-lg leading-none mt-0.5">🏗️</span>
+                                    <div>
+                                        <p className="font-bold text-[var(--emerald)] mb-0.5">1. Build Phase (90s)</p>
+                                        <p>Design your fortress! Place blocks manually by clicking on your side, or describe your fortress to the AI architect using the prompt bar. Protect your King at all costs.</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 items-start">
+                                    <span className="text-lg leading-none mt-0.5">👁️</span>
+                                    <div>
+                                        <p className="font-bold text-[var(--gold)] mb-0.5">2. Reveal Phase (5s)</p>
+                                        <p>The camera pans across the battlefield, revealing both fortresses and any environmental hazards.</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 items-start">
+                                    <span className="text-lg leading-none mt-0.5">💥</span>
+                                    <div>
+                                        <p className="font-bold text-[var(--crimson)] mb-0.5">3. Combat Phase (15s/turn)</p>
+                                        <p>Take turns firing cannonballs! Drag to aim and release to fire. Destroy the enemy King to win the round. First to win 2 rounds wins the match.</p>
+                                    </div>
+                                </div>
+                                <div className="border-t border-[var(--border-subtle)] pt-2 mt-1">
+                                    <p className="font-bold text-[var(--text-primary)] mb-1.5">Materials</p>
+                                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                                        <span>🪵 <b>Wood</b> — 30 HP, high grip</span>
+                                        <span>🪨 <b>Stone</b> — 80 HP, heavy</span>
+                                        <span>🧊 <b>Ice</b> — 15 HP, slippery</span>
+                                        <span>⚫ <b>Rubber</b> — 40 HP, bouncy</span>
+                                        <span>⚙️ <b>Steel</b> — 200 HP, very dense</span>
+                                    </div>
+                                </div>
+                                <div className="border-t border-[var(--border-subtle)] pt-2">
+                                    <p className="font-bold text-[var(--text-primary)] mb-1.5">Controls</p>
+                                    <div className="grid grid-cols-1 gap-1 text-[10px]">
+                                        <span>🖱️ <b>Click</b> to place blocks during build phase</span>
+                                        <span>🎯 <b>Drag</b> on the cannon to aim, release to fire</span>
+                                        <span>⌨️ <b>A/D</b> to pan camera · <b>↑↓</b> adjust power · <b>Space</b> to fire</span>
+                                        <span>🤖 <b>Set an API key</b> and type a prompt to let AI build your fortress</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Player Profile & History */}
                     {playerProfile && (

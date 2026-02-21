@@ -14,6 +14,7 @@ interface PhaseOverlayProps {
     currentRound?: number;
     rematchState?: 'none' | 'requested' | 'opponent_requested';
     onRequestRematch?: () => void;
+    onReturnToLobby?: () => void;
     hazards?: { type: string; id: string; windDirection?: number; windStrength?: number }[];
     matchScores?: MatchScores | null;
     playerProfile?: PlayerProfile | null;
@@ -21,7 +22,7 @@ interface PhaseOverlayProps {
     prevPlayerProfile?: PlayerProfile | null;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
     useEffect(() => {
@@ -372,13 +373,10 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         </div>
                     )}
 
-                    {/* New Game — return to lobby.
-                        Socket.io reconnects automatically; a page reload is the
-                        cleanest way to reset all React state and socket listeners
-                        in a single-page game app without a router. */}
+                    {/* New Game — return to lobby cleanly */}
                     <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
                         <button
-                            onClick={() => window.location.reload()}
+                            onClick={() => onReturnToLobby?.()}
                             className="btn-medieval min-h-[40px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 mx-auto"
                         >
                             <Home size={13} />

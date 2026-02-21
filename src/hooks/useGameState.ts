@@ -75,6 +75,7 @@ export const useGameState = () => {
     // Callback refs for canvas effects
     const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
     const projectileImpactCbRef = useRef<((data: { position: Vector }) => void) | null>(null);
+    const kingDamageCbRef = useRef<((data: { side: Side; damage: number }) => void) | null>(null);
 
     useEffect(() => {
         const playerUuid = getOrCreateUuid();
@@ -129,6 +130,7 @@ export const useGameState = () => {
                 ...prev,
                 [data.side]: { hp: data.hp, maxHp: data.maxHp },
             }));
+            kingDamageCbRef.current?.({ side: data.side, damage: data.damage });
         });
 
         socketRef.current.on('king_dead', (_data: { side: Side }) => {
@@ -337,12 +339,36 @@ export const useGameState = () => {
         socketRef.current?.emit('get_profile');
     }, []);
 
+    const returnToLobby = useCallback(() => {
+        socketRef.current?.emit('leave_room');
+        setGameState(null);
+        setTerrain(null);
+        setBuildStatus({ status: 'idle', message: '' });
+        setKingsHp({ left: { hp: 100, maxHp: 100, x: 0 }, right: { hp: 100, maxHp: 100, x: 0 } });
+        setRoomState(null);
+        setPhase('lobby');
+        setPhaseEndsAt(null);
+        setTurnPlayer(null);
+        setMatchResult(null);
+        setQueuePosition(null);
+        setChatMessages([]);
+        setRematchState('none');
+        setRoundScore({ left: 0, right: 0 });
+        setCurrentRound(1);
+        setHazards([]);
+        setMatchScores(null);
+    }, []);
+
     const setBlockDestroyedCallback = useCallback((cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => {
         blockDestroyedCbRef.current = cb;
     }, []);
 
     const setProjectileImpactCallback = useCallback((cb: ((data: { position: Vector }) => void) | null) => {
         projectileImpactCbRef.current = cb;
+    }, []);
+
+    const setKingDamageCallback = useCallback((cb: ((data: { side: Side; damage: number }) => void) | null) => {
+        kingDamageCbRef.current = cb;
     }, []);
 
     return {
@@ -352,7 +378,7 @@ export const useGameState = () => {
         matchScores, playerProfile, prevPlayerProfile, isConnected,
         createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
         spawnBox, requestBuild, fireProjectile,
-        sendChatMessage, requestRematch, getProfile,
-        setBlockDestroyedCallback, setProjectileImpactCallback,
+        sendChatMessage, requestRematch, getProfile, returnToLobby,
+        setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback,
     };
 };
