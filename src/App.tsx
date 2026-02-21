@@ -93,6 +93,7 @@ function App() {
   const isBuilding = buildStatus.status === 'generating' || buildStatus.status === 'building';
   const mySide = roomState?.side ?? 'left';
   const myRank = playerProfile ? getRankTier(playerProfile.totalScore) : null;
+  const isSinglePlayer = roomState?.opponentName === 'Training Bot';
 
   // Derive pre-match score from post-match data for rank-up detection
   const prevTotalScore = (playerProfile && matchScores)
@@ -135,8 +136,8 @@ function App() {
               <span className="text-xs font-bold" style={{ color: myRank.color }}>{myRank.name}</span>
             </button>
           )}
-          {/* Chat toggle (mobile only, in-game) */}
-          {inGame && (
+          {/* Chat toggle (mobile only, in-game, only for PvP) */}
+          {inGame && !isSinglePlayer && (
             <button
               onClick={() => setShowChat(!showChat)}
               className={`xl:hidden min-w-[44px] min-h-[44px] px-2 py-1.5 text-sm rounded-lg transition-all duration-200 touch-manipulation
@@ -287,22 +288,24 @@ function App() {
                     </div>
                   )}
 
-                  {/* Mobile: Chat button — top-right, moved down to clear header */}
-                  <div className="absolute top-20 right-1 z-20 sm:hidden">
-                    <button
-                      onClick={() => setShowChat(!showChat)}
-                      className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation border
-                        ${showChat
-                          ? 'bg-[var(--bg-elevated)] border-[var(--border-accent)]'
-                          : 'bg-[rgba(10,10,18,0.6)] border-[var(--border-subtle)] active:bg-[var(--bg-elevated)]'
-                        }`}
-                    >
-                      <MessageCircle size={18} className="text-[var(--gold)]" />
-                      {chatMessages.length > 0 && (
-                        <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--ember)]"></span>
-                      )}
-                    </button>
-                  </div>
+                  {/* Mobile: Chat button — top-right, moved down to clear header (PvP only) */}
+                  {!isSinglePlayer && (
+                    <div className="absolute top-20 right-1 z-20 sm:hidden">
+                      <button
+                        onClick={() => setShowChat(!showChat)}
+                        className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation border
+                          ${showChat
+                            ? 'bg-[var(--bg-elevated)] border-[var(--border-accent)]'
+                            : 'bg-[rgba(10,10,18,0.6)] border-[var(--border-subtle)] active:bg-[var(--bg-elevated)]'
+                          }`}
+                      >
+                        <MessageCircle size={18} className="text-[var(--gold)]" />
+                        {chatMessages.length > 0 && (
+                          <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--ember)]"></span>
+                        )}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Mobile: Done button - moved down below centered banner */}
                   {phase === 'build' && (
@@ -332,14 +335,16 @@ function App() {
                 </div>
               </div>
 
-              {/* Chat — visible on xl screens, toggleable overlay on smaller */}
-              <div className="hidden xl:block">
-                <ChatPanel
-                  messages={chatMessages}
-                  onSend={sendChatMessage}
-                  mySide={mySide}
-                />
-              </div>
+              {/* Chat — visible on xl screens for PvP only */}
+              {!isSinglePlayer && (
+                <div className="hidden xl:block">
+                  <ChatPanel
+                    messages={chatMessages}
+                    onSend={sendChatMessage}
+                    mySide={mySide}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Desktop: God Tools (build phase only) */}
@@ -376,8 +381,8 @@ function App() {
               </div>
             )}
 
-            {/* Mobile chat overlay */}
-            {showChat && (
+            {/* Mobile chat overlay (PvP only) */}
+            {showChat && !isSinglePlayer && (
               <div className="fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-[rgba(10,10,18,0.7)] backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
                 <div className="w-full max-w-md mb-0 sm:mb-4 safe-area-bottom">
                   <ChatPanel

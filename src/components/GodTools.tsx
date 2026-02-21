@@ -128,7 +128,7 @@ export const GodTools = ({
                                     title={MATERIAL_TIPS[mat.key]}
                                 >
                                     <span className="text-sm">{mat.icon}</span>
-                                    <span className="hidden sm:inline">{mat.label}</span>
+                                    <span className="hidden">{mat.label}</span>
                                     <span
                                         className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${isActive ? 'ring-2 ring-white/40 scale-110' : ''}`}
                                         style={{ backgroundColor: matColor, boxShadow: isActive ? `0 0 8px ${matColor}` : 'none' }}

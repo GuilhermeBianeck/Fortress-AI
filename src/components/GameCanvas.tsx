@@ -642,11 +642,20 @@ export const GameCanvas = ({
             // Build zone overlays (more visible during build phase)
             const isBuildPhase = currentPhase === 'build';
             for (const zone of terr.buildZones) {
-                const zoneAlpha = isBuildPhase ? 0.08 : 0.04;
-                const borderAlpha = isBuildPhase ? 0.25 : 0.12;
-                ctx.fillStyle = `rgba(255, 215, 0, ${zoneAlpha})`;
+                // Determine if this zone belongs to the current player
+                const isMyZone = isBuildPhase && (
+                    (side === 'left' && zone.x < WORLD_WIDTH / 2) ||
+                    (side === 'right' && zone.x >= WORLD_WIDTH / 2)
+                );
+                const zoneAlpha = isBuildPhase ? (isMyZone ? 0.1 : 0.04) : 0.03;
+                const borderAlpha = isBuildPhase ? (isMyZone ? 0.4 : 0.15) : 0.1;
+                // My zone: green tint; enemy zone: red tint; non-build: gold
+                const zoneColor = isBuildPhase
+                    ? (isMyZone ? '39, 174, 96' : '192, 57, 43')
+                    : '255, 215, 0';
+                ctx.fillStyle = `rgba(${zoneColor}, ${zoneAlpha})`;
                 ctx.fillRect(zone.x, zone.y - 200, zone.width, 200);
-                ctx.strokeStyle = `rgba(255, 215, 0, ${borderAlpha})`;
+                ctx.strokeStyle = `rgba(${zoneColor}, ${borderAlpha})`;
                 ctx.lineWidth = isBuildPhase ? 1.5 : 1;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
@@ -663,12 +672,14 @@ export const GameCanvas = ({
                     ctx.stroke();
                 }
                 ctx.setLineDash([]);
-                // "BUILD ZONE" label during build phase
+                // Zone label during build phase
                 if (isBuildPhase) {
-                    ctx.font = 'bold 11px monospace';
-                    ctx.fillStyle = `rgba(255, 215, 0, 0.2)`;
+                    const labelAlpha = isMyZone ? 0.55 : 0.25;
+                    const label = isMyZone ? 'YOUR ZONE' : 'ENEMY ZONE';
+                    ctx.font = `bold ${isMyZone ? 13 : 11}px monospace`;
+                    ctx.fillStyle = `rgba(${zoneColor}, ${labelAlpha})`;
                     ctx.textAlign = 'center';
-                    ctx.fillText('BUILD ZONE', zone.x + zone.width / 2, zone.y - 185);
+                    ctx.fillText(label, zone.x + zone.width / 2, zone.y - 182);
                 }
             }
 
@@ -771,6 +782,21 @@ export const GameCanvas = ({
             const drawCannon = (cannonX: number, facingRight: boolean, isActive: boolean) => {
                 const cannonY = interpolateTerrainY(terr.points, cannonX) - 20;
                 const currentAngle = isActive ? aim.angle : Math.PI / 4;
+
+                // Pulsing glow ring on active cannon — shows player where to drag
+                if (isActive && currentPhase === 'combat' && !aim.active && !aim.useKeyboard) {
+                    const pulse = 0.5 + 0.5 * Math.sin(nowMs / 350);
+                    ctx.beginPath();
+                    ctx.arc(cannonX, cannonY, 16 + pulse * 5, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 215, 0, ${(0.25 + pulse * 0.45).toFixed(2)})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    // Inner subtle glow fill
+                    ctx.beginPath();
+                    ctx.arc(cannonX, cannonY, 14, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 215, 0, ${(0.05 + pulse * 0.07).toFixed(2)})`;
+                    ctx.fill();
+                }
 
                 // Barrel — dark iron with gold accent
                 ctx.save();
@@ -1304,10 +1330,12 @@ export const GameCanvas = ({
     const getWorldCoords = (e: React.MouseEvent): { x: number; y: number } => {
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
-        // Use logical coords directly
+        const dpr = window.devicePixelRatio || 1;
+        const scaleX = (canvas.width / dpr) / rect.width;
+        const scaleY = (canvas.height / dpr) / rect.height;
         return {
-            x: (e.clientX - rect.left) + cameraRef.current.x,
-            y: (e.clientY - rect.top),
+            x: (e.clientX - rect.left) * scaleX + cameraRef.current.x,
+            y: (e.clientY - rect.top) * scaleY,
         };
     };
 
@@ -1325,12 +1353,14 @@ export const GameCanvas = ({
         if (Date.now() - lastTouchRef.current < 500) return;
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
-        // Logical coords
-        const screenX = (e.clientX - rect.left);
-        const screenY = (e.clientY - rect.top);
+        const dpr = window.devicePixelRatio || 1;
+        const scaleX = (canvas.width / dpr) / rect.width;
+        const scaleY = (canvas.height / dpr) / rect.height;
+        // Logical (scaled) screen coords for minimap/HUD detection
+        const screenX = (e.clientX - rect.left) * scaleX;
+        const screenY = (e.clientY - rect.top) * scaleY;
 
         // Minimap click detection
-        const dpr = window.devicePixelRatio || 1;
         const width = canvas.width / dpr;
         const height = canvas.height / dpr;
 
@@ -1379,9 +1409,10 @@ export const GameCanvas = ({
         if (isDraggingMinimapRef.current && canvasRef.current) {
             const canvas = canvasRef.current;
             const rect = canvas.getBoundingClientRect();
-            const screenX = (e.clientX - rect.left);
-
             const dpr = window.devicePixelRatio || 1;
+            const scaleX = (canvas.width / dpr) / rect.width;
+            const screenX = (e.clientX - rect.left) * scaleX;
+
             const width = canvas.width / dpr;
             const mmW = 200;
             const mmX = width - mmW - 10;
@@ -1420,9 +1451,11 @@ export const GameCanvas = ({
     const getTouchWorldCoords = (touch: React.Touch) => {
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
-        // Use logical coords
-        const screenX = (touch.clientX - rect.left);
-        const screenY = (touch.clientY - rect.top);
+        const dpr = window.devicePixelRatio || 1;
+        const scaleX = (canvas.width / dpr) / rect.width;
+        const scaleY = (canvas.height / dpr) / rect.height;
+        const screenX = (touch.clientX - rect.left) * scaleX;
+        const screenY = (touch.clientY - rect.top) * scaleY;
         const cam = cameraRef.current;
         return { x: screenX + cam.x, y: screenY, screenX, screenY };
     };
@@ -1491,14 +1524,16 @@ export const GameCanvas = ({
         // Two-finger pan
         if (e.touches.length === 2 && panTouchRef.current) {
             e.preventDefault();
-            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
             const canvas = canvasRef.current!;
-            // Use logical coords for pan
-            const deltaScreen = panTouchRef.current.startX - midX;
-            const deltaWorld = deltaScreen; // 1:1 movement
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const scaleX = (canvas.width / dpr) / rect.width;
+            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            // Scale the delta to logical coords for accurate 1:1 panning
+            const deltaScreen = (panTouchRef.current.startX - midX) * scaleX;
             cameraRef.current.targetX = Math.max(0, Math.min(
-                WORLD_WIDTH - (canvas.width / (window.devicePixelRatio || 1)),
-                panTouchRef.current.camStartX + deltaWorld
+                WORLD_WIDTH - (canvas.width / dpr),
+                panTouchRef.current.camStartX + deltaScreen
             ));
             return;
         }
@@ -1507,10 +1542,10 @@ export const GameCanvas = ({
             e.preventDefault();
             const canvas = canvasRef.current;
             const rect = canvas.getBoundingClientRect();
-            // Use clientX since we care about screen position over the minimap
-            const screenX = (e.touches[0].clientX - rect.left);
-
             const dpr = window.devicePixelRatio || 1;
+            const scaleX = (canvas.width / dpr) / rect.width;
+            const screenX = (e.touches[0].clientX - rect.left) * scaleX;
+
             const width = canvas.width / dpr;
             const mmW = 200;
             const mmX = width - mmW - 10;

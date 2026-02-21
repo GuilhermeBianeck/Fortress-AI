@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle, TrendingUp, Zap, Home } from 'lucide-react';
 import type { MatchPhase, Side, MatchScores, PlayerProfile } from '../types';
 import { getRankTier, getNextRankProgress, getUnlockedAchievements, getPerformanceGrade, PERFORMANCE_GRADE_COLORS, ACHIEVEMENT_RARITY_COLORS, getUtcDayStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS } from '../types';
-
 interface PhaseOverlayProps {
     phase: MatchPhase;
     phaseEndsAt: number | null;
@@ -24,6 +23,7 @@ interface PhaseOverlayProps {
 
 export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const [botDots, setBotDots] = useState(1);
 
     useEffect(() => {
         if (!phaseEndsAt) {
@@ -40,6 +40,14 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const interval = setInterval(tick, 250);
         return () => clearInterval(interval);
     }, [phaseEndsAt]);
+
+    // Animate bot thinking dots (cycles 1–3)
+    useEffect(() => {
+        const isBot = turnPlayer ? playerNames?.[turnPlayer] === 'Training Bot' : false;
+        if (!isBot || turnPlayer === mySide) return;
+        const t = setInterval(() => setBotDots(d => (d % 3) + 1), 450);
+        return () => clearInterval(t);
+    }, [turnPlayer, mySide, playerNames]);
 
     if (phase === 'lobby') return null;
 
@@ -101,6 +109,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const isMyTurn = turnPlayer === mySide;
         const isBot = turnPlayer ? playerNames?.[turnPlayer] === 'Training Bot' : false;
         const windHazard = hazards?.find(h => h.type === 'wind_zone');
+        const botDotStr = '.'.repeat(botDots);
         return (
             <div className="w-full relative pointer-events-none">
                 {/* Combat Banner - Centered, inline timer */}
@@ -111,7 +120,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         {isMyTurn ? <Flame size={14} className="text-[var(--crimson)]" /> : <Clock size={14} className="text-[var(--text-muted)]" />}
                         <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
-                            {isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? "BOT'S TURN..." : "OPPONENT'S TURN")}
+                            {isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? `BOT AIMING${botDotStr}` : "OPPONENT'S TURN")}
                         </span>
                         {timeLeft !== null && (
                             <span className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${timeLeft <= 5 ? 'timer-urgent' : isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
@@ -119,6 +128,17 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             </span>
                         )}
                     </div>
+                    {/* Wind Indicator — inline with turn banner */}
+                    {windHazard && (() => {
+                        const windSpeed = Math.round((windHazard.windStrength ?? 0.0003) * 20000);
+                        const windLabel = windSpeed < 4 ? 'Light' : windSpeed < 8 ? 'Moderate' : 'Strong';
+                        return (
+                            <div className="flex items-center gap-1 text-[10px] font-bold" style={{ color: 'rgba(52,152,219,0.9)' }}>
+                                <Wind size={11} />
+                                <span>{(windHazard.windDirection ?? 1) > 0 ? '→' : '←'} {windLabel} Wind</span>
+                            </div>
+                        );
+                    })()}
                     {/* Mobile: compact controls hint when it's your turn */}
                     {isMyTurn && (
                         <p className="sm:hidden text-[10px] text-[var(--text-muted)] mt-0.5">
@@ -126,24 +146,6 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         </p>
                     )}
                 </div>
-
-                {/* Wind Indicator - Centered Below Banner */}
-                {windHazard && (
-                    <div className="absolute top-[52px] sm:top-[45px] left-1/2 -translate-x-1/2 pointer-events-auto">
-                        {(() => {
-                            const windSpeed = Math.round((windHazard.windStrength ?? 0.0003) * 20000);
-                            const windLabel = windSpeed < 4 ? 'Light' : windSpeed < 8 ? 'Moderate' : 'Strong';
-                            return (
-                                <div className="flex items-center gap-1 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md border border-[rgba(52,152,219,0.3)]" style={{ background: 'rgba(52,152,219,0.1)' }}>
-                                    <Wind size={14} className="text-[var(--royal-blue)]" />
-                                    <span className="text-[var(--royal-blue)] text-[10px] sm:text-xs font-bold">
-                                        {(windHazard.windDirection ?? 1) > 0 ? '→' : '←'} Wind · {windLabel}
-                                    </span>
-                                </div>
-                            );
-                        })()}
-                    </div>
-                )}
             </div>
         );
     }
