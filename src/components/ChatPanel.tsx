@@ -11,6 +11,11 @@ interface ChatPanelProps {
     onClose?: () => void;
 }
 
+function formatTime(ts: number): string {
+    const d = new Date(ts);
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
 export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPanelProps) => {
     const [text, setText] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -33,49 +38,67 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
         <div className={`flex flex-col border border-[var(--border-subtle)] backdrop-blur-md ${mobile
                 ? 'w-full rounded-t-xl h-[50vh]'
                 : 'w-[250px] rounded-xl h-[600px]'
-            }`} style={{ background: 'rgba(10, 10, 18, 0.85)' }}>
-            <div className="px-3 py-2 border-b border-[var(--border-subtle)] text-xs text-[var(--gold)] font-bold flex justify-between items-center font-display">
-                <span className="flex items-center gap-1.5">
-                    <ScrollText size={14} />
+            }`} style={{ background: 'rgba(10, 10, 18, 0.88)' }}>
+            {/* Header */}
+            <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center">
+                <span className="text-xs text-[var(--gold)] font-bold flex items-center gap-1.5 font-display tracking-wider">
+                    <ScrollText size={13} />
                     HERALD
                 </span>
                 {mobile && onClose && (
-                    <button onClick={onClose} className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] text-base transition-colors duration-150 touch-manipulation">
-                        <X size={16} />
+                    <button onClick={onClose} className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-150 touch-manipulation rounded-lg hover:bg-[var(--bg-elevated)]">
+                        <X size={15} />
                     </button>
                 )}
             </div>
+
+            {/* Message list */}
             <div
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 text-sm"
+                className="flex-1 overflow-y-auto px-2.5 py-2 space-y-2 text-sm"
             >
-                {messages.map(msg => (
-                    <div key={msg.id}>
-                        <span className={`font-bold text-xs ${msg.side === mySide ? 'text-[var(--emerald)]' : 'text-[var(--crimson)]'}`}>
-                            {msg.sender}
-                        </span>
-                        <span className="text-[var(--text-primary)] ml-1.5 text-xs break-words">{msg.text}</span>
-                    </div>
-                ))}
                 {messages.length === 0 && (
-                    <p className="text-[var(--text-muted)] text-xs italic">The herald awaits your message...</p>
+                    <p className="text-[var(--text-muted)] text-xs italic text-center mt-4 px-2">The herald awaits your message...</p>
                 )}
+                {messages.map(msg => {
+                    const isMine = msg.side === mySide;
+                    return (
+                        <div
+                            key={msg.id}
+                            className={`flex flex-col animate-slide-up ${isMine ? 'items-end' : 'items-start'}`}
+                        >
+                            {/* Sender name + time */}
+                            <div className={`flex items-center gap-1.5 mb-0.5 px-1 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+                                <span className={`text-[10px] font-bold ${isMine ? 'text-[var(--emerald)]' : 'text-[var(--crimson)]'}`}>
+                                    {msg.sender}
+                                </span>
+                                <span className="text-[10px] text-[var(--text-muted)]">{formatTime(msg.timestamp)}</span>
+                            </div>
+                            {/* Bubble */}
+                            <div className={`max-w-[90%] px-2.5 py-1.5 text-xs break-words ${isMine ? 'chat-bubble-mine text-[var(--text-primary)]' : 'chat-bubble-theirs text-[var(--text-primary)]'}`}>
+                                {msg.text}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
-            <form onSubmit={handleSubmit} className="border-t border-[var(--border-subtle)] flex">
+
+            {/* Input */}
+            <form onSubmit={handleSubmit} className="border-t border-[var(--border-subtle)] flex items-center gap-1 px-2 py-1.5">
                 <input
                     type="text"
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder="Send a message..."
                     maxLength={200}
-                    className="flex-1 bg-transparent px-3 py-3 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none"
+                    className="flex-1 bg-transparent px-2 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none min-w-0"
                 />
                 <button
                     type="submit"
                     disabled={!text.trim()}
-                    className="min-w-[44px] min-h-[44px] px-3 py-2 text-xs text-[var(--gold)] font-bold hover:text-[var(--gold)] transition-colors duration-150 touch-manipulation disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                    className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-[var(--gold)] hover:bg-[var(--bg-elevated)] transition-all duration-150 touch-manipulation disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                    <Send size={14} />
+                    <Send size={13} />
                 </button>
             </form>
         </div>

@@ -7,7 +7,7 @@ import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
 import { RankBadge } from './components/RankBadge';
-import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, Crown } from 'lucide-react';
+import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, WifiOff } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
 
@@ -16,7 +16,7 @@ function App() {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards,
-    matchScores, playerProfile, prevPlayerProfile,
+    matchScores, playerProfile, prevPlayerProfile, isConnected,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
     sendChatMessage, requestRematch, getProfile,
@@ -108,16 +108,16 @@ function App() {
   return (
     <div className="h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top" style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: 'var(--bg-deepest)' }}>
       {/* Header — hidden on mobile when in-game */}
-      <header className={`px-4 py-2 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`} style={{ background: 'rgba(10, 10, 18, 0.85)' }}>
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg" style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05))' }}>
-            <Crown size={20} className="text-[var(--gold)]" />
+      <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`} style={{ background: 'rgba(10, 10, 18, 0.9)', boxShadow: '0 1px 0 rgba(255,215,0,0.08), 0 2px 16px rgba(0,0,0,0.4)' }}>
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg shrink-0" style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,215,0,0.06))', border: '1px solid rgba(255,215,0,0.2)' }}>
+            <img src="/favicon.svg" alt="Fortress AI" width={20} height={20} className="block" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-[var(--gold)] font-heading">FORTRESS AI</h1>
-            <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--emerald)] animate-pulse"></span>
-              {inGame && roomState ? `Room: ${roomState.roomId}` : 'ONLINE'}
+            <h1 className="text-sm font-bold tracking-wide text-[var(--gold)] font-heading leading-none">FORTRESS AI</h1>
+            <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--emerald)] animate-pulse shrink-0"></span>
+              <span className="font-mono">{inGame && roomState ? `Room: ${roomState.roomId}` : 'LIVE'}</span>
             </div>
           </div>
         </div>
@@ -127,7 +127,7 @@ function App() {
           {!inGame && myRank && (
             <button
               onClick={() => setShowRankPanel(!showRankPanel)}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors duration-200 hover:bg-[var(--bg-elevated)]"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all duration-200 hover:bg-[var(--bg-elevated)]"
               style={{ borderColor: `${myRank.color}44`, background: `${myRank.color}0d` }}
               title="Your Rank"
             >
@@ -139,7 +139,7 @@ function App() {
           {inGame && (
             <button
               onClick={() => setShowChat(!showChat)}
-              className={`xl:hidden min-w-[44px] min-h-[44px] px-2 py-1.5 text-sm rounded-lg transition-colors duration-200 touch-manipulation
+              className={`xl:hidden min-w-[44px] min-h-[44px] px-2 py-1.5 text-sm rounded-lg transition-all duration-200 touch-manipulation
                 border flex items-center justify-center gap-1.5
                 ${showChat
                   ? 'bg-[var(--bg-elevated)] border-[var(--border-accent)] text-[var(--gold)]'
@@ -156,11 +156,11 @@ function App() {
           {/* API Key toggle */}
           <button
             onClick={() => setShowApiKey(!showApiKey)}
-            className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-colors duration-200 touch-manipulation flex items-center justify-center gap-1.5
+            className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center gap-1.5
                        ${apiKey
-                ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
-                : 'text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]'
-              }
+              ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
+              : 'text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]'
+            }
                        hover:bg-[var(--bg-elevated)]`}
           >
             <Key size={14} />
@@ -171,8 +171,26 @@ function App() {
 
       {/* Rank panel dropdown (desktop, lobby) */}
       {showRankPanel && !inGame && playerProfile && (
-        <div className="w-full max-w-sm mx-auto px-4 pt-2 z-40">
+        <div className="w-full max-w-sm mx-auto px-4 pt-2 z-40 animate-scale-in">
           <RankBadge profile={playerProfile} showProgress />
+        </div>
+      )}
+
+      {/* Connection lost banner */}
+      {!isConnected && (
+        <div className="w-full px-3 py-2 flex items-center justify-between gap-2 animate-slide-up z-50"
+          style={{ background: 'rgba(192,57,43,0.2)', borderBottom: '1px solid rgba(192,57,43,0.4)' }}>
+          <div className="flex items-center gap-2 text-xs text-[var(--crimson)]">
+            <WifiOff size={14} className="shrink-0" />
+            {/* Socket.io retries automatically; the Reload button is a manual escape hatch. */}
+            <span>Connection lost — attempting to reconnect…</span>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-[10px] font-bold text-[var(--crimson)] border border-[rgba(192,57,43,0.4)] rounded px-2 py-0.5 hover:bg-[rgba(192,57,43,0.1)] transition-colors shrink-0"
+          >
+            Reload
+          </button>
         </div>
       )}
 

@@ -152,9 +152,80 @@ export const GAMIFICATION_DAILY_MATCH_TARGET = 3;
 export const GAMIFICATION_DAILY_WIN_TARGET = 2;
 export const GAMIFICATION_DAILY_DAMAGE_TARGET = 250;
 export const GAMIFICATION_DAILY_SCORE_TARGET = 900;
+export const GAMIFICATION_FIRST_WIN_BONUS_EMBERS = 150;
+
+export const MS_PER_DAY = 86_400_000;
+
+// === Daily Check-in ===
+
+/** Ember rewards for consecutive check-in days (index = streak day − 1, cycles). */
+export const CHECKIN_REWARDS = [50, 75, 100, 125, 150, 175, 300] as const;
+
+export interface CheckinStatus {
+    streak: number;      // consecutive days including today (0 = not checked in yet today)
+    todayClaimed: boolean;
+    nextReward: number;  // Embers awarded on next (or current) claim
+}
+
+export function getCheckinReward(streakAfterClaim: number): number {
+    const idx = Math.min(streakAfterClaim - 1, CHECKIN_REWARDS.length - 1);
+    return CHECKIN_REWARDS[idx];
+}
+
+// === Weekly Challenges ===
+
+export interface WeeklyChallenge {
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    current: number;
+    target: number;
+    reward: number;
+    unit: 'matches' | 'wins' | 'damage';
+    completed: boolean;
+    progress: number;
+}
+
+export function getWeeklyChallenges(profile: PlayerProfile): { challenges: WeeklyChallenge[]; claimableEmbers: number } {
+    const now = new Date();
+    const weekStart = getUtcWeekStartMs(now);
+    const weekEntries = profile.history.filter(entry => entry.timestamp >= weekStart);
+
+    const weekMatches = weekEntries.length;
+    const weekWins = weekEntries.filter(e => e.won).length;
+    const weekDamage = Math.round(weekEntries.reduce((sum, e) => sum + e.score.damageDealt, 0));
+
+    const makeChallenge = (
+        id: string, title: string, description: string, icon: string,
+        current: number, target: number, reward: number,
+        unit: WeeklyChallenge['unit'],
+    ): WeeklyChallenge => ({
+        id, title, description, icon, current, target, reward, unit,
+        completed: current >= target,
+        progress: target > 0 ? Math.min(1, current / target) : 0,
+    });
+
+    const challenges: WeeklyChallenge[] = [
+        makeChallenge('weekly_battles',  'War Veteran',   'Fight 15 battles this week',       '🛡️', weekMatches, 15,   400, 'matches'),
+        makeChallenge('weekly_wins',     'Conqueror',     'Win 7 battles this week',           '👑', weekWins,    7,    600, 'wins'),
+        makeChallenge('weekly_damage',   'Siege Master',  'Deal 1500 total damage this week',  '💥', weekDamage,  1500, 500, 'damage'),
+    ];
+
+    const claimableEmbers = challenges.filter(c => c.completed).reduce((sum, c) => sum + c.reward, 0);
+    return { challenges, claimableEmbers };
+}
 
 export function getUtcDayStartMs(date: Date): number {
     return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+export function getUtcWeekStartMs(date: Date): number {
+    // Returns the UTC ms for Monday 00:00 of the current week.
+    // Days back to Monday: Sun(0)→6, Mon(1)→0, Tue(2)→1, …, Sat(6)→5
+    const dayOfWeek = date.getUTCDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - diffToMonday);
 }
 
 // === Ranking ===
@@ -253,7 +324,7 @@ export function getGamificationStats(profile: PlayerProfile): GamificationStats 
     };
 }
 
-export function getDailyMissions(profile: PlayerProfile): { missions: DailyMission[]; claimableEmbers: number } {
+export function getDailyMissions(profile: PlayerProfile): { missions: DailyMission[]; claimableEmbers: number; firstWinOfDay: boolean } {
     const createMission = (
         id: DailyMission['id'],
         title: DailyMission['title'],
@@ -280,19 +351,41 @@ export function getDailyMissions(profile: PlayerProfile): { missions: DailyMissi
     const dailyWins = todayEntries.filter(entry => entry.won).length;
     const dailyDamage = Math.round(todayEntries.reduce((sum, entry) => sum + entry.score.damageDealt, 0));
     const dailyScore = Math.round(todayEntries.reduce((sum, entry) => sum + entry.score.totalScore, 0));
+    const dailyAiWins = todayEntries.filter(e => e.won && (e.score.aiBlocksUsed ?? 0) > 0).length;
 
-    const missions: DailyMission[] = [
-        createMission('play_matches', 'Fight daily battles', dailyMatches, GAMIFICATION_DAILY_MATCH_TARGET, 120, 'matches'),
-        createMission('win_matches', 'Claim daily victories', dailyWins, GAMIFICATION_DAILY_WIN_TARGET, 200, 'wins'),
-        createMission('deal_damage', 'Deal King damage', dailyDamage, GAMIFICATION_DAILY_DAMAGE_TARGET, 160, 'damage'),
-        createMission('earn_points', 'Earn score points', dailyScore, GAMIFICATION_DAILY_SCORE_TARGET, 220, 'points'),
+    // Rotating extra missions — one of two alternates picked by UTC day parity
+    const dayIndex = Math.floor(todayStart / 86_400_000);
+    const useHardVariant = dayIndex % 2 === 0;
+
+    // Six-mission pool: always include the four core missions; slot the 5th and 6th from rotating pairs
+    const allMissions: DailyMission[] = [
+        createMission('play_matches', 'Fight daily battles',   dailyMatches, GAMIFICATION_DAILY_MATCH_TARGET, 120, 'matches'),
+        createMission('win_matches',  'Claim daily victories', dailyWins,    GAMIFICATION_DAILY_WIN_TARGET,   200, 'wins'),
+        createMission('deal_damage',  'Deal King damage',      dailyDamage,  GAMIFICATION_DAILY_DAMAGE_TARGET, 160, 'damage'),
+        createMission('earn_points',  'Earn score points',     dailyScore,   GAMIFICATION_DAILY_SCORE_TARGET,  220, 'points'),
+        useHardVariant
+            ? createMission('play_matches_hard', 'Relentless warrior', dailyMatches, 5, 250, 'matches')
+            : createMission('win_ai', 'Win with AI fortress', dailyAiWins, 1, 220, 'wins'),
+        useHardVariant
+            ? createMission('deal_damage_hard', 'Devastating barrage', dailyDamage, 500, 280, 'damage')
+            : createMission('earn_points_hard', 'Score champion', dailyScore, 1800, 300, 'points'),
     ];
+
+    // Select 4 core missions plus 1 rotating bonus mission (5 total).
+    // Comment below is intentional: we always show exactly 5 missions.
+    const missions = allMissions.slice(0, 4);
+    // Append the rotating 5th mission (index 4)
+    missions.push(allMissions[4]);
+
+    // firstWinOfDay: true when the player has exactly one win today,
+    // meaning they just earned their first win of the day.
+    const firstWinOfDay = dailyWins === 1;
 
     const claimableEmbers = missions
         .filter(mission => mission.completed)
         .reduce((sum, mission) => sum + mission.reward, 0);
 
-    return { missions, claimableEmbers };
+    return { missions, claimableEmbers, firstWinOfDay };
 }
 
 // === Achievements ===

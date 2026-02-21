@@ -1,0 +1,20 @@
+{
+  "name": "Fortress AI — Castle War",
+  "short_name": "Fortress AI",
+  "description": "Real-time multiplayer fortress-building battle game powered by AI. Design your castle, then unleash cannon fire on your opponent.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0a12",
+  "theme_color": "#ffd700",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games"],
+  "lang": "en"
+}

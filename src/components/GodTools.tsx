@@ -18,8 +18,18 @@ interface GodToolsProps {
 const MATERIALS: { key: MaterialType; label: string; icon: string }[] = [
     { key: 'wood', label: 'Wood', icon: '🪵' },
     { key: 'stone', label: 'Stone', icon: '🪨' },
+    { key: 'ice', label: 'Ice', icon: '🧊' },
+    { key: 'rubber', label: 'Rubber', icon: '⚫' },
     { key: 'steel', label: 'Steel', icon: '⚙️' },
 ];
+
+const MATERIAL_TIPS: Record<MaterialType, string> = {
+    wood: 'Wood · 30 HP · High friction',
+    stone: 'Stone · 80 HP · Heavy',
+    ice: 'Ice · 15 HP · Slippery',
+    rubber: 'Rubber · 40 HP · Bouncy',
+    steel: 'Steel · 200 HP · Dense',
+};
 
 const SHAPES: { key: ShapeType; label: string }[] = [
     { key: 'rectangle', label: 'Block' },
@@ -104,7 +114,7 @@ export const GodTools = ({
                                         flex items-center gap-1.5 min-h-[40px] sm:min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold
                                         transition-all duration-200 touch-manipulation relative
                                         ${isActive
-                                            ? 'text-white shadow-lg'
+                                            ? 'text-white shadow-lg material-selected'
                                             : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] active:text-[var(--text-primary)]'
                                         }
                                     `}
@@ -115,7 +125,7 @@ export const GodTools = ({
                                     } : {
                                         border: '1.5px solid transparent',
                                     }}
-                                    title={mat.label}
+                                    title={MATERIAL_TIPS[mat.key]}
                                 >
                                     <span className="text-sm">{mat.icon}</span>
                                     <span className="hidden sm:inline">{mat.label}</span>
