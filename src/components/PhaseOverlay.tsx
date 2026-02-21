@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import type { MatchPhase, Side, MatchScores, PlayerProfile } from '../types';
-import { getRankTier, getNextRankProgress, getUnlockedAchievements, getPerformanceGrade, PERFORMANCE_GRADE_COLORS, ACHIEVEMENT_RARITY_COLORS } from '../types';
+import { getRankTier, getNextRankProgress, getUnlockedAchievements, getPerformanceGrade, PERFORMANCE_GRADE_COLORS, ACHIEVEMENT_RARITY_COLORS, getUtcDayStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS } from '../types';
 
 interface PhaseOverlayProps {
     phase: MatchPhase;
@@ -179,6 +179,12 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const prevAchievementIds = new Set(prevAchievements.map(a => a.id));
         const newlyUnlocked = currentAchievements.filter(a => !prevAchievementIds.has(a.id));
 
+        // First-win-of-day detection
+        const todayStart = getUtcDayStartMs(new Date());
+        const prevDailyWins = prevPlayerProfile?.history.filter(e => e.timestamp >= todayStart && e.won).length ?? 0;
+        const currDailyWins = playerProfile?.history.filter(e => e.timestamp >= todayStart && e.won).length ?? 0;
+        const isFirstWinOfDay = isWinner && prevDailyWins === 0 && currDailyWins >= 1;
+
         return (
             <div className="flex items-center justify-center w-full">
                 <div className={`rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-xl border text-center shadow-2xl w-full max-w-sm ${isWinner
@@ -271,6 +277,20 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                         <span>{a.title}</span>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* First Win of the Day badge */}
+                    {isFirstWinOfDay && (
+                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
+                            <div className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2"
+                                style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.35)' }}>
+                                <span className="text-base leading-none">⭐</span>
+                                <div className="text-center">
+                                    <p className="text-[11px] font-bold text-[var(--gold)]">First Win of the Day!</p>
+                                    <p className="text-[9px] text-[var(--text-muted)]">+{GAMIFICATION_FIRST_WIN_BONUS_EMBERS} Embers bonus · Come back tomorrow!</p>
+                                </div>
                             </div>
                         </div>
                     )}

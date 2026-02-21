@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy } from 'lucide-react';
 import { RankBadge } from './RankBadge';
-import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS } from '../types';
+import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -145,8 +145,23 @@ export const Lobby = ({
     const [missionToast, setMissionToast] = useState<string | null>(null);
     const [claimedMissionDay, setClaimedMissionDay] = useState(() => localStorage.getItem('fortress_missions_claim_day') || '');
     const claimToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Check-in state
+    const [checkinStreak, setCheckinStreak] = useState(() => parseInt(localStorage.getItem('fortress_checkin_streak') || '0', 10));
+    const [checkinLastDay, setCheckinLastDay] = useState(() => localStorage.getItem('fortress_checkin_last_day') || '');
+    const todayKey = String(getUtcDayStartMs(new Date()));
+    const checkinToday = checkinLastDay === todayKey;
+    const pendingCheckinStreak = checkinToday ? checkinStreak : checkinStreak + 1;
+    const checkinRewardToday = getCheckinReward(pendingCheckinStreak);
+
+    // Weekly challenge claim state
+    const [claimedWeekKey, setClaimedWeekKey] = useState(() => localStorage.getItem('fortress_weekly_claim_week') || '');
+    const weekKey = String(getUtcWeekStartMs(new Date()));
+    const claimedWeekRewards = claimedWeekKey === weekKey;
+
     const gamification = playerProfile ? getGamificationStats(playerProfile) : null;
     const dailyMissions = playerProfile ? getDailyMissions(playerProfile) : null;
+    const weeklyChallenges = playerProfile ? getWeeklyChallenges(playerProfile) : null;
     const claimedMissionRewards = claimedMissionDay === missionDayKey;
     const claimableEmbers = dailyMissions && !claimedMissionRewards ? dailyMissions.claimableEmbers : 0;
     const claimButtonLabel = claimedMissionRewards
@@ -154,6 +169,12 @@ export const Lobby = ({
         : claimableEmbers > 0
             ? `Claim ${claimableEmbers} Embers`
             : 'Complete missions to claim rewards';
+    const weeklyClaimableEmbers = weeklyChallenges && !claimedWeekRewards ? weeklyChallenges.claimableEmbers : 0;
+    const weeklyClaimButtonLabel = claimedWeekRewards
+        ? 'Weekly rewards claimed'
+        : weeklyClaimableEmbers > 0
+            ? `Claim ${weeklyClaimableEmbers} Embers`
+            : 'Complete challenges to claim';
 
     useEffect(() => {
         onGetProfile?.();
@@ -210,6 +231,28 @@ export const Lobby = ({
         setMissionToast(`+${dailyMissions.claimableEmbers} Embers claimed!`);
         if (claimToastTimeoutRef.current) clearTimeout(claimToastTimeoutRef.current);
         claimToastTimeoutRef.current = setTimeout(() => setMissionToast(null), 2500);
+    };
+
+    const handleCheckin = () => {
+        if (checkinToday) return;
+        const yesterday = String(getUtcDayStartMs(new Date(Date.now() - MS_PER_DAY)));
+        const newStreak = checkinLastDay === yesterday ? checkinStreak + 1 : 1;
+        setCheckinStreak(newStreak);
+        setCheckinLastDay(todayKey);
+        localStorage.setItem('fortress_checkin_streak', String(newStreak));
+        localStorage.setItem('fortress_checkin_last_day', todayKey);
+        setMissionToast(`+${checkinRewardToday} Embers — Day ${newStreak} check-in!`);
+        if (claimToastTimeoutRef.current) clearTimeout(claimToastTimeoutRef.current);
+        claimToastTimeoutRef.current = setTimeout(() => setMissionToast(null), 3000);
+    };
+
+    const handleClaimWeeklyChallenges = () => {
+        if (!weeklyChallenges || weeklyChallenges.claimableEmbers <= 0 || claimedWeekRewards) return;
+        setClaimedWeekKey(weekKey);
+        localStorage.setItem('fortress_weekly_claim_week', weekKey);
+        setMissionToast(`+${weeklyChallenges.claimableEmbers} Embers — Weekly rewards!`);
+        if (claimToastTimeoutRef.current) clearTimeout(claimToastTimeoutRef.current);
+        claimToastTimeoutRef.current = setTimeout(() => setMissionToast(null), 3000);
     };
 
     const getMissionStatus = (mission: { completed: boolean; current: number; target: number }) => {
@@ -528,6 +571,61 @@ export const Lobby = ({
                     {playerProfile && (
                         <div className="mt-2">
                             <RankBadge profile={playerProfile} showProgress />
+
+                            {/* Daily Check-in */}
+                            <div className="mt-2 card-dark rounded-xl p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                                        <Calendar size={12} />
+                                        Daily Check-in
+                                    </p>
+                                    {checkinToday && (
+                                        <span className="text-[10px] text-[var(--emerald)] font-bold">✓ Claimed</span>
+                                    )}
+                                </div>
+                                {/* Streak day bubbles */}
+                                <div className="flex justify-between gap-1 mb-2">
+                                    {CHECKIN_REWARDS.map((reward, idx) => {
+                                        const dayNum = idx + 1;
+                                        const totalDays = CHECKIN_REWARDS.length;
+                                        // A day slot is "past" when the confirmed streak has passed it
+                                        const isPast = checkinStreak >= dayNum;
+                                        // A day slot is "today" when it matches the pending streak position
+                                        const isTodaySlot = !isPast && (
+                                            pendingCheckinStreak % totalDays === dayNum % totalDays ||
+                                            (pendingCheckinStreak === totalDays && idx === totalDays - 1)
+                                        );
+                                        const isWeekly = idx === totalDays - 1;
+                                        return (
+                                            <div key={idx} className="flex-1 flex flex-col items-center gap-0.5">
+                                                <div className={`w-full aspect-square rounded-lg flex items-center justify-center text-[9px] font-bold transition-all ${
+                                                    isPast ? 'opacity-50' : isTodaySlot ? 'ring-1 ring-[var(--gold)]' : ''
+                                                }`} style={{
+                                                    background: isPast
+                                                        ? 'rgba(46,204,113,0.25)'
+                                                        : isWeekly
+                                                            ? 'rgba(245,158,11,0.18)'
+                                                            : 'rgba(255,255,255,0.06)',
+                                                    border: isPast ? '1px solid rgba(46,204,113,0.4)' : isTodaySlot ? '1px solid rgba(255,215,0,0.6)' : '1px solid rgba(255,255,255,0.08)',
+                                                }}>
+                                                    {isPast ? '✓' : isWeekly ? '🌟' : `${reward}`}
+                                                </div>
+                                                <span className="text-[8px] text-[var(--text-muted)]">D{dayNum}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    onClick={handleCheckin}
+                                    disabled={checkinToday}
+                                    className="btn-primary w-full min-h-[38px] rounded-lg text-xs touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                                >
+                                    {checkinToday
+                                        ? `Come back tomorrow (+${getCheckinReward(pendingCheckinStreak + 1)} Embers)`
+                                        : `Check in — Claim ${checkinRewardToday} Embers${checkinStreak > 0 ? ` · Day ${pendingCheckinStreak}` : ''}`}
+                                </button>
+                            </div>
+
                             {gamification && (
                                 <div className="mt-2 card-dark rounded-xl p-3">
                                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Campaign Board</p>
@@ -565,6 +663,13 @@ export const Lobby = ({
                                             {claimableEmbers} Embers
                                         </span>
                                     </div>
+                                    {dailyMissions.firstWinOfDay && (
+                                        <div className="mb-2 rounded-lg px-2 py-1.5 flex items-center gap-1.5 text-[10px] font-bold"
+                                            style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.3)', color: 'var(--gold)' }}>
+                                            <span>⭐</span>
+                                            <span>First win of the day! +{GAMIFICATION_FIRST_WIN_BONUS_EMBERS} Embers</span>
+                                        </div>
+                                    )}
                                     <div className="flex flex-col gap-2">
                                         {dailyMissions.missions.map((mission) => {
                                             const missionStatus = getMissionStatus(mission);
@@ -598,6 +703,60 @@ export const Lobby = ({
                                     </div>
                                 </div>
                             )}
+
+                            {/* Weekly Challenges */}
+                            {weeklyChallenges && (
+                                <div className="mt-2 card-dark rounded-xl p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                                            <Trophy size={12} />
+                                            Weekly Challenges
+                                        </p>
+                                        <span className="text-[10px] text-[var(--gold)] font-bold flex items-center gap-1">
+                                            <Gift size={11} />
+                                            {weeklyClaimableEmbers} Embers
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        {weeklyChallenges.challenges.map((challenge) => {
+                                            const isCompleted = challenge.completed;
+                                            const isClaimed = claimedWeekRewards && isCompleted;
+                                            return (
+                                                <div key={challenge.id} className="rounded-lg px-2 py-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                                        <p className="text-xs text-[var(--text-secondary)] flex items-center gap-1">
+                                                            <span className="text-sm leading-none">{challenge.icon}</span>
+                                                            {challenge.title}
+                                                        </p>
+                                                        <span className={`text-[10px] font-bold ${isClaimed ? 'text-[var(--gold)]' : isCompleted ? 'text-[var(--emerald)]' : 'text-[var(--text-muted)]'}`}>
+                                                            {isClaimed ? 'CLAIMED' : isCompleted ? 'DONE' : `${challenge.current}/${challenge.target}`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-1.5 rounded-full overflow-hidden mb-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-500"
+                                                            style={{ width: `${Math.round(challenge.progress * 100)}%`, background: isCompleted ? 'linear-gradient(90deg, #F59E0B, #FFD700)' : 'linear-gradient(90deg, #A78BFA, #7C3AED)' }}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] font-mono" style={{ color: '#F59E0B' }}>Reward: {challenge.reward} Embers</p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="mt-2">
+                                        <button
+                                            onClick={handleClaimWeeklyChallenges}
+                                            disabled={weeklyClaimableEmbers <= 0 || claimedWeekRewards}
+                                            className="w-full min-h-[40px] rounded-lg text-xs touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none font-bold"
+                                            style={{ background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.4)', color: '#F59E0B' }}
+                                        >
+                                            {weeklyClaimButtonLabel}
+                                        </button>
+                                        <p className="text-[9px] text-[var(--text-muted)] mt-1 text-center">Resets every Monday 00:00 UTC</p>
+                                    </div>
+                                </div>
+                            )}
+
                             {missionToast && (
                                 <div className="mt-2 rounded-lg px-3 py-2 text-xs text-center font-bold border border-[rgba(46,204,113,0.35)] text-[var(--emerald)]" style={{ background: 'rgba(46,204,113,0.12)' }}>
                                     {missionToast}
