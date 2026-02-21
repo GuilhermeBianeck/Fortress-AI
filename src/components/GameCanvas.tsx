@@ -75,6 +75,8 @@ const PHYSICS_MAX_SPEED = 1000;
 const PHYSICS_POWER_MULTIPLIER = 1.0;
 const PHYSICS_AIR_FRICTION = 0.005;
 
+interface DamageNumber { side: Side; damage: number; x: number; y: number; age: number; }
+
 export const GameCanvas = ({
     gameState, terrain, onSpawn, kingsHp, mySide,
     gameMode, phase, turnPlayer, onFire,
@@ -156,7 +158,6 @@ export const GameCanvas = ({
     const shakeRef = useRef({ amplitude: 0, remaining: 0, max: 0 });
 
     // Floating damage numbers
-    interface DamageNumber { side: Side; damage: number; x: number; y: number; age: number; }
     const damageNumbersRef = useRef<DamageNumber[]>([]);
 
     // Particles
@@ -1103,8 +1104,8 @@ export const GameCanvas = ({
             ctx.scale(scale, scale);
             ctx.font = 'bold 14px monospace';
             ctx.textAlign = 'center';
-            ctx.fillStyle = `rgba(239, 68, 68, ${alpha.toFixed(2)})`;
-            ctx.strokeStyle = `rgba(0, 0, 0, ${(alpha * 0.7).toFixed(2)})`;
+            ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
+            ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.7})`;
             ctx.lineWidth = 3;
             const text = `-${dn.damage}`;
             ctx.strokeText(text, 0, 0);
