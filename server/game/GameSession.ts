@@ -309,7 +309,7 @@ export class GameSession {
         }
     }
 
-    handleFireProjectile(socketId: string, data: { angle: number; power: number }) {
+    handleFireProjectile(socketId: string, data: { angle?: unknown; power?: unknown }) {
         if (!this.stateMachine.canFire()) return;
 
         const player = this.players.get(socketId);
@@ -318,11 +318,17 @@ export class GameSession {
         // Only the current turn's player can fire
         if (player.side !== this.stateMachine.getCurrentTurn()) return;
 
+        if (typeof data.angle !== 'number' || !Number.isFinite(data.angle) ||
+            typeof data.power !== 'number' || !Number.isFinite(data.power)) {
+            return;
+        }
+
         this.fireProjectile(player.side, data.angle, data.power);
     }
 
     fireProjectile(side: Side, rawAngle: number, rawPower: number): void {
         if (!this.stateMachine.canFire()) return;
+        if (!Number.isFinite(rawAngle) || !Number.isFinite(rawPower)) return;
 
         const player = this.getPlayerBySide(side);
         if (!player) return;
@@ -662,15 +668,21 @@ export class GameSession {
                 // --- King damage from any collision (check BOTH kings) ---
                 for (const ps of this.players.values()) {
                     let kingHit = false;
+                    let kingBody: Matter.Body | null = null;
                     let otherBody: Matter.Body | null = null;
 
-                    if (bodyA.id === ps.kingState.bodyId) { otherBody = bodyB; kingHit = true; }
-                    else if (bodyB.id === ps.kingState.bodyId) { otherBody = bodyA; kingHit = true; }
+                    if (bodyA.id === ps.kingState.bodyId) { kingBody = bodyA; otherBody = bodyB; kingHit = true; }
+                    else if (bodyB.id === ps.kingState.bodyId) { kingBody = bodyB; otherBody = bodyA; kingHit = true; }
 
-                    if (kingHit && otherBody && ps.kingState.hp > 0) {
-                        const getMomentum = (b: Matter.Body) => b.isStatic ? 0 : b.speed * b.mass;
-                        const impactForce = getMomentum(bodyA) + getMomentum(bodyB);
-                        if (impactForce >= IMPACT_THRESHOLD && !isNaN(impactForce)) {
+                    if (kingHit && kingBody && otherBody && ps.kingState.hp > 0) {
+                        const relativeVelocityX = kingBody.velocity.x - otherBody.velocity.x;
+                        const relativeVelocityY = kingBody.velocity.y - otherBody.velocity.y;
+                        const relativeSpeed = Math.hypot(relativeVelocityX, relativeVelocityY);
+                        const reducedMass = otherBody.isStatic
+                            ? kingBody.mass
+                            : (kingBody.mass * otherBody.mass) / (kingBody.mass + otherBody.mass);
+                        const impactForce = relativeSpeed * reducedMass;
+                        if (impactForce >= IMPACT_THRESHOLD && Number.isFinite(impactForce)) {
                             const multiplier = DAMAGE_MULTIPLIERS[otherBody.label] ?? 1.0;
                             const damage = ((impactForce - IMPACT_THRESHOLD) * multiplier) * DAMAGE_SCALE;
                             ps.kingState.hp = Math.max(0, ps.kingState.hp - damage);
