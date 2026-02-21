@@ -662,13 +662,13 @@ export class GameSession {
                 // --- King damage from any collision (check BOTH kings) ---
                 for (const ps of this.players.values()) {
                     let kingHit = false;
+                    let kingBody: Matter.Body | null = null;
                     let otherBody: Matter.Body | null = null;
 
-                    if (bodyA.id === ps.kingState.bodyId) { otherBody = bodyB; kingHit = true; }
-                    else if (bodyB.id === ps.kingState.bodyId) { otherBody = bodyA; kingHit = true; }
+                    if (bodyA.id === ps.kingState.bodyId) { kingBody = bodyA; otherBody = bodyB; kingHit = true; }
+                    else if (bodyB.id === ps.kingState.bodyId) { kingBody = bodyB; otherBody = bodyA; kingHit = true; }
 
-                    if (kingHit && otherBody && ps.kingState.hp > 0) {
-                        const kingBody = ps.kingBody;
+                    if (kingHit && kingBody && otherBody && ps.kingState.hp > 0) {
                         const relativeVelocityX = kingBody.velocity.x - otherBody.velocity.x;
                         const relativeVelocityY = kingBody.velocity.y - otherBody.velocity.y;
                         const relativeSpeed = Math.hypot(relativeVelocityX, relativeVelocityY);
