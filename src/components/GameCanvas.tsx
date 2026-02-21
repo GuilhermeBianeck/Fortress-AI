@@ -15,6 +15,7 @@ interface GameCanvasProps {
     onFire: (angle: number, power: number) => void;
     setBlockDestroyedCallback: (cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => void;
     setProjectileImpactCallback: (cb: ((data: { position: Vector }) => void) | null) => void;
+    setKingDamageCallback: (cb: ((data: { side: Side; damage: number }) => void) | null) => void;
     playerNames?: { left: string; right: string };
     hazards?: HazardData[];
     roundScore?: { left: number; right: number };
@@ -74,10 +75,12 @@ const PHYSICS_MAX_SPEED = 1000;
 const PHYSICS_POWER_MULTIPLIER = 1.0;
 const PHYSICS_AIR_FRICTION = 0.005;
 
+interface DamageNumber { side: Side; damage: number; x: number; y: number; age: number; }
+
 export const GameCanvas = ({
     gameState, terrain, onSpawn, kingsHp, mySide,
     gameMode, phase, turnPlayer, onFire,
-    setBlockDestroyedCallback, setProjectileImpactCallback,
+    setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback,
     playerNames, hazards, roundScore, currentRound,
 }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -153,6 +156,9 @@ export const GameCanvas = ({
 
     // Screen shake
     const shakeRef = useRef({ amplitude: 0, remaining: 0, max: 0 });
+
+    // Floating damage numbers
+    const damageNumbersRef = useRef<DamageNumber[]>([]);
 
     // Particles
     const particlesRef = useRef(new ParticleSystem());
@@ -236,11 +242,24 @@ export const GameCanvas = ({
         setProjectileImpactCallback((data) => {
             particlesRef.current.emit(data.position.x, data.position.y, 6, '#888');
         });
+        setKingDamageCallback((data) => {
+            const kingHp = kingsHpRef.current[data.side];
+            const x = kingHp.x ?? (data.side === 'left' ? 300 : WORLD_WIDTH - 300);
+            const y = (kingHp.y ?? 400) - 30;
+            damageNumbersRef.current.push({
+                side: data.side,
+                damage: Math.round(data.damage),
+                x: x + (Math.random() - 0.5) * 20,
+                y,
+                age: 0,
+            });
+        });
         return () => {
             setBlockDestroyedCallback(null);
             setProjectileImpactCallback(null);
+            setKingDamageCallback(null);
         };
-    }, [setBlockDestroyedCallback, setProjectileImpactCallback, triggerShake]);
+    }, [setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback, triggerShake]);
 
     // Update projectile trails from gameState
     useEffect(() => {
@@ -327,20 +346,16 @@ export const GameCanvas = ({
 
     // 60fps render loop
     useEffect(() => {
-        console.log('GameCanvas: useEffect mount - starting render loop');
         const render = () => {
             renderFrame();
             rafRef.current = requestAnimationFrame(render);
         };
         rafRef.current = requestAnimationFrame(render);
         return () => {
-            console.log('GameCanvas: useEffect unmount - stopping render loop');
             cancelAnimationFrame(rafRef.current);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const debugLogRef = useRef(false);
 
     const renderFrame = () => {
         const canvas = canvasRef.current;
@@ -360,19 +375,6 @@ export const GameCanvas = ({
         const terr = terrainRef.current;
         const cam = cameraRef.current;
 
-        if (!debugLogRef.current) {
-            console.log('renderFrame: first run', {
-                hasTerrain: !!terr,
-                points: terr?.points?.length,
-                camX: cam.x,
-                camTargetX: cam.targetX,
-                canvasWidth: canvas.width,
-                canvasHeight: canvas.height,
-                firstPoint: terr?.points?.[0],
-                lastPoint: terr?.points?.[terr.points.length - 1]
-            });
-            debugLogRef.current = true;
-        }
         const kings = kingsHpRef.current;
         const side = mySideRef.current;
         const currentPhase = phaseRef.current;
@@ -637,18 +639,37 @@ export const GameCanvas = ({
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Build zone overlays (gold-tinted)
+            // Build zone overlays (more visible during build phase)
+            const isBuildPhase = currentPhase === 'build';
             for (const zone of terr.buildZones) {
-                ctx.fillStyle = 'rgba(255, 215, 0, 0.04)';
-                ctx.fillRect(zone.x, zone.y - 100, zone.width, 100);
-                ctx.strokeStyle = 'rgba(255, 215, 0, 0.12)';
-                ctx.lineWidth = 1;
+                const zoneAlpha = isBuildPhase ? 0.08 : 0.04;
+                const borderAlpha = isBuildPhase ? 0.25 : 0.12;
+                ctx.fillStyle = `rgba(255, 215, 0, ${zoneAlpha})`;
+                ctx.fillRect(zone.x, zone.y - 200, zone.width, 200);
+                ctx.strokeStyle = `rgba(255, 215, 0, ${borderAlpha})`;
+                ctx.lineWidth = isBuildPhase ? 1.5 : 1;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
                 ctx.moveTo(zone.x, zone.y - 2);
                 ctx.lineTo(zone.x + zone.width, zone.y - 2);
                 ctx.stroke();
+                // Vertical build zone borders during build phase
+                if (isBuildPhase) {
+                    ctx.beginPath();
+                    ctx.moveTo(zone.x, zone.y - 200);
+                    ctx.lineTo(zone.x, zone.y - 2);
+                    ctx.moveTo(zone.x + zone.width, zone.y - 200);
+                    ctx.lineTo(zone.x + zone.width, zone.y - 2);
+                    ctx.stroke();
+                }
                 ctx.setLineDash([]);
+                // "BUILD ZONE" label during build phase
+                if (isBuildPhase) {
+                    ctx.font = 'bold 11px monospace';
+                    ctx.fillStyle = `rgba(255, 215, 0, 0.2)`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText('BUILD ZONE', zone.x + zone.width / 2, zone.y - 185);
+                }
             }
 
             // Center divider — subtle gold dashed line
@@ -1064,6 +1085,33 @@ export const GameCanvas = ({
 
         // Draw particles (in world space)
         particles.draw(ctx);
+
+        // Draw floating damage numbers (in world space)
+        const dmgNums = damageNumbersRef.current;
+        for (let i = dmgNums.length - 1; i >= 0; i--) {
+            const dn = dmgNums[i];
+            dn.age++;
+            if (dn.age > 60) {
+                dmgNums.splice(i, 1);
+                continue;
+            }
+            const progress = dn.age / 60;
+            const alpha = 1 - progress;
+            const yOffset = -progress * 40;
+            const scale = 1 + progress * 0.3;
+            ctx.save();
+            ctx.translate(dn.x, dn.y + yOffset);
+            ctx.scale(scale, scale);
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
+            ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.7})`;
+            ctx.lineWidth = 3;
+            const text = `-${dn.damage}`;
+            ctx.strokeText(text, 0, 0);
+            ctx.fillText(text, 0, 0);
+            ctx.restore();
+        }
 
         // === End world drawing ===
         ctx.restore();

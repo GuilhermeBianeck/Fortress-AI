@@ -19,8 +19,8 @@ function App() {
     matchScores, playerProfile, prevPlayerProfile, isConnected,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
-    sendChatMessage, requestRematch, getProfile,
-    setBlockDestroyedCallback, setProjectileImpactCallback,
+    sendChatMessage, requestRematch, getProfile, returnToLobby,
+    setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback,
   } = useGameState();
 
   // God Tools state
@@ -254,6 +254,7 @@ function App() {
                     onFire={fireProjectile}
                     setBlockDestroyedCallback={setBlockDestroyedCallback}
                     setProjectileImpactCallback={setProjectileImpactCallback}
+                    setKingDamageCallback={setKingDamageCallback}
                     playerNames={playerNamesMap}
                     hazards={hazards}
                     roundScore={roundScore}
@@ -275,6 +276,7 @@ function App() {
                           currentRound={currentRound}
                           rematchState={rematchState}
                           onRequestRematch={requestRematch}
+                          onReturnToLobby={returnToLobby}
                           hazards={hazards}
                           matchScores={matchScores}
                           playerProfile={playerProfile}
