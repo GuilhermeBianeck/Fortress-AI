@@ -7,7 +7,7 @@ import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
 import { RankBadge } from './components/RankBadge';
-import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle } from 'lucide-react';
+import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, WifiOff } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
 
@@ -16,7 +16,7 @@ function App() {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards,
-    matchScores, playerProfile, prevPlayerProfile,
+    matchScores, playerProfile, prevPlayerProfile, isConnected,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
     sendChatMessage, requestRematch, getProfile,
@@ -173,6 +173,24 @@ function App() {
       {showRankPanel && !inGame && playerProfile && (
         <div className="w-full max-w-sm mx-auto px-4 pt-2 z-40 animate-scale-in">
           <RankBadge profile={playerProfile} showProgress />
+        </div>
+      )}
+
+      {/* Connection lost banner */}
+      {!isConnected && (
+        <div className="w-full px-3 py-2 flex items-center justify-between gap-2 animate-slide-up z-50"
+          style={{ background: 'rgba(192,57,43,0.2)', borderBottom: '1px solid rgba(192,57,43,0.4)' }}>
+          <div className="flex items-center gap-2 text-xs text-[var(--crimson)]">
+            <WifiOff size={14} className="shrink-0" />
+            {/* Socket.io retries automatically; the Reload button is a manual escape hatch. */}
+            <span>Connection lost — attempting to reconnect…</span>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-[10px] font-bold text-[var(--crimson)] border border-[rgba(192,57,43,0.4)] rounded px-2 py-0.5 hover:bg-[rgba(192,57,43,0.1)] transition-colors shrink-0"
+          >
+            Reload
+          </button>
         </div>
       )}
 

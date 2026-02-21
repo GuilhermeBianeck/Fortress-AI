@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy } from 'lucide-react';
 import { RankBadge } from './RankBadge';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 
@@ -23,18 +23,20 @@ export interface LobbyProps {
    Ember Particle Component (CSS-driven)
    ═══════════════════════════════════════ */
 const EmberParticles = () => {
-    const embers = Array.from({ length: 18 }, (_, i) => ({
-        id: i,
-        left: `${Math.random() * 100}%`,
-        delay: `${Math.random() * 8}s`,
-        duration: `${6 + Math.random() * 8}s`,
-        size: 2 + Math.random() * 3,
-        opacity: 0.3 + Math.random() * 0.5,
-    }));
+    const embersRef = useRef(
+        Array.from({ length: 18 }, (_, i) => ({
+            id: i,
+            left: `${Math.random() * 100}%`,
+            delay: `${Math.random() * 8}s`,
+            duration: `${6 + Math.random() * 8}s`,
+            size: 2 + Math.random() * 3,
+            opacity: 0.3 + Math.random() * 0.5,
+        }))
+    );
 
     return (
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]">
-            {embers.map(e => (
+            {embersRef.current.map(e => (
                 <div
                     key={e.id}
                     className="ember animate-ember"
@@ -128,6 +130,10 @@ const TIPS = [
     '🎯 Aim at the base of enemy walls for maximum destruction',
     '🛡️ Build walls in front of your King for protection',
     '🔥 Steel blocks are nearly indestructible',
+    '🧊 Ice blocks are slippery — shots glance off at odd angles',
+    '⚫ Rubber blocks absorb impacts and bounce projectiles back',
+    '🤖 Let AI design your fortress, then refine it manually',
+    '👑 Protect your King at all costs — losing it ends the round',
 ];
 
 export const Lobby = ({
@@ -145,6 +151,7 @@ export const Lobby = ({
     const [missionToast, setMissionToast] = useState<string | null>(null);
     const [claimedMissionDay, setClaimedMissionDay] = useState(() => localStorage.getItem('fortress_missions_claim_day') || '');
     const claimToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [codeCopied, setCodeCopied] = useState(false);
 
     // Check-in state
     const [checkinStreak, setCheckinStreak] = useState(() => parseInt(localStorage.getItem('fortress_checkin_streak') || '0', 10));
@@ -261,6 +268,18 @@ export const Lobby = ({
         return { label: `${mission.current}/${mission.target}`, className: 'text-[var(--text-muted)]' };
     };
 
+    const handleCopyCode = (code: string) => {
+        navigator.clipboard.writeText(code).then(() => {
+            setCodeCopied(true);
+            setTimeout(() => setCodeCopied(false), 2000);
+        }).catch(() => {
+            // Clipboard API requires HTTPS / user gesture — silently ignore
+            // (text is already selectable with the select-all class on the code element)
+            setCodeCopied(true);
+            setTimeout(() => setCodeCopied(false), 2000);
+        });
+    };
+
     // ─── Waiting Room View — VS Card ───
     if (roomState) {
         const isSinglePlayer = roomState.opponentName === 'Training Bot';
@@ -284,11 +303,24 @@ export const Lobby = ({
                     {/* Room Code for PvP */}
                     {!isSinglePlayer && (
                         <>
-                            <div className="text-4xl font-mono font-bold text-[var(--gold)] tracking-[0.3em] mb-2 select-all text-glow-gold">
-                                {roomState.roomId}
+                            <div className="flex items-center justify-center gap-3 mb-2">
+                                <div className="text-4xl font-mono font-bold text-[var(--gold)] tracking-[0.3em] select-all text-glow-gold">
+                                    {roomState.roomId}
+                                </div>
+                                <button
+                                    onClick={() => handleCopyCode(roomState.roomId)}
+                                    title="Copy room code"
+                                    className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border transition-all duration-200 touch-manipulation ${
+                                        codeCopied
+                                            ? 'text-[var(--emerald)] border-[rgba(46,204,113,0.4)] bg-[rgba(46,204,113,0.1)]'
+                                            : 'text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--gold)] hover:border-[var(--border-accent)] hover:bg-[var(--bg-elevated)]'
+                                    }`}
+                                >
+                                    {codeCopied ? <Check size={16} /> : <Copy size={16} />}
+                                </button>
                             </div>
                             <p className="text-xs text-[var(--text-secondary)] mb-6">
-                                Share this code with your opponent
+                                {codeCopied ? '✓ Copied to clipboard!' : 'Share this code with your opponent'}
                             </p>
                         </>
                     )}

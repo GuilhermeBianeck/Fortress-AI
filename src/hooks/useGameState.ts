@@ -67,6 +67,7 @@ export const useGameState = () => {
     const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(() => loadStoredProfile());
     const [prevPlayerProfile, setPrevPlayerProfile] = useState<PlayerProfile | null>(null);
     const playerProfileRef = useRef<PlayerProfile | null>(loadStoredProfile());
+    const [isConnected, setIsConnected] = useState(true);
 
     const socketRef = useRef<Socket | null>(null);
     const mySideRef = useRef<Side>('left');
@@ -80,7 +81,7 @@ export const useGameState = () => {
         socketRef.current = io(SERVER_URL, { auth: { uuid: playerUuid } });
 
         socketRef.current.on('connect', () => {
-            console.log('Connected to Game Server');
+            setIsConnected(true);
         });
 
         // --- Game state ---
@@ -93,7 +94,6 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('terrain', (data: TerrainData & { hazards?: any[] }) => {
-            console.log('Terrain received:', data.seed);
             setTerrain(data);
             if (data.hazards) {
                 setHazards(data.hazards);
@@ -129,11 +129,9 @@ export const useGameState = () => {
                 ...prev,
                 [data.side]: { hp: data.hp, maxHp: data.maxHp },
             }));
-            console.log(`${data.side} King hit by ${data.source}! Damage: ${data.damage.toFixed(1)} | HP: ${data.hp.toFixed(1)}/${data.maxHp}`);
         });
 
-        socketRef.current.on('king_dead', (data: { side: Side }) => {
-            console.log(`${data.side} King has fallen!`);
+        socketRef.current.on('king_dead', (_data: { side: Side }) => {
         });
 
         // --- Room/lobby events ---
@@ -173,10 +171,9 @@ export const useGameState = () => {
             setRoomState(prev => prev ? { ...prev, opponentConnected: true, opponentName: data.name || 'Player' } : prev);
         });
 
-        socketRef.current.on('player_left', (data: { side: Side; reason: string }) => {
+        socketRef.current.on('player_left', (_data: { side: Side; reason: string }) => {
             setRoomState(prev => prev ? { ...prev, opponentConnected: false } : prev);
             setRematchState('none');
-            console.log(`Player ${data.side} left: ${data.reason}`);
         });
 
         socketRef.current.on('player_ready_ack', (_data: { side: Side }) => {
@@ -276,7 +273,7 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('disconnect', () => {
-            console.log('Disconnected from Game Server');
+            setIsConnected(false);
         });
 
         return () => {
@@ -352,7 +349,7 @@ export const useGameState = () => {
         gameState, terrain, buildStatus, kingsHp,
         roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
         chatMessages, rematchState, roundScore, currentRound, hazards,
-        matchScores, playerProfile, prevPlayerProfile,
+        matchScores, playerProfile, prevPlayerProfile, isConnected,
         createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
         spawnBox, requestBuild, fireProjectile,
         sendChatMessage, requestRematch, getProfile,
