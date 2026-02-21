@@ -668,8 +668,14 @@ export class GameSession {
                     else if (bodyB.id === ps.kingState.bodyId) { otherBody = bodyA; kingHit = true; }
 
                     if (kingHit && otherBody && ps.kingState.hp > 0) {
-                        const getMomentum = (b: Matter.Body) => b.isStatic ? 0 : b.speed * b.mass;
-                        const impactForce = getMomentum(bodyA) + getMomentum(bodyB);
+                        const kingBody = ps.kingBody;
+                        const relativeVelocityX = kingBody.velocity.x - otherBody.velocity.x;
+                        const relativeVelocityY = kingBody.velocity.y - otherBody.velocity.y;
+                        const relativeSpeed = Math.hypot(relativeVelocityX, relativeVelocityY);
+                        const reducedMass = otherBody.isStatic
+                            ? kingBody.mass
+                            : (kingBody.mass * otherBody.mass) / (kingBody.mass + otherBody.mass);
+                        const impactForce = relativeSpeed * reducedMass;
                         if (impactForce >= IMPACT_THRESHOLD && !isNaN(impactForce)) {
                             const multiplier = DAMAGE_MULTIPLIERS[otherBody.label] ?? 1.0;
                             const damage = ((impactForce - IMPACT_THRESHOLD) * multiplier) * DAMAGE_SCALE;
