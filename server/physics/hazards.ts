@@ -77,8 +77,7 @@ export function generateHazards(terrain: TerrainResult, seed: number): HazardDat
     return hazards;
 }
 
-export function applyWindForce(bodies: Matter.Body[], hazards: HazardData[]): void {
-    const windHazards = hazards.filter(h => h.type === 'wind_zone');
+export function applyWindForce(bodies: Matter.Body[], windHazards: HazardData[]): void {
     if (windHazards.length === 0) return;
 
     for (const body of bodies) {
@@ -108,11 +107,10 @@ export function applyWindForce(bodies: Matter.Body[], hazards: HazardData[]): vo
 export function checkLavaDamage(
     bodies: Matter.Body[],
     world: Matter.World,
-    hazards: HazardData[],
+    lavaHazards: HazardData[],
     kings: Map<Side, KingState>,
     emitKingDamage: (side: Side, damage: number) => void,
 ): void {
-    const lavaHazards = hazards.filter(h => h.type === 'lava_pool');
     if (lavaHazards.length === 0) return;
 
     for (const body of bodies) {

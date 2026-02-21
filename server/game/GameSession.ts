@@ -40,6 +40,8 @@ export class GameSession {
     private onPhaseChangeCallback?: (phase: MatchPhase) => void;
     private onRoundEndCallback?: (winner: Side, reason: string) => 'continue' | 'match_over';
     private hazards: HazardData[] = [];
+    private windHazards: HazardData[] = [];
+    private lavaHazards: HazardData[] = [];
     private hazardTimers: ReturnType<typeof setInterval>[] = [];
     private scoreManager: ScoreManager = new ScoreManager();
     private botAI: BotAI | null = null;
@@ -147,6 +149,8 @@ export class GameSession {
 
         // Generate hazards
         this.hazards = generateHazards(this.terrain, ws.seed);
+        this.windHazards = this.hazards.filter(h => h.type === 'wind_zone');
+        this.lavaHazards = this.hazards.filter(h => h.type === 'lava_pool');
         if (this.hazards.length > 0) {
             console.log(`Hazards: ${this.hazards.map(h => h.type).join(', ')}`);
         }
@@ -180,6 +184,8 @@ export class GameSession {
 
     setHazards(hazards: HazardData[]): void {
         this.hazards = hazards;
+        this.windHazards = this.hazards.filter(h => h.type === 'wind_zone');
+        this.lavaHazards = this.hazards.filter(h => h.type === 'lava_pool');
     }
 
     getWorld(): Matter.World {
@@ -436,10 +442,10 @@ export class GameSession {
         const bodies = Matter.Composite.allBodies(this.world);
 
         // Wind
-        applyWindForce(bodies, this.hazards);
+        applyWindForce(bodies, this.windHazards);
 
         // Lava — reuse the pre-built kingsMap member variable
-        checkLavaDamage(bodies, this.world, this.hazards, this.kingsMap, (side, damage) => {
+        checkLavaDamage(bodies, this.world, this.lavaHazards, this.kingsMap, (side, damage) => {
             const ps = this.getPlayerBySide(side);
             if (ps) {
                 this.io.to(this.roomId).emit('king_damage', {
