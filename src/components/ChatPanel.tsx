@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import type { ChatMessage, Side } from '../types';
-import { Send, X, ScrollText } from 'lucide-react';
+import { Send, X, MessageCircle } from 'lucide-react';
 
 interface ChatPanelProps {
     messages: ChatMessage[];
@@ -42,8 +42,8 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
             {/* Header */}
             <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center">
                 <span className="text-xs text-[var(--gold)] font-bold flex items-center gap-1.5 font-display tracking-wider">
-                    <ScrollText size={13} />
-                    HERALD
+                    <MessageCircle size={13} />
+                    CHAT
                 </span>
                 {mobile && onClose && (
                     <button onClick={onClose} className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-150 touch-manipulation rounded-lg hover:bg-[var(--bg-elevated)]">
@@ -58,7 +58,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
                 className="flex-1 overflow-y-auto px-2.5 py-2 space-y-2 text-sm"
             >
                 {messages.length === 0 && (
-                    <p className="text-[var(--text-muted)] text-xs italic text-center mt-4 px-2">The herald awaits your message...</p>
+                    <p className="text-[var(--text-muted)] text-xs italic text-center mt-4 px-2">No messages yet — say hello!</p>
                 )}
                 {messages.map(msg => {
                     const isMine = msg.side === mySide;
