@@ -195,7 +195,7 @@ function App() {
         </div>
       )}
 
-      <main className={`flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto min-h-0 ${inGame ? 'sm:p-3 sm:gap-3' : ''}`}>
+      <main className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'overflow-hidden sm:p-3 sm:gap-3' : 'overflow-y-auto'}`}>
         {/* API Key Input (collapsible) */}
         {showApiKey && (
           <div className="w-full card-dark rounded-xl p-3 sm:p-4">
@@ -235,10 +235,10 @@ function App() {
           />
         ) : (
           /* Desktop: constrained 4:3. Mobile: full width, fills available height. */
-          <div className="flex flex-col items-center flex-1 w-full sm:gap-3 game-container safe-area-bottom">
+          <div className="flex flex-col items-center flex-1 w-full h-full min-h-0 sm:gap-3 game-container safe-area-bottom">
 
             {/* Canvas + Chat row */}
-            <div className="flex flex-1 sm:flex-initial gap-4 items-stretch sm:items-start w-full justify-center">
+            <div className="flex flex-1 min-h-0 gap-4 items-stretch sm:items-start w-full justify-center">
               <div className="relative group flex-1 min-w-0">
                 {/* Glow border — desktop only */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-[var(--gold)] to-[var(--ember)] rounded-xl blur opacity-10 group-hover:opacity-20 transition duration-1000 pointer-events-none hidden sm:block"></div>
