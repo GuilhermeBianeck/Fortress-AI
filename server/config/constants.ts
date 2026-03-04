@@ -13,8 +13,8 @@ export const RIGHT_CANNON_X = 2380;
 export const BUILD_PHASE_DURATION_MS = 90_000;
 export const COMBAT_TURN_DURATION_MS = 15_000;
 export const REVEAL_DURATION_MS = 5_000;
-export const SETTLE_TIMEOUT_MS = 3_000;
-export const SETTLE_MAX_TIMEOUT_MS = 8_000;
+export const SETTLE_TIMEOUT_MS = 1_000;
+export const SETTLE_MAX_TIMEOUT_MS = 5_000;
 export const SETTLE_POLL_INTERVAL_MS = 200;
 export const SETTLE_SPEED_THRESHOLD = 1.5;
 

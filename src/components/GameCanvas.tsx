@@ -391,7 +391,8 @@ export const GameCanvas = ({
         if (keys.has('a') || keys.has('A')) cam.targetX -= 8;
         if (keys.has('d') || keys.has('D')) cam.targetX += 8;
         cam.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, cam.targetX));
-        cam.x += (cam.targetX - cam.x) * 0.1;
+        const lerpFactor = currentPhase === 'reveal' ? 0.015 : 0.1;
+        cam.x += (cam.targetX - cam.x) * lerpFactor;
 
         // Update particles
         particles.update();
@@ -872,28 +873,18 @@ export const GameCanvas = ({
                         vy *= s;
                     }
 
-                    // Full trajectory arc preview
+                    // Full trajectory arc preview - solid dashed line
                     const frames = 120;
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+
                     for (let f = 0; f < frames; f++) {
                         // Simulate 2 sub-steps per frame to match server
                         for (let sub = 0; sub < 2; sub++) {
-                            // Matter.js update order:
-                            // 1. Update position (x += vx)
-                            // 2. Apply forces/gravity (vy += g)
-                            // 3. Apply friction (vx *= friction)
-
-                            // Replicating Server tick order from previous observation or standard Matter.js
-                            // Standard Matter.js Newton-Euler:
-                            // velocity += forces * dt
-                            // position += velocity * dt  (Matter uses verlet or something, but position += velocity is effectively it for step)
-
-                            // Simple integration matching observation:
                             vy += gravityAccel;
-
                             vx *= airDamp;
                             vy *= airDamp;
-
-                            px += vx; // * correction (1)
+                            px += vx;
                             py += vy;
 
                             // Per-tick speed cap matching server
@@ -905,21 +896,15 @@ export const GameCanvas = ({
                             }
                         }
 
-                        // Gentle linear fade
-                        const alpha = 0.7 * (1 - f / frames);
-                        if (alpha < 0.03) break;
-
-                        // Dashed dots every 2 frames
-                        if (f % 2 === 0) {
-                            const dotSize = f < 20 ? 2 : 1.5;
-                            ctx.beginPath();
-                            ctx.arc(px, py, dotSize, 0, Math.PI * 2);
-                            ctx.fillStyle = `rgba(255, 215, 0, ${Math.min(0.9, alpha + 0.2).toFixed(2)})`;
-                            ctx.fill();
-                        }
-
+                        ctx.lineTo(px, py);
                         if (py > canvas.height + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
                     }
+
+                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 6]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 }
 
                 // Aim readout (always show when aiming)
@@ -1142,16 +1127,18 @@ export const GameCanvas = ({
         // === End world drawing ===
         ctx.restore();
 
-        // === HUD (fixed to screen, not affected by camera) ===
+        // HUD (fixed to screen, not affected by camera)
+        const isMobile = width < 640;
+        const topPadding = isMobile ? 48 : 12;
 
         // Left King HP bar (top-left)
         const names = playerNamesRef.current;
         const leftLabel = names?.left || (side === 'left' ? 'YOU' : 'ENEMY');
         const rightLabel = names?.right || (side === 'right' ? 'YOU' : 'ENEMY');
-        drawKingHud(ctx, 12, 12, kings.left, leftLabel);
+        drawKingHud(ctx, 12, topPadding, kings.left, leftLabel);
 
         // Right King HP bar (top-right)
-        drawKingHud(ctx, width - 132, 12, kings.right, rightLabel);
+        drawKingHud(ctx, width - 132, topPadding, kings.right, rightLabel);
 
         // Mode indicator and round score are shown by PhaseOverlay (HTML overlay)
         // so we don't draw them on canvas to avoid overlap
@@ -1561,14 +1548,30 @@ export const GameCanvas = ({
         const { x: mx, y: my } = getTouchWorldCoords(e.touches[0]);
         const cannon = getMyCannonPos();
         const aim = aimRef.current;
-        // Angle always tracks finger-to-cannon direction
+        // Angle always tracks finger-to-cannon direction as before
         aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
         aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
+
         // Power from drag distance (screen pixels from initial tap)
-        // Power from distance between touch and cannon (same as mouse)
-        const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        const normalizedDist = Math.max(0, Math.min(1, dist / 800));
-        aim.power = Math.max(5, Math.min(100, 5 + Math.pow(normalizedDist, 1.2) * 95));
+        if (touchStartRef.current) {
+            const touch = e.touches[0];
+            const canvas = canvasRef.current!;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const scaleX = (canvas.width / dpr) / rect.width;
+            const scaleY = (canvas.height / dpr) / rect.height;
+            const currentScreenX = (touch.clientX - rect.left) * scaleX;
+            const currentScreenY = (touch.clientY - rect.top) * scaleY;
+
+            const dx = currentScreenX - touchStartRef.current.sx;
+            const dy = currentScreenY - touchStartRef.current.sy;
+            const dragDist = Math.sqrt(dx * dx + dy * dy);
+
+            // Map 0-300px of drag to 0-100 power
+            const dragPower = (dragDist / 300) * 100;
+            // Start at 25 (minimum viable shot) and add drag power
+            aim.power = Math.max(5, Math.min(100, 25 + dragPower));
+        }
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {

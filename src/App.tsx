@@ -159,9 +159,9 @@ function App() {
             onClick={() => setShowApiKey(!showApiKey)}
             className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center gap-1.5
                        ${apiKey
-              ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
-              : 'text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]'
-            }
+                ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
+                : 'text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]'
+              }
                        hover:bg-[var(--bg-elevated)]`}
           >
             <Key size={14} />
@@ -196,24 +196,30 @@ function App() {
       )}
 
       <main className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'overflow-hidden sm:p-3 sm:gap-3' : 'overflow-y-auto'}`}>
-        {/* API Key Input (collapsible) */}
+        {/* API Key Input (Modal Overlay) */}
         {showApiKey && (
-          <div className="w-full card-dark rounded-xl p-3 sm:p-4">
-            <label className="text-xs text-[var(--text-muted)] mb-2 block">Gemini API Key (stored locally)</label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => handleApiKeyChange(e.target.value)}
-                placeholder="AIzaSy..."
-                className="input-medieval flex-1 min-w-0 rounded-lg px-3 py-2 text-sm font-mono"
-              />
-              <button
-                onClick={() => setShowApiKey(false)}
-                className="btn-primary shrink-0 min-h-[44px] px-4 py-2 rounded-lg text-sm"
-              >
-                Save
-              </button>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowApiKey(false); }}>
+            <div className="w-full max-w-md card-dark rounded-xl p-5 shadow-2xl border border-[var(--border-accent)] animate-scale-in">
+              <label className="text-sm font-bold text-[var(--gold)] mb-3 block">Configure AI Architect</label>
+              <p className="text-xs text-[var(--text-muted)] mb-4">
+                Enter your Google Gemini API key to enable AI fortress generation. Your key is stored locally in your browser and never sent to our servers.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => handleApiKeyChange(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="input-medieval flex-1 min-w-0 rounded-lg px-3 py-2 text-sm font-mono"
+                  autoFocus
+                />
+                <button
+                  onClick={() => setShowApiKey(false)}
+                  className="btn-primary shrink-0 min-h-[44px] px-4 py-2 rounded-lg text-sm"
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         )}
