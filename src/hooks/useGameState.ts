@@ -7,6 +7,16 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protoco
 const PROFILE_STORAGE_KEY = 'fortress_player_profile';
 const UUID_STORAGE_KEY = 'fortress_player_uuid';
 
+// Compact update tuple indices: [id, x, y, angle, vx, vy, hp]
+const T_ID = 0;
+const T_X = 1;
+const T_Y = 2;
+const T_ANGLE = 3;
+const T_VX = 4;
+const T_VY = 5;
+const T_HP = 6;
+const NULL_HP_SENTINEL = -1;
+
 function getOrCreateUuid(): string {
     let uuid = localStorage.getItem(UUID_STORAGE_KEY);
     if (!uuid) {
@@ -129,12 +139,12 @@ export const useGameState = () => {
             // Apply compact dynamic updates: [id, x, y, angle, vx, vy, hp]
             if (data.u) {
                 for (const tuple of data.u) {
-                    const existing = cache.get(tuple[0]);
+                    const existing = cache.get(tuple[T_ID]);
                     if (existing) {
-                        existing.position = { x: tuple[1], y: tuple[2] };
-                        existing.angle = tuple[3];
-                        existing.velocity = { x: tuple[4], y: tuple[5] };
-                        existing.blockHp = tuple[6] === -1 ? null : tuple[6];
+                        existing.position = { x: tuple[T_X], y: tuple[T_Y] };
+                        existing.angle = tuple[T_ANGLE];
+                        existing.velocity = { x: tuple[T_VX], y: tuple[T_VY] };
+                        existing.blockHp = tuple[T_HP] === NULL_HP_SENTINEL ? null : tuple[T_HP];
                     }
                 }
             }

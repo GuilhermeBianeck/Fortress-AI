@@ -32,6 +32,9 @@ export interface HazardData {
     windStrength?: number;
 }
 
+// Server snapshot rate: 20Hz = 50ms between snapshots (must match SNAPSHOT_RATE in server/physics/loop.ts)
+const SERVER_SNAPSHOT_MS = 50;
+
 // Material color map (dark medieval theme)
 const MATERIAL_COLORS: Record<string, string> = {
     wood: '#8B6B42',
@@ -201,7 +204,6 @@ export const GameCanvas = ({
     // Interpolation state: store previous snapshot for smooth movement
     const prevBodiesRef = useRef<Map<number, { x: number; y: number; angle: number }>>(new Map());
     const snapshotTimeRef = useRef<number>(0);
-    const SNAPSHOT_INTERVAL = 50; // 20Hz = 50ms between server snapshots
 
     // Sync refs
     useEffect(() => {
@@ -397,7 +399,7 @@ export const GameCanvas = ({
         // Compute interpolation factor: 0 = at previous snapshot, 1 = at current snapshot
         const prevBodies = prevBodiesRef.current;
         const elapsed = performance.now() - snapshotTimeRef.current;
-        const interpT = Math.min(elapsed / SNAPSHOT_INTERVAL, 1);
+        const interpT = Math.min(elapsed / SERVER_SNAPSHOT_MS, 1);
 
         const kings = kingsHpRef.current;
         const side = mySideRef.current;

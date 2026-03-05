@@ -10,6 +10,14 @@ const TICK_DT = 1000 / TICK_RATE;
 // Full sync every 60 snapshots (3 seconds) to recover from any dropped packets
 const FULL_SYNC_INTERVAL = 60;
 
+// Rounding precision for compact updates (reduces JSON size)
+const POS_PRECISION = 10;       // 0.1px resolution
+const ANGLE_PRECISION = 1000;   // 0.001 rad resolution
+const NULL_HP_SENTINEL = -1;    // Sentinel value for null blockHp in compact tuples
+
+/** Interval (ms) between server snapshots — exported for client interpolation */
+export const SNAPSHOT_INTERVAL_MS = 1000 / SNAPSHOT_RATE;
+
 // Compact update tuple indices: [id, x, y, angle, vx, vy, hp]
 // Using arrays instead of objects saves ~40% payload size per body
 
@@ -119,12 +127,12 @@ export class GameLoop {
                 // Rounding reduces JSON size and avoids false precision
                 updates.push([
                     body.id,
-                    Math.round(body.position.x * 10) / 10,
-                    Math.round(body.position.y * 10) / 10,
-                    Math.round(body.angle * 1000) / 1000,
-                    Math.round(body.velocity.x * 10) / 10,
-                    Math.round(body.velocity.y * 10) / 10,
-                    (body as any).blockHp ?? -1,
+                    Math.round(body.position.x * POS_PRECISION) / POS_PRECISION,
+                    Math.round(body.position.y * POS_PRECISION) / POS_PRECISION,
+                    Math.round(body.angle * ANGLE_PRECISION) / ANGLE_PRECISION,
+                    Math.round(body.velocity.x * POS_PRECISION) / POS_PRECISION,
+                    Math.round(body.velocity.y * POS_PRECISION) / POS_PRECISION,
+                    (body as any).blockHp ?? NULL_HP_SENTINEL,
                 ]);
             }
             // Static known bodies: skip entirely (terrain, boundaries, foundations)
