@@ -1,11 +1,21 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile } from '../types';
+import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile, CompactGameState, BodyState } from '../types';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
 const PROFILE_STORAGE_KEY = 'fortress_player_profile';
 const UUID_STORAGE_KEY = 'fortress_player_uuid';
+
+// Compact update tuple indices: [id, x, y, angle, vx, vy, hp]
+const T_ID = 0;
+const T_X = 1;
+const T_Y = 2;
+const T_ANGLE = 3;
+const T_VX = 4;
+const T_VY = 5;
+const T_HP = 6;
+const NULL_HP_SENTINEL = -1;
 
 function getOrCreateUuid(): string {
     let uuid = localStorage.getItem(UUID_STORAGE_KEY);
@@ -72,6 +82,9 @@ export const useGameState = () => {
     const socketRef = useRef<Socket | null>(null);
     const mySideRef = useRef<Side>('left');
 
+    // Body metadata cache for delta-encoded state reconstruction
+    const bodyCacheRef = useRef<Map<number, BodyState>>(new Map());
+
     // Callback refs for canvas effects
     const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
     const projectileImpactCbRef = useRef<((data: { position: Vector }) => void) | null>(null);
@@ -79,19 +92,82 @@ export const useGameState = () => {
 
     useEffect(() => {
         const playerUuid = getOrCreateUuid();
-        socketRef.current = io(SERVER_URL, { auth: { uuid: playerUuid } });
+        socketRef.current = io(SERVER_URL, {
+            auth: { uuid: playerUuid },
+            // Match server: websocket-only, skip polling overhead
+            transports: ['websocket'],
+            // Reconnect aggressively for real-time game
+            reconnectionDelay: 500,
+            reconnectionDelayMax: 2000,
+        });
 
         socketRef.current.on('connect', () => {
             setIsConnected(true);
         });
 
-        // --- Game state ---
+        // --- Game state (compact delta-encoded format) ---
 
-        socketRef.current.on('gameState', (state: GameState) => {
-            setGameState(state);
-            if (state.kings) {
-                setKingsHp(state.kings);
+        socketRef.current.on('gameState', (data: CompactGameState) => {
+            const cache = bodyCacheRef.current;
+
+            // On full sync, clear cache so stale entries don't linger
+            if (data.f === 1) {
+                cache.clear();
             }
+
+            // Process new/full-sync bodies (full metadata)
+            if (data.n) {
+                for (const body of data.n) {
+                    cache.set(body.id, {
+                        id: body.id,
+                        position: body.position,
+                        angle: body.angle,
+                        velocity: body.velocity,
+                        label: body.label,
+                        isStatic: body.isStatic,
+                        width: body.width,
+                        height: body.height,
+                        circleRadius: body.circleRadius,
+                        material: body.material,
+                        color: body.color,
+                        blockHp: body.blockHp,
+                        blockMaxHp: body.blockMaxHp,
+                    });
+                }
+            }
+
+            // Apply compact dynamic updates: [id, x, y, angle, vx, vy, hp]
+            if (data.u) {
+                for (const tuple of data.u) {
+                    const existing = cache.get(tuple[T_ID]);
+                    if (existing) {
+                        existing.position = { x: tuple[T_X], y: tuple[T_Y] };
+                        existing.angle = tuple[T_ANGLE];
+                        existing.velocity = { x: tuple[T_VX], y: tuple[T_VY] };
+                        existing.blockHp = tuple[T_HP] === NULL_HP_SENTINEL ? null : tuple[T_HP];
+                    }
+                }
+            }
+
+            // Remove destroyed bodies
+            if (data.r) {
+                for (const id of data.r) {
+                    cache.delete(id);
+                }
+            }
+
+            // Reconstruct full GameState for canvas
+            const kings = {
+                left: data.k.l,
+                right: data.k.r,
+            };
+
+            setGameState({
+                bodies: Array.from(cache.values()),
+                timestamp: data.t,
+                kings,
+            });
+            setKingsHp(kings);
         });
 
         socketRef.current.on('terrain', (data: TerrainData & { hazards?: any[] }) => {
@@ -245,6 +321,7 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('rematch_start', () => {
+            bodyCacheRef.current.clear();
             setRematchState('none');
             setMatchResult(null);
             setMatchScores(null);
@@ -341,6 +418,7 @@ export const useGameState = () => {
 
     const returnToLobby = useCallback(() => {
         socketRef.current?.emit('leave_room');
+        bodyCacheRef.current.clear();
         setGameState(null);
         setTerrain(null);
         setBuildStatus({ status: 'idle', message: '' });

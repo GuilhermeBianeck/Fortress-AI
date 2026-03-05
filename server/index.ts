@@ -15,7 +15,16 @@ const io = new Server(httpServer, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    // Force websocket transport — skip HTTP long-polling upgrade overhead
+    transports: ['websocket'],
+    // Enable per-message deflate compression for large payloads
+    perMessageDeflate: {
+        threshold: 512,
+    },
+    // Tighter ping for real-time responsiveness
+    pingInterval: 10000,
+    pingTimeout: 5000,
 });
 
 const PORT = process.env.PORT || 3001;

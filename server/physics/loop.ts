@@ -7,6 +7,20 @@ const TICK_RATE = 60;
 const SNAPSHOT_RATE = 20;
 const TICK_DT = 1000 / TICK_RATE;
 
+// Full sync every 60 snapshots (3 seconds) to recover from any dropped packets
+const FULL_SYNC_INTERVAL = 60;
+
+// Rounding precision for compact updates (reduces JSON size)
+const POS_PRECISION = 10;       // 0.1px resolution
+const ANGLE_PRECISION = 1000;   // 0.001 rad resolution
+const NULL_HP_SENTINEL = -1;    // Sentinel value for null blockHp in compact tuples
+
+/** Interval (ms) between server snapshots — exported for client interpolation */
+export const SNAPSHOT_INTERVAL_MS = 1000 / SNAPSHOT_RATE;
+
+// Compact update tuple indices: [id, x, y, angle, vx, vy, hp]
+// Using arrays instead of objects saves ~40% payload size per body
+
 export class GameLoop {
     private engine: Matter.Engine;
     private io: Server;
@@ -15,6 +29,10 @@ export class GameLoop {
     private lastSnapshotTime = 0;
     private kingStates: Map<string, KingState> = new Map(); // side → KingState
     private onTickCallback: (() => void) | null = null;
+
+    // Delta encoding state
+    private knownBodyIds: Set<number> = new Set();
+    private snapshotCount = 0;
 
     constructor(engine: Matter.Engine, io: Server, roomId: string) {
         this.engine = engine;
@@ -45,6 +63,12 @@ export class GameLoop {
         }
     }
 
+    /** Reset delta tracking (e.g. on round restart) */
+    resetDelta() {
+        this.knownBodyIds.clear();
+        this.snapshotCount = 0;
+    }
+
     private tick() {
         // Sub-step: 2 half-updates per tick for better collision detection
         Matter.Engine.update(this.engine, TICK_DT / 2);
@@ -60,38 +84,83 @@ export class GameLoop {
     }
 
     private broadcastState() {
-        const bodies = Matter.Composite.allBodies(this.engine.world).map(body => {
-            // Use stamped original dimensions to avoid AABB flicker on rotation
-            const width = (body as any).originalWidth || (body.bounds.max.x - body.bounds.min.x);
-            const height = (body as any).originalHeight || (body.bounds.max.y - body.bounds.min.y);
+        const allBodies = Matter.Composite.allBodies(this.engine.world);
+        this.snapshotCount++;
+        const isFullSync = this.snapshotCount % FULL_SYNC_INTERVAL === 0;
 
-            return {
-                id: body.id,
-                position: body.position,
-                angle: body.angle,
-                velocity: body.velocity,
-                label: body.label,
-                isStatic: body.isStatic,
-                width,
-                height,
-                circleRadius: (body as any).circleRadius || 0,
-                material: body.label || 'default',
-                color: MATERIAL_COLORS[body.label] || '#e11d48',
-                blockHp: (body as any).blockHp ?? null,
-                blockMaxHp: (body as any).blockMaxHp ?? null,
-            };
-        });
+        // New bodies: full metadata (sent once per body, or on full-sync)
+        const newBodies: any[] = [];
+        // Dynamic updates: compact array tuples [id, x, y, angle, vx, vy, hp]
+        const updates: number[][] = [];
+        // Track current body IDs to detect removals
+        const currentIds = new Set<number>();
+
+        for (const body of allBodies) {
+            currentIds.add(body.id);
+
+            const isNew = !this.knownBodyIds.has(body.id);
+
+            if (isNew || isFullSync) {
+                // Send full metadata for new bodies or during periodic full sync
+                const width = (body as any).originalWidth || (body.bounds.max.x - body.bounds.min.x);
+                const height = (body as any).originalHeight || (body.bounds.max.y - body.bounds.min.y);
+
+                newBodies.push({
+                    id: body.id,
+                    label: body.label,
+                    isStatic: body.isStatic,
+                    width,
+                    height,
+                    circleRadius: (body as any).circleRadius || 0,
+                    material: body.label || 'default',
+                    color: MATERIAL_COLORS[body.label] || '#e11d48',
+                    blockMaxHp: (body as any).blockMaxHp ?? null,
+                    // Include dynamic data in full metadata too
+                    position: { x: body.position.x, y: body.position.y },
+                    angle: body.angle,
+                    velocity: { x: body.velocity.x, y: body.velocity.y },
+                    blockHp: (body as any).blockHp ?? null,
+                });
+                this.knownBodyIds.add(body.id);
+            } else if (!body.isStatic) {
+                // Known dynamic body: send only compact positional data
+                // Rounding reduces JSON size and avoids false precision
+                updates.push([
+                    body.id,
+                    Math.round(body.position.x * POS_PRECISION) / POS_PRECISION,
+                    Math.round(body.position.y * POS_PRECISION) / POS_PRECISION,
+                    Math.round(body.angle * ANGLE_PRECISION) / ANGLE_PRECISION,
+                    Math.round(body.velocity.x * POS_PRECISION) / POS_PRECISION,
+                    Math.round(body.velocity.y * POS_PRECISION) / POS_PRECISION,
+                    (body as any).blockHp ?? NULL_HP_SENTINEL,
+                ]);
+            }
+            // Static known bodies: skip entirely (terrain, boundaries, foundations)
+        }
+
+        // Detect removed bodies
+        const removed: number[] = [];
+        for (const id of this.knownBodyIds) {
+            if (!currentIds.has(id)) {
+                removed.push(id);
+                this.knownBodyIds.delete(id);
+            }
+        }
 
         const leftKing = this.kingStates.get('left');
         const rightKing = this.kingStates.get('right');
 
         this.io.to(this.roomId).emit('gameState', {
-            bodies,
-            timestamp: Date.now(),
-            kings: {
-                left: { hp: leftKing?.hp ?? 0, maxHp: leftKing?.maxHp ?? 0, x: leftKing?.position.x, y: leftKing?.position.y },
-                right: { hp: rightKing?.hp ?? 0, maxHp: rightKing?.maxHp ?? 0, x: rightKing?.position.x, y: rightKing?.position.y },
+            // Compact delta-encoded payload
+            u: updates,       // dynamic body updates (array tuples)
+            n: newBodies,      // new/full-sync body metadata
+            r: removed,        // removed body IDs
+            t: Date.now(),     // timestamp
+            k: {
+                l: { hp: leftKing?.hp ?? 0, maxHp: leftKing?.maxHp ?? 0, x: leftKing?.position.x, y: leftKing?.position.y },
+                r: { hp: rightKing?.hp ?? 0, maxHp: rightKing?.maxHp ?? 0, x: rightKing?.position.x, y: rightKing?.position.y },
             },
+            f: isFullSync ? 1 : 0,  // full sync flag
         });
     }
 }
