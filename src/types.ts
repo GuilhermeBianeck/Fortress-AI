@@ -39,6 +39,25 @@ export interface GameState {
     };
 }
 
+/** Compact delta-encoded payload from server (wire format) */
+export interface CompactGameState {
+    /** Dynamic body updates: [id, x, y, angle, vx, vy, hp] */
+    u: number[][];
+    /** New/full-sync bodies with full metadata */
+    n: (BodyState & { position: Vector; angle: number; velocity: Vector; blockHp: number | null })[];
+    /** Removed body IDs */
+    r: number[];
+    /** Timestamp */
+    t: number;
+    /** Kings (compact) */
+    k: {
+        l: KingHpState;
+        r: KingHpState;
+    };
+    /** Full sync flag (1 = full sync) */
+    f: number;
+}
+
 export interface RoomState {
     roomId: string;
     side: Side;

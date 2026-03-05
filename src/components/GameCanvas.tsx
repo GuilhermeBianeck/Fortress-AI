@@ -198,8 +198,27 @@ export const GameCanvas = ({
     // Flag to ensure initial camera setup only happens once
     const hasPannedForPhaseRef = useRef<string | null>(null);
 
+    // Interpolation state: store previous snapshot for smooth movement
+    const prevBodiesRef = useRef<Map<number, { x: number; y: number; angle: number }>>(new Map());
+    const snapshotTimeRef = useRef<number>(0);
+    const SNAPSHOT_INTERVAL = 50; // 20Hz = 50ms between server snapshots
+
     // Sync refs
-    useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+    useEffect(() => {
+        // On each new server snapshot, capture previous positions for interpolation
+        if (gameState) {
+            const prevMap = prevBodiesRef.current;
+            const gsRef = gameStateRef.current;
+            if (gsRef) {
+                prevMap.clear();
+                for (const body of gsRef.bodies) {
+                    prevMap.set(body.id, { x: body.position.x, y: body.position.y, angle: body.angle });
+                }
+            }
+            snapshotTimeRef.current = performance.now();
+        }
+        gameStateRef.current = gameState;
+    }, [gameState]);
     useEffect(() => { terrainRef.current = terrain; }, [terrain]);
     useEffect(() => { kingsHpRef.current = kingsHp; }, [kingsHp]);
     useEffect(() => { mySideRef.current = mySide; }, [mySide]);
@@ -374,6 +393,11 @@ export const GameCanvas = ({
         const gs = gameStateRef.current;
         const terr = terrainRef.current;
         const cam = cameraRef.current;
+
+        // Compute interpolation factor: 0 = at previous snapshot, 1 = at current snapshot
+        const prevBodies = prevBodiesRef.current;
+        const elapsed = performance.now() - snapshotTimeRef.current;
+        const interpT = Math.min(elapsed / SNAPSHOT_INTERVAL, 1);
 
         const kings = kingsHpRef.current;
         const side = mySideRef.current;
@@ -959,9 +983,25 @@ export const GameCanvas = ({
             for (const body of gs.bodies) {
                 if (body.label === 'Terrain' || body.label === 'Boundary') continue;
 
+                // Interpolate position and angle for smooth movement between server snapshots
+                let drawX = body.position.x;
+                let drawY = body.position.y;
+                let drawAngle = body.angle;
+
+                const prev = prevBodies.get(body.id);
+                if (prev && interpT < 1) {
+                    drawX = prev.x + (body.position.x - prev.x) * interpT;
+                    drawY = prev.y + (body.position.y - prev.y) * interpT;
+                    // Interpolate angle with shortest-path wrapping
+                    let dAngle = body.angle - prev.angle;
+                    if (dAngle > Math.PI) dAngle -= Math.PI * 2;
+                    if (dAngle < -Math.PI) dAngle += Math.PI * 2;
+                    drawAngle = prev.angle + dAngle * interpT;
+                }
+
                 ctx.save();
-                ctx.translate(body.position.x, body.position.y);
-                ctx.rotate(body.angle);
+                ctx.translate(drawX, drawY);
+                ctx.rotate(drawAngle);
 
                 const fillColor = body.color || MATERIAL_COLORS[body.material] || MATERIAL_COLORS[body.label] || '#e11d48';
                 const strokeColor = MATERIAL_STROKE[body.material] || MATERIAL_STROKE[body.label] || 'rgba(255,255,255,0.3)';
@@ -1054,14 +1094,14 @@ export const GameCanvas = ({
                 // Floating HP bar above King
                 if (body.label === 'king') {
                     // Determine which king this is based on position
-                    const kingSide: Side = body.position.x < WORLD_WIDTH / 2 ? 'left' : 'right';
+                    const kingSide: Side = drawX < WORLD_WIDTH / 2 ? 'left' : 'right';
                     const kHp = kings[kingSide].hp;
                     const kMaxHp = kings[kingSide].maxHp;
                     if (kMaxHp > 0) {
                         const barWidth = 30;
                         const barHeight = 4;
-                        const barX = body.position.x - barWidth / 2;
-                        const barY = body.position.y - (body.circleRadius || 12) - 10;
+                        const barX = drawX - barWidth / 2;
+                        const barY = drawY - (body.circleRadius || 12) - 10;
                         const hpRatio = Math.max(0, kHp / kMaxHp);
 
                         ctx.fillStyle = 'rgba(10, 10, 18, 0.7)';
@@ -1080,8 +1120,8 @@ export const GameCanvas = ({
                 if (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0 && body.blockHp < body.blockMaxHp) {
                     const barWidth = Math.min(body.width || 30, 30);
                     const barHeight = 3;
-                    const barX = body.position.x - barWidth / 2;
-                    const barY = body.position.y - (body.height || 30) / 2 - 6;
+                    const barX = drawX - barWidth / 2;
+                    const barY = drawY - (body.height || 30) / 2 - 6;
                     const hpRatio = Math.max(0, body.blockHp / body.blockMaxHp);
 
                     ctx.fillStyle = 'rgba(10, 10, 18, 0.6)';
