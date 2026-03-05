@@ -60,12 +60,15 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [phase]);
 
-  // Reset spawn counter when build phase starts
-  useEffect(() => {
+  // Reset spawn counter when build phase starts.
+  // Pattern: store previous phase in state; check during render (React docs: "Adjusting some state when a prop changes").
+  const [prevPhase, setPrevPhase] = useState(phase);
+  if (prevPhase !== phase) {
+    setPrevPhase(phase);
     if (phase === 'build') {
       setSpawnCount(0);
     }
-  }, [phase]);
+  }
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -116,8 +119,8 @@ function App() {
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-wide text-[var(--gold)] font-heading leading-none">FORTRESS AI</h1>
-            <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--emerald)] animate-pulse shrink-0"></span>
+            <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5 mt-0.5" aria-live="polite" aria-atomic="true">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--emerald)] animate-pulse shrink-0" aria-hidden="true"></span>
               <span className="font-mono">{inGame && roomState ? `Room: ${roomState.roomId}` : 'LIVE'}</span>
             </div>
           </div>
@@ -128,11 +131,12 @@ function App() {
           {!inGame && myRank && (
             <button
               onClick={() => setShowRankPanel(!showRankPanel)}
+              aria-expanded={showRankPanel}
+              aria-label={`Your rank: ${myRank.name}. ${showRankPanel ? 'Hide' : 'Show'} rank details`}
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all duration-200 hover:bg-[var(--bg-elevated)]"
               style={{ borderColor: `${myRank.color}44`, background: `${myRank.color}0d` }}
-              title="Your Rank"
             >
-              <span className="text-sm">{myRank.emoji}</span>
+              <span className="text-sm" aria-hidden="true">{myRank.emoji}</span>
               <span className="text-xs font-bold" style={{ color: myRank.color }}>{myRank.name}</span>
             </button>
           )}
@@ -140,6 +144,8 @@ function App() {
           {inGame && !isSinglePlayer && (
             <button
               onClick={() => setShowChat(!showChat)}
+              aria-pressed={showChat}
+              aria-label={showChat ? 'Close chat' : 'Open chat'}
               className={`xl:hidden min-w-[44px] min-h-[44px] px-2 py-1.5 text-sm rounded-lg transition-all duration-200 touch-manipulation
                 border flex items-center justify-center gap-1.5
                 ${showChat
@@ -147,16 +153,18 @@ function App() {
                   : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
                 }`}
             >
-              <MessageCircle size={16} />
+              <MessageCircle size={16} aria-hidden="true" />
               <span className="hidden sm:inline text-xs">Chat</span>
               {chatMessages.length > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--ember)]"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--ember)]" aria-hidden="true"></span>
               )}
             </button>
           )}
           {/* API Key toggle */}
           <button
             onClick={() => setShowApiKey(!showApiKey)}
+            aria-pressed={showApiKey}
+            aria-label={apiKey ? 'API key configured — click to change' : 'Set Gemini API key to enable AI fortress building'}
             className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center gap-1.5
                        ${apiKey
                 ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
@@ -164,7 +172,7 @@ function App() {
               }
                        hover:bg-[var(--bg-elevated)]`}
           >
-            <Key size={14} />
+            <Key size={14} aria-hidden="true" />
             <span className="hidden sm:inline">{apiKey ? 'Key Set' : 'Set API Key'}</span>
           </button>
         </div>
@@ -179,10 +187,14 @@ function App() {
 
       {/* Connection lost banner */}
       {!isConnected && (
-        <div className="w-full px-3 py-2 flex items-center justify-between gap-2 animate-slide-up z-50"
-          style={{ background: 'rgba(192,57,43,0.2)', borderBottom: '1px solid rgba(192,57,43,0.4)' }}>
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="w-full px-3 py-2 flex items-center justify-between gap-2 animate-slide-up z-50"
+          style={{ background: 'rgba(192,57,43,0.2)', borderBottom: '1px solid rgba(192,57,43,0.4)' }}
+        >
           <div className="flex items-center gap-2 text-xs text-[var(--crimson)]">
-            <WifiOff size={14} className="shrink-0" />
+            <WifiOff size={14} className="shrink-0" aria-hidden="true" />
             {/* Socket.io retries automatically; the Reload button is a manual escape hatch. */}
             <span>Connection lost — attempting to reconnect…</span>
           </div>
@@ -198,20 +210,30 @@ function App() {
       <main className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'overflow-hidden sm:p-3 sm:gap-3' : 'overflow-y-auto'}`}>
         {/* API Key Input (Modal Overlay) */}
         {showApiKey && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowApiKey(false); }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="api-key-dialog-title"
+            aria-describedby="api-key-dialog-desc"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowApiKey(false); }}
+          >
             <div className="w-full max-w-md card-dark rounded-xl p-5 shadow-2xl border border-[var(--border-accent)] animate-scale-in">
-              <label className="text-sm font-bold text-[var(--gold)] mb-3 block">Configure AI Architect</label>
-              <p className="text-xs text-[var(--text-muted)] mb-4">
+              <label id="api-key-dialog-title" htmlFor="api-key-input" className="text-sm font-bold text-[var(--gold)] mb-3 block">Configure AI Architect</label>
+              <p id="api-key-dialog-desc" className="text-xs text-[var(--text-muted)] mb-4">
                 Enter your Google Gemini API key to enable AI fortress generation. Your key is stored locally in your browser and never sent to our servers.
               </p>
               <div className="flex gap-2">
                 <input
+                  id="api-key-input"
                   type="password"
                   value={apiKey}
                   onChange={(e) => handleApiKeyChange(e.target.value)}
                   placeholder="AIzaSy..."
                   className="input-medieval flex-1 min-w-0 rounded-lg px-3 py-2 text-sm font-mono"
                   autoFocus
+                  autoComplete="off"
+                  spellCheck={false}
                 />
                 <button
                   onClick={() => setShowApiKey(false)}
@@ -372,7 +394,11 @@ function App() {
 
             {/* Build Status Overlay */}
             {buildStatus.status !== 'idle' && (
-              <div className={`w-full border rounded-xl p-2 sm:p-3 backdrop-blur-sm flex items-center gap-2 sm:gap-3 transition-all order-first
+              <div
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className={`w-full border rounded-xl p-2 sm:p-3 backdrop-blur-sm flex items-center gap-2 sm:gap-3 transition-all order-first
                 ${buildStatus.status === 'error'
                   ? 'bg-[rgba(192,57,43,0.15)] border-[rgba(192,57,43,0.3)] text-[var(--crimson)]'
                   : buildStatus.status === 'success'
@@ -380,9 +406,9 @@ function App() {
                     : 'bg-[rgba(255,215,0,0.1)] border-[var(--border-medium)] text-[var(--gold)]'
                 }`}
               >
-                {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" />}
-                {buildStatus.status === 'success' && <CheckCircle2 size={14} className="shrink-0" />}
-                {buildStatus.status === 'error' && <AlertCircle size={14} className="shrink-0" />}
+                {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" aria-hidden="true" />}
+                {buildStatus.status === 'success' && <CheckCircle2 size={14} className="shrink-0" aria-hidden="true" />}
+                {buildStatus.status === 'error' && <AlertCircle size={14} className="shrink-0" aria-hidden="true" />}
                 <span className="text-xs sm:text-sm font-mono truncate">{buildStatus.message}</span>
               </div>
             )}
@@ -404,26 +430,31 @@ function App() {
 
             {/* Prompt Input — only in build mode during build phase */}
             {phase === 'build' && gameMode === 'build' && (
-              <form onSubmit={handleSubmitPrompt} className="w-full card-dark rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 bg-[var(--bg-deep)] rounded-lg shrink-0">
+              <form onSubmit={handleSubmitPrompt} className="w-full card-dark rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3" role="search" aria-label="AI fortress builder">
+                <div className="p-2 sm:p-2.5 bg-[var(--bg-deep)] rounded-lg shrink-0" aria-hidden="true">
                   <Terminal size={16} className="text-[var(--gold)]" />
                 </div>
+                <label htmlFor="ai-prompt-input" className="sr-only">Describe your fortress to the AI architect</label>
                 <input
+                  id="ai-prompt-input"
                   type="text"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Describe your fortress to AI..."
                   className="w-full min-w-0 bg-transparent outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)] font-mono text-xs sm:text-sm"
                   disabled={isBuilding}
+                  autoComplete="off"
+                  aria-describedby={isBuilding ? 'build-status' : undefined}
                 />
                 <button
                   type="submit"
                   disabled={isBuilding || !prompt.trim()}
+                  aria-label={isBuilding ? 'Building fortress…' : 'Generate fortress with AI'}
                   className="p-2 sm:p-2.5 bg-gradient-to-b from-[var(--gold)] to-[var(--gold-dim)] rounded-lg shrink-0
                       transition-all duration-200 touch-manipulation shadow-md shadow-[var(--gold-glow)]
                       disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-lg"
                 >
-                  {isBuilding ? <Loader2 size={16} className="animate-spin text-[var(--bg-deepest)]" /> : <Send size={16} className="text-[var(--bg-deepest)]" />}
+                  {isBuilding ? <Loader2 size={16} className="animate-spin text-[var(--bg-deepest)]" aria-hidden="true" /> : <Send size={16} className="text-[var(--bg-deepest)]" aria-hidden="true" />}
                 </button>
               </form>
             )}

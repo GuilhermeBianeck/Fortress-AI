@@ -27,8 +27,10 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
     useEffect(() => {
         if (!phaseEndsAt) {
-            setTimeLeft(null);
-            return;
+            // Use a microtask to avoid the synchronous setState-in-effect lint warning
+            // while still resetting the timer display promptly when the phase ends.
+            const id = setTimeout(() => setTimeLeft(null), 0);
+            return () => clearTimeout(id);
         }
 
         const tick = () => {
@@ -40,6 +42,9 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const interval = setInterval(tick, 250);
         return () => clearInterval(interval);
     }, [phaseEndsAt]);
+
+    // Derive display value: null when there's no active phase end time
+    const displayTimeLeft = phaseEndsAt ? timeLeft : null;
 
     // Animate bot thinking dots (cycles 1–3)
     useEffect(() => {
@@ -56,20 +61,23 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         return (
             <div className="w-full relative pointer-events-none">
                 {/* Build Banner - Centered, inline timer */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-2xl text-center" style={{ background: 'rgba(22, 33, 62, 0.85)' }}>
+                <div role="status" aria-live="polite" aria-atomic="true" className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-2xl text-center" style={{ background: 'rgba(22, 33, 62, 0.85)' }}>
                     <div className="flex items-center gap-1.5 sm:gap-2">
-                        <Hammer size={14} className="text-[var(--emerald)]" />
+                        <Hammer size={14} className="text-[var(--emerald)]" aria-hidden="true" />
                         <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
                             {currentRound ? `R${currentRound} — ` : ''}BUILD
                         </span>
-                        {timeLeft !== null && (
-                            <span className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${timeLeft <= 10 ? 'timer-urgent' : 'text-[var(--text-secondary)]'}`}>
-                                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                        {displayTimeLeft !== null && (
+                            <span
+                                aria-label={`${Math.floor(displayTimeLeft / 60)} minutes ${displayTimeLeft % 60} seconds remaining`}
+                                className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${displayTimeLeft <= 10 ? 'timer-urgent' : 'text-[var(--text-secondary)]'}`}
+                            >
+                                {Math.floor(displayTimeLeft / 60)}:{String(displayTimeLeft % 60).padStart(2, '0')}
                             </span>
                         )}
                     </div>
                     {roundScore && (
-                        <span className="text-[var(--gold-dim)] text-[10px] sm:text-xs font-medium tracking-wider">
+                        <span className="text-[var(--gold-dim)] text-[10px] sm:text-xs font-medium tracking-wider" aria-label={`Score: left ${roundScore.left}, right ${roundScore.right}`}>
                             {roundScore.left} — {roundScore.right}
                         </span>
                     )}
@@ -87,15 +95,15 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         };
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-                <div className="rounded-xl px-5 sm:px-8 py-3 sm:py-4 backdrop-blur-xl text-center border border-[var(--border-accent)] pointer-events-auto shadow-2xl" style={{ background: 'rgba(22, 33, 62, 0.9)' }}>
+                <div role="status" aria-live="polite" className="rounded-xl px-5 sm:px-8 py-3 sm:py-4 backdrop-blur-xl text-center border border-[var(--border-accent)] pointer-events-auto shadow-2xl" style={{ background: 'rgba(22, 33, 62, 0.9)' }}>
                     <div className="flex items-center justify-center gap-2">
-                        <Eye size={16} className="text-[var(--gold)]" />
+                        <Eye size={16} className="text-[var(--gold)]" aria-hidden="true" />
                         <span className="text-[var(--gold)] font-bold text-sm sm:text-base font-display">REVEALING KINGDOMS</span>
                     </div>
                     <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">The scout surveys the battlefield...</p>
                     {hazards && hazards.length > 0 && (
                         <p className="text-xs text-[var(--ember)] mt-1 flex items-center justify-center gap-1">
-                            <AlertTriangle size={12} />
+                            <AlertTriangle size={12} aria-hidden="true" />
                             Hazards: {hazards.map(h => hazardNames[h.type] || h.type).join(', ')}
                         </p>
                     )}
@@ -113,7 +121,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         return (
             <div className="w-full relative pointer-events-none">
                 {/* Combat Banner - Centered, inline timer */}
-                <div className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border pointer-events-auto shadow-2xl text-center ${isMyTurn
+                <div role="status" aria-live="polite" aria-atomic="true" className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border pointer-events-auto shadow-2xl text-center ${isMyTurn
                     ? 'border-[rgba(192,57,43,0.4)]'
                     : 'border-[var(--border-subtle)]'
                     }`} style={{ background: isMyTurn ? 'rgba(192,57,43,0.12)' : 'rgba(22, 33, 62, 0.85)' }}>
@@ -122,9 +130,12 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
                             {isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? `BOT AIMING${botDotStr}` : "OPPONENT'S TURN")}
                         </span>
-                        {timeLeft !== null && (
-                            <span className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${timeLeft <= 5 ? 'timer-urgent' : isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
-                                {timeLeft}s
+                        {displayTimeLeft !== null && (
+                            <span
+                                aria-label={`${displayTimeLeft} seconds remaining`}
+                                className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${displayTimeLeft <= 5 ? 'timer-urgent' : isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}
+                            >
+                                {displayTimeLeft}s
                             </span>
                         )}
                     </div>

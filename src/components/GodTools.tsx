@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Hammer, Eye, Check, Swords } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode, MatchPhase } from '../types';
 import { MATERIAL_COLORS } from '../types';
@@ -59,12 +59,15 @@ export const GodTools = ({
 }: GodToolsProps) => {
     const [isReady, setIsReady] = useState(false);
 
-    // Reset ready state when a new build phase starts (new match/round)
-    useEffect(() => {
-        if (phase === 'build') {
+    // Reset ready state when a new build phase starts.
+    // Pattern: store previous phase in state; check during render (React docs: "Adjusting some state when a prop changes").
+    const [prevPhase, setPrevPhase] = useState(phase);
+    if (prevPhase !== phase) {
+        setPrevPhase(phase);
+        if (phase === 'build' && isReady) {
             setIsReady(false);
         }
-    }, [phase]);
+    }
 
     // Only show during build phase
     if (phase !== 'build') {
@@ -82,9 +85,10 @@ export const GodTools = ({
     return (
         <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3 w-full">
             {/* Mode Toggle - Mobile Only */}
-            <div className="flex items-center border border-[var(--border-subtle)] rounded-lg p-0.5 sm:p-1 backdrop-blur-sm sm:hidden" style={{ background: 'var(--bg-card)' }}>
+            <div className="flex items-center border border-[var(--border-subtle)] rounded-lg p-0.5 sm:p-1 backdrop-blur-sm sm:hidden" style={{ background: 'var(--bg-card)' }} role="group" aria-label="Build mode">
                 <button
                     onClick={() => onModeChange('build')}
+                    aria-pressed={gameMode === 'build'}
                     className={`
                         min-h-[36px] px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5
                         transition-all duration-200 touch-manipulation
@@ -94,7 +98,7 @@ export const GodTools = ({
                         }
                     `}
                 >
-                    <Hammer size={14} />
+                    <Hammer size={14} aria-hidden="true" />
                     BUILD
                 </button>
             </div>
@@ -102,7 +106,7 @@ export const GodTools = ({
             {gameMode === 'build' ? (
                 <>
                     {/* Material Selector — Color Swatches */}
-                    <div className="flex items-center gap-0.5 sm:gap-1 border border-[var(--border-subtle)] rounded-xl p-1 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
+                    <div className="flex items-center gap-0.5 sm:gap-1 border border-[var(--border-subtle)] rounded-xl p-1 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }} role="group" aria-label="Select material">
                         {MATERIALS.map(mat => {
                             const isActive = selectedMaterial === mat.key;
                             const matColor = MATERIAL_COLORS[mat.key];
@@ -110,6 +114,8 @@ export const GodTools = ({
                                 <button
                                     key={mat.key}
                                     onClick={() => onMaterialChange(mat.key)}
+                                    aria-pressed={isActive}
+                                    aria-label={MATERIAL_TIPS[mat.key]}
                                     className={`
                                         flex items-center gap-1.5 min-h-[40px] sm:min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold
                                         transition-all duration-200 touch-manipulation relative
@@ -125,11 +131,11 @@ export const GodTools = ({
                                     } : {
                                         border: '1.5px solid transparent',
                                     }}
-                                    title={MATERIAL_TIPS[mat.key]}
                                 >
-                                    <span className="text-sm">{mat.icon}</span>
-                                    <span className="hidden">{mat.label}</span>
+                                    <span className="text-sm" aria-hidden="true">{mat.icon}</span>
+                                    <span className="sr-only">{mat.label}</span>
                                     <span
+                                        aria-hidden="true"
                                         className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${isActive ? 'ring-2 ring-white/40 scale-110' : ''}`}
                                         style={{ backgroundColor: matColor, boxShadow: isActive ? `0 0 8px ${matColor}` : 'none' }}
                                     />
@@ -139,13 +145,15 @@ export const GodTools = ({
                     </div>
 
                     {/* Shape Selector — SVG Previews */}
-                    <div className="flex items-center gap-0.5 sm:gap-1 border border-[var(--border-subtle)] rounded-xl p-1 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
+                    <div className="flex items-center gap-0.5 sm:gap-1 border border-[var(--border-subtle)] rounded-xl p-1 sm:p-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }} role="group" aria-label="Select block shape">
                         {SHAPES.map(shape => {
                             const isActive = selectedShape === shape.key;
                             return (
                                 <button
                                     key={shape.key}
                                     onClick={() => onShapeChange(shape.key)}
+                                    aria-pressed={isActive}
+                                    aria-label={shape.label}
                                     className={`
                                         flex items-center gap-1.5 min-h-[40px] sm:min-h-[36px] px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-bold
                                         transition-all duration-200 touch-manipulation
@@ -161,10 +169,9 @@ export const GodTools = ({
                                     } : {
                                         border: '1.5px solid transparent',
                                     }}
-                                    title={shape.label}
                                 >
                                     <ShapeIcon shape={shape.key} color={isActive ? activeColor : '#665c54'} />
-                                    <span className="hidden sm:inline">{shape.label}</span>
+                                    <span className="hidden sm:inline" aria-hidden="true">{shape.label}</span>
                                 </button>
                             );
                         })}
@@ -172,7 +179,7 @@ export const GodTools = ({
                 </>
             ) : (
                 <div className="flex items-center gap-2 border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 backdrop-blur-sm" style={{ background: 'var(--bg-card)' }}>
-                    <Eye size={14} className="text-[var(--text-muted)]" />
+                    <Eye size={14} className="text-[var(--text-muted)]" aria-hidden="true" />
                     <span className="text-xs font-medium text-[var(--text-muted)]">Preview mode — survey the battlefield</span>
                 </div>
             )}
@@ -210,11 +217,15 @@ export const GodTools = ({
 export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onReady: () => void }) => {
     const [isReady, setIsReady] = useState(false);
 
-    useEffect(() => {
-        if (phase === 'build') {
+    // Reset ready state when build phase restarts.
+    // Pattern: store previous phase in state; check during render (React docs: "Adjusting some state when a prop changes").
+    const [prevPhase, setPrevPhase] = useState(phase);
+    if (prevPhase !== phase) {
+        setPrevPhase(phase);
+        if (phase === 'build' && isReady) {
             setIsReady(false);
         }
-    }, [phase]);
+    }
 
     if (phase !== 'build') return null;
 
@@ -228,6 +239,7 @@ export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onRead
         <button
             onClick={handleReady}
             disabled={isReady}
+            aria-label={isReady ? 'Ready for battle' : 'Done building — signal ready to fight'}
             className={`flex items-center gap-1.5 min-h-[44px] px-5 py-2 rounded-xl text-sm font-bold
                 transition-all duration-200 touch-manipulation border shadow-lg
                 ${isReady
@@ -235,7 +247,7 @@ export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onRead
                     : 'btn-emerald cursor-pointer animate-pulse-subtle'
                 }`}
         >
-            {isReady ? <Check size={14} /> : <Swords size={14} />}
+            {isReady ? <Check size={14} aria-hidden="true" /> : <Swords size={14} aria-hidden="true" />}
             {isReady ? 'READY!' : 'DONE'}
         </button>
     );

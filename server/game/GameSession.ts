@@ -20,9 +20,19 @@ import {
     LEFT_SIDE, RIGHT_SIDE, LEFT_CANNON_X, RIGHT_CANNON_X,
     FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS,
     COL_BLOCK, SHAPE_DIMS,
-    PHYSICS_GRAVITY, PHYSICS_MAX_SPEED, PHYSICS_POWER_MULTIPLIER, PHYSICS_AIR_FRICTION,
+    PHYSICS_MAX_SPEED, PHYSICS_POWER_MULTIPLIER, PHYSICS_AIR_FRICTION,
 } from '../config/constants';
 import { generateHazards, applyWindForce, checkLavaDamage } from '../physics/hazards';
+
+/** Matter.js Body extended with custom game properties */
+interface GameBody extends Matter.Body {
+    blockHp?: number | null;
+    blockMaxHp?: number | null;
+    originalWidth?: number;
+    originalHeight?: number;
+    isBullet?: boolean;
+    side?: Side;
+}
 
 export class GameSession {
     readonly id: string;
@@ -111,7 +121,7 @@ export class GameSession {
                     this.botAI.takeTurn();
                 }
             },
-            onMatchResult: (_winner, _reason) => { /* Room manager handles result */ },
+            onMatchResult: () => { /* Room manager handles result */ },
             onRoundEnd: (winner, reason) => {
                 return this.onRoundEndCallback?.(winner, reason) ?? 'match_over';
             },
@@ -303,9 +313,10 @@ export class GameSession {
             socket.emit('build_success', { count: spawnedCount, thought: plan.thought_chain });
             this.scoreManager.recordResourceUsed(player.side, spawnedCount);
             this.scoreManager.recordAIBuild(player.side, spawnedCount);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Build Error:", err);
-            socket.emit('build_error', { message: err.message || "AI Generation Failed" });
+            const message = err instanceof Error ? err.message : "AI Generation Failed";
+            socket.emit('build_error', { message });
         }
     }
 
@@ -353,7 +364,7 @@ export class GameSession {
         });
 
         // Enable CCD to prevent tunneling through terrain
-        (body as any).isBullet = true;
+        (body as GameBody).isBullet = true;
 
         Matter.World.add(this.world, body);
 
@@ -394,7 +405,7 @@ export class GameSession {
         }
     }
 
-    handleForfeit(disconnectedSocketId: string): void {
+    handleForfeit(): void {
         // Stop the game loop and state machine
         this.stateMachine.destroy();
     }
@@ -529,7 +540,7 @@ export class GameSession {
         });
 
         // Tag with side for collision identification
-        (body as any).side = side;
+        (body as GameBody).side = side;
 
         Matter.World.add(this.world, body);
 
@@ -577,8 +588,8 @@ export class GameSession {
 
         // Tag it so it doesn't get destroyed easily (high HP)
         this.stampBlockProps(foundation, 'stone', foundationWidth, foundationDisplayHeight);
-        (foundation as any).blockHp = 10000; // Indestructible-ish
-        (foundation as any).blockMaxHp = 10000;
+        (foundation as GameBody).blockHp = 10000; // Indestructible-ish
+        (foundation as GameBody).blockMaxHp = 10000;
 
         Matter.World.add(this.world, foundation);
 
@@ -653,11 +664,11 @@ export class GameSession {
     }
 
     private stampBlockProps(body: Matter.Body, material: string, w: number, h: number) {
-        (body as any).originalWidth = w;
-        (body as any).originalHeight = h;
+        (body as GameBody).originalWidth = w;
+        (body as GameBody).originalHeight = h;
         const hp = MATERIAL_BLOCK_HP[material] ?? null;
-        (body as any).blockHp = hp;
-        (body as any).blockMaxHp = hp;
+        (body as GameBody).blockHp = hp;
+        (body as GameBody).blockMaxHp = hp;
     }
 
     private setupCollisionHandlers() {
@@ -731,14 +742,14 @@ export class GameSession {
                     }
 
                     // Block HP damage (skip terrain, king, other projectiles)
-                    const blockHp = (block as any).blockHp;
+                    const blockHp = (block as GameBody).blockHp;
                     if (blockHp != null && block.label !== 'Terrain' && block.label !== 'king') {
                         const impactForce = projectile.speed * projectile.mass;
                         if (impactForce >= PROJECTILE_MIN_IMPACT) {
                             const blockDamage = impactForce * PROJECTILE_BLOCK_DAMAGE_MULT;
-                            (block as any).blockHp = Math.max(0, blockHp - blockDamage);
+                            (block as GameBody).blockHp = Math.max(0, blockHp - blockDamage);
 
-                            if ((block as any).blockHp <= 0) {
+                            if ((block as GameBody).blockHp <= 0) {
                                 this.io.to(this.roomId).emit('block_destroyed', {
                                     bodyId: block.id,
                                     position: { x: block.position.x, y: block.position.y },

@@ -22,21 +22,21 @@ export interface LobbyProps {
 /* ═══════════════════════════════════════
    Ember Particle Component (CSS-driven)
    ═══════════════════════════════════════ */
-const EmberParticles = () => {
-    const embersRef = useRef(
-        Array.from({ length: 18 }, (_, i) => ({
-            id: i,
-            left: `${Math.random() * 100}%`,
-            delay: `${Math.random() * 8}s`,
-            duration: `${6 + Math.random() * 8}s`,
-            size: 2 + Math.random() * 3,
-            opacity: 0.3 + Math.random() * 0.5,
-        }))
-    );
 
+// Module-level constant — Math.random is called once at module load time, not during render
+const EMBER_DATA = Array.from({ length: 18 }, (_, i) => ({
+    id: i,
+    left: `${Math.random() * 100}%`,
+    delay: `${Math.random() * 8}s`,
+    duration: `${6 + Math.random() * 8}s`,
+    size: 2 + Math.random() * 3,
+    opacity: 0.3 + Math.random() * 0.5,
+}));
+
+const EmberParticles = () => {
     return (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]">
-            {embersRef.current.map(e => (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]" aria-hidden="true">
+            {EMBER_DATA.map(e => (
                 <div
                     key={e.id}
                     className="ember animate-ember"
@@ -535,12 +535,15 @@ export const Lobby = ({
                 {/* Action Panel */}
                 <div className="w-full flex flex-col gap-3">
                     {/* Player Name */}
+                    <label htmlFor="player-name-input" className="sr-only">Player name</label>
                     <input
+                        id="player-name-input"
                         type="text"
                         value={playerName}
                         onChange={(e) => onPlayerNameChange(e.target.value)}
                         placeholder="Enter thy name..."
                         maxLength={20}
+                        autoComplete="nickname"
                         className="input-medieval w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-display font-bold tracking-wide touch-manipulation"
                     />
 
@@ -549,7 +552,7 @@ export const Lobby = ({
                         onClick={() => onCreateRoom(playerName, 'single')}
                         className="btn-blue w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        <Zap size={20} />
+                        <Zap size={20} aria-hidden="true" />
                         <span>Single Player</span>
                     </button>
 
@@ -558,19 +561,22 @@ export const Lobby = ({
                         onClick={() => onCreateRoom(playerName, 'pvp')}
                         className="btn-primary w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        <Crown size={20} />
+                        <Crown size={20} aria-hidden="true" />
                         <span>Create Kingdom</span>
                         <span className="text-xs opacity-70 ml-1">(PvP)</span>
                     </button>
 
                     {/* Join Room */}
-                    <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
+                    <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full" aria-label="Join existing room">
+                        <label htmlFor="room-code-input" className="sr-only">Room code</label>
                         <input
+                            id="room-code-input"
                             type="text"
                             value={joinCode}
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                             placeholder="ROOM CODE"
                             maxLength={6}
+                            autoComplete="off"
                             className="input-medieval min-w-0 flex-1 rounded-xl px-3 py-3.5 text-center text-base font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
                         />
                         <button
@@ -580,14 +586,14 @@ export const Lobby = ({
                                 flex items-center gap-2
                                 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
                         >
-                            <LogIn size={18} />
+                            <LogIn size={18} aria-hidden="true" />
                             Join
                         </button>
                     </form>
 
                     {/* Divider */}
-                    <div className="ornament-divider mx-4">
-                        <span className="text-[10px] text-[var(--text-muted)] font-display tracking-widest">OR</span>
+                    <div className="ornament-divider mx-4" role="separator" aria-label="or">
+                        <span className="text-[10px] text-[var(--text-muted)] font-display tracking-widest" aria-hidden="true">OR</span>
                     </div>
 
                     {/* Quick Match */}
@@ -595,41 +601,43 @@ export const Lobby = ({
                         onClick={() => onJoinQueue(playerName)}
                         className="btn-medieval w-full min-h-[52px] py-3.5 rounded-xl text-base touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        <Users size={18} />
+                        <Users size={18} aria-hidden="true" />
                         <span>Quick Battle</span>
-                        <ChevronRight size={16} className="opacity-50" />
+                        <ChevronRight size={16} className="opacity-50" aria-hidden="true" />
                     </button>
 
                     {/* How to Play */}
                     <div className="card-dark rounded-xl overflow-hidden">
                         <button
                             onClick={() => setShowHowToPlay(!showHowToPlay)}
+                            aria-expanded={showHowToPlay}
+                            aria-controls="how-to-play-content"
                             className="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors touch-manipulation"
                         >
                             <span className="flex items-center gap-2 font-display font-bold tracking-wider">
-                                <HelpCircle size={16} className="text-[var(--gold-dim)]" />
+                                <HelpCircle size={16} className="text-[var(--gold-dim)]" aria-hidden="true" />
                                 HOW TO PLAY
                             </span>
-                            {showHowToPlay ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            {showHowToPlay ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
                         </button>
                         {showHowToPlay && (
-                            <div className="px-4 pb-4 text-xs text-[var(--text-secondary)] flex flex-col gap-3 animate-scale-in">
+                            <div id="how-to-play-content" className="px-4 pb-4 text-xs text-[var(--text-secondary)] flex flex-col gap-3 animate-scale-in">
                                 <div className="flex gap-3 items-start">
-                                    <span className="text-lg leading-none mt-0.5">🏗️</span>
+                                    <span className="text-lg leading-none mt-0.5" aria-hidden="true">🏗️</span>
                                     <div>
                                         <p className="font-bold text-[var(--emerald)] mb-0.5">1. Build Phase (90s)</p>
                                         <p>Design your fortress! Place blocks manually by clicking on your side, or describe your fortress to the AI architect using the prompt bar. Protect your King at all costs.</p>
                                     </div>
                                 </div>
                                 <div className="flex gap-3 items-start">
-                                    <span className="text-lg leading-none mt-0.5">👁️</span>
+                                    <span className="text-lg leading-none mt-0.5" aria-hidden="true">👁️</span>
                                     <div>
                                         <p className="font-bold text-[var(--gold)] mb-0.5">2. Reveal Phase (5s)</p>
                                         <p>The camera pans across the battlefield, revealing both fortresses and any environmental hazards.</p>
                                     </div>
                                 </div>
                                 <div className="flex gap-3 items-start">
-                                    <span className="text-lg leading-none mt-0.5">💥</span>
+                                    <span className="text-lg leading-none mt-0.5" aria-hidden="true">💥</span>
                                     <div>
                                         <p className="font-bold text-[var(--crimson)] mb-0.5">3. Combat Phase (15s/turn)</p>
                                         <p>Take turns firing cannonballs! Drag to aim and release to fire. Destroy the enemy King to win the round. First to win 2 rounds wins the match.</p>
@@ -638,20 +646,20 @@ export const Lobby = ({
                                 <div className="border-t border-[var(--border-subtle)] pt-2 mt-1">
                                     <p className="font-bold text-[var(--text-primary)] mb-1.5">Materials</p>
                                     <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                                        <span>🪵 <b>Wood</b> — 30 HP, high grip</span>
-                                        <span>🪨 <b>Stone</b> — 80 HP, heavy</span>
-                                        <span>🧊 <b>Ice</b> — 15 HP, slippery</span>
-                                        <span>⚫ <b>Rubber</b> — 40 HP, bouncy</span>
-                                        <span>⚙️ <b>Steel</b> — 200 HP, very dense</span>
+                                        <span><span aria-hidden="true">🪵</span> <b>Wood</b> — 30 HP, high grip</span>
+                                        <span><span aria-hidden="true">🪨</span> <b>Stone</b> — 80 HP, heavy</span>
+                                        <span><span aria-hidden="true">🧊</span> <b>Ice</b> — 15 HP, slippery</span>
+                                        <span><span aria-hidden="true">⚫</span> <b>Rubber</b> — 40 HP, bouncy</span>
+                                        <span><span aria-hidden="true">⚙️</span> <b>Steel</b> — 200 HP, very dense</span>
                                     </div>
                                 </div>
                                 <div className="border-t border-[var(--border-subtle)] pt-2">
                                     <p className="font-bold text-[var(--text-primary)] mb-1.5">Controls</p>
                                     <div className="grid grid-cols-1 gap-1 text-[10px]">
-                                        <span>🖱️ <b>Click</b> to place blocks during build phase</span>
-                                        <span>🎯 <b>Drag</b> on the cannon to aim, release to fire</span>
-                                        <span>⌨️ <b>A/D</b> to pan camera · <b>↑↓</b> adjust power · <b>Space</b> to fire</span>
-                                        <span>🤖 <b>Set an API key</b> and type a prompt to let AI build your fortress</span>
+                                        <span><span aria-hidden="true">🖱️</span> <b>Click</b> to place blocks during build phase</span>
+                                        <span><span aria-hidden="true">🎯</span> <b>Drag</b> on the cannon to aim, release to fire</span>
+                                        <span><span aria-hidden="true">⌨️</span> <b>A/D</b> to pan camera · <b>↑↓</b> adjust power · <b>Space</b> to fire</span>
+                                        <span><span aria-hidden="true">🤖</span> <b>Set an API key</b> and type a prompt to let AI build your fortress</span>
                                     </div>
                                 </div>
                             </div>

@@ -15,22 +15,42 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
 
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Fortress AI — Castle War" />
     <meta property="og:description" content="Real-time multiplayer fortress-building battle game powered by AI. Design your castle, then unleash cannon fire on your opponent." />
     <meta property="og:image" content="/favicon.svg" />
+    <meta property="og:site_name" content="Fortress AI" />
 
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Fortress AI — Castle War" />
     <meta name="twitter:description" content="Real-time multiplayer fortress-building battle game powered by AI." />
+    <meta name="twitter:image" content="/favicon.svg" />
 
     <!-- iOS / PWA hints -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Fortress AI" />
     <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "name": "Fortress AI",
+      "description": "Real-time multiplayer fortress-building battle game powered by AI. Design your castle with AI, then unleash cannon fire on your opponent.",
+      "genre": ["Strategy", "Action", "Multiplayer"],
+      "gamePlatform": ["Web Browser"],
+      "applicationCategory": "Game",
+      "operatingSystem": "Any"
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

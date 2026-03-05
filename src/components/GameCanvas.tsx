@@ -242,6 +242,8 @@ export const GameCanvas = ({
             triggerShake(6, 18);
         }
         prevKingsHpRef.current = kingsHp;
+        // triggerShake is stable (useCallback with no deps) — safe to omit from deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [kingsHp, mySide]);
 
     const triggerShake = useCallback((amplitude: number, duration: number) => {
@@ -600,7 +602,7 @@ export const GameCanvas = ({
             // const modX = ((cloud.x - cam.x * parallaxFactor) % (canvas.width + 500));
             // simplified:
 
-            let drawX = screenX;
+            const drawX = screenX;
             // Provide localized wrapping if it goes too far off screen?
             // For a fixed world size, standard parallax is fine.
 
