@@ -1,4 +1,4 @@
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { GameSession } from './GameSession';
 import type { PlayerInfo, MatchPhase, Side, PlayerProfile, MatchHistoryEntry, MatchScores } from '../types';
 import { ROUNDS_TO_WIN, ROUND_INTERSTITIAL_MS, MAX_MATCH_HISTORY } from '../config/constants';
@@ -163,7 +163,7 @@ export class RoomManager {
             const remainingPlayer = Array.from(room.players.values())[0];
             if (remainingPlayer) {
                 room.phase = 'result';
-                room.session.handleForfeit(socketId);
+                room.session.handleForfeit();
                 this.io.to(roomId).emit('match_result', {
                     winner: remainingPlayer.side,
                     reason: 'opponent_disconnected',

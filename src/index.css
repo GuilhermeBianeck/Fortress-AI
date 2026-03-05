@@ -589,3 +589,146 @@ body {
 .material-selected {
   animation: material-select 0.4s ease-out;
 }
+
+/* ═══════════════════════
+   Skeleton Loading
+   ═══════════════════════ */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+  border-radius: 6px;
+}
+
+.skeleton-text {
+  height: 0.75rem;
+  border-radius: 4px;
+}
+
+.skeleton-block {
+  border-radius: 8px;
+}
+
+/* ═══════════════════════
+   Forced Colors (high-contrast a11y)
+   ═══════════════════════ */
+@media (forced-colors: active) {
+  .btn-primary,
+  .btn-medieval,
+  .btn-blue,
+  .btn-emerald {
+    border: 2px solid ButtonText;
+    forced-color-adjust: none;
+  }
+  :focus-visible {
+    outline: 3px solid Highlight;
+  }
+}
+
+/* ═══════════════════════
+   Reduced Motion
+   ═══════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-float,
+  .animate-ember,
+  .animate-shimmer,
+  .animate-pulse-subtle,
+  .timer-urgent {
+    animation: none !important;
+  }
+
+  .parallax-layer {
+    transform: none !important;
+  }
+}
+
+/* ═══════════════════════
+   Touch ripple feedback
+   ═══════════════════════ */
+@keyframes ripple-expand {
+  from {
+    transform: scale(0);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px;
+  background: rgba(255, 215, 0, 0.3);
+  pointer-events: none;
+  animation: ripple-expand 0.5s ease-out forwards;
+}
+
+/* ═══════════════════════
+   Screen reader only
+   ═══════════════════════ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ═══════════════════════
+   Focus visible enhancements
+   ═══════════════════════ */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgba(255, 215, 0, 0.8);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ═══════════════════════
+   Input validation states
+   ═══════════════════════ */
+.input-medieval[aria-invalid="true"] {
+  border-color: var(--crimson);
+  box-shadow: 0 0 10px rgba(192, 57, 43, 0.15);
+}
+
+.input-medieval[aria-invalid="true"]:focus {
+  border-color: var(--crimson);
+  box-shadow: 0 0 15px rgba(192, 57, 43, 0.2);
+}
+
+/* ═══════════════════════
+   Prose (How To Play)
+   ═══════════════════════ */
+.prose-medieval p {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}

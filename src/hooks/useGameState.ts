@@ -170,7 +170,7 @@ export const useGameState = () => {
             setKingsHp(kings);
         });
 
-        socketRef.current.on('terrain', (data: TerrainData & { hazards?: any[] }) => {
+        socketRef.current.on('terrain', (data: TerrainData & { hazards?: { type: string; id: string; position: { x: number; y: number }; width: number; height: number; windDirection?: number; windStrength?: number }[] }) => {
             setTerrain(data);
             if (data.hazards) {
                 setHazards(data.hazards);
@@ -209,7 +209,7 @@ export const useGameState = () => {
             kingDamageCbRef.current?.({ side: data.side, damage: data.damage });
         });
 
-        socketRef.current.on('king_dead', (_data: { side: Side }) => {
+        socketRef.current.on('king_dead', () => {
         });
 
         // --- Room/lobby events ---
@@ -249,12 +249,12 @@ export const useGameState = () => {
             setRoomState(prev => prev ? { ...prev, opponentConnected: true, opponentName: data.name || 'Player' } : prev);
         });
 
-        socketRef.current.on('player_left', (_data: { side: Side; reason: string }) => {
+        socketRef.current.on('player_left', () => {
             setRoomState(prev => prev ? { ...prev, opponentConnected: false } : prev);
             setRematchState('none');
         });
 
-        socketRef.current.on('player_ready_ack', (_data: { side: Side }) => {
+        socketRef.current.on('player_ready_ack', () => {
             // Could track which players are ready in UI
         });
 
@@ -262,7 +262,7 @@ export const useGameState = () => {
             setQueuePosition(data.position);
         });
 
-        socketRef.current.on('match_found', (_data: { roomId: string }) => {
+        socketRef.current.on('match_found', () => {
             setQueuePosition(null);
         });
 

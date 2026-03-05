@@ -3,6 +3,15 @@ import { Server } from 'socket.io';
 import type { KingState } from '../types';
 import { MATERIAL_COLORS } from '../config/constants';
 
+/** Matter.js Body with custom game properties used in loop snapshots */
+interface LoopBody extends Matter.Body {
+    blockHp?: number | null;
+    blockMaxHp?: number | null;
+    originalWidth?: number;
+    originalHeight?: number;
+    circleRadius?: number;
+}
+
 const TICK_RATE = 60;
 const SNAPSHOT_RATE = 20;
 const TICK_DT = 1000 / TICK_RATE;
@@ -89,7 +98,7 @@ export class GameLoop {
         const isFullSync = this.snapshotCount % FULL_SYNC_INTERVAL === 0;
 
         // New bodies: full metadata (sent once per body, or on full-sync)
-        const newBodies: any[] = [];
+        const newBodies: object[] = [];
         // Dynamic updates: compact array tuples [id, x, y, angle, vx, vy, hp]
         const updates: number[][] = [];
         // Track current body IDs to detect removals
@@ -102,8 +111,8 @@ export class GameLoop {
 
             if (isNew || isFullSync) {
                 // Send full metadata for new bodies or during periodic full sync
-                const width = (body as any).originalWidth || (body.bounds.max.x - body.bounds.min.x);
-                const height = (body as any).originalHeight || (body.bounds.max.y - body.bounds.min.y);
+                const width = (body as LoopBody).originalWidth || (body.bounds.max.x - body.bounds.min.x);
+                const height = (body as LoopBody).originalHeight || (body.bounds.max.y - body.bounds.min.y);
 
                 newBodies.push({
                     id: body.id,
@@ -111,15 +120,15 @@ export class GameLoop {
                     isStatic: body.isStatic,
                     width,
                     height,
-                    circleRadius: (body as any).circleRadius || 0,
+                    circleRadius: (body as LoopBody).circleRadius || 0,
                     material: body.label || 'default',
                     color: MATERIAL_COLORS[body.label] || '#e11d48',
-                    blockMaxHp: (body as any).blockMaxHp ?? null,
+                    blockMaxHp: (body as LoopBody).blockMaxHp ?? null,
                     // Include dynamic data in full metadata too
                     position: { x: body.position.x, y: body.position.y },
                     angle: body.angle,
                     velocity: { x: body.velocity.x, y: body.velocity.y },
-                    blockHp: (body as any).blockHp ?? null,
+                    blockHp: (body as LoopBody).blockHp ?? null,
                 });
                 this.knownBodyIds.add(body.id);
             } else if (!body.isStatic) {
@@ -132,7 +141,7 @@ export class GameLoop {
                     Math.round(body.angle * ANGLE_PRECISION) / ANGLE_PRECISION,
                     Math.round(body.velocity.x * POS_PRECISION) / POS_PRECISION,
                     Math.round(body.velocity.y * POS_PRECISION) / POS_PRECISION,
-                    (body as any).blockHp ?? NULL_HP_SENTINEL,
+                    (body as LoopBody).blockHp ?? NULL_HP_SENTINEL,
                 ]);
             }
             // Static known bodies: skip entirely (terrain, boundaries, foundations)

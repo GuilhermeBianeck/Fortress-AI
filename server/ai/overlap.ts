@@ -38,7 +38,8 @@ export function safeSpawn(plans: BodyPlan[], existingWorld: Matter.World): SafeS
     const adjustedBodies: BodyPlan[] = [];
 
     for (const plan of plans) {
-        let { x, y } = plan;
+        const { x } = plan;
+        let y = plan.y;
         let adjusted = false;
 
         for (let attempt = 0; attempt < MAX_SHIFT_ATTEMPTS; attempt++) {

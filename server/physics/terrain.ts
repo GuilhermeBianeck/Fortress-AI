@@ -132,40 +132,6 @@ function createTerrainSegments(
     return bodies;
 }
 
-/**
- * Flattens terrain surface points within build zones.
- * Sets all points in each zone to the minimum Y (highest terrain point),
- * creating genuinely flat platforms for stable building.
- */
-function flattenBuildZones(
-    points: { x: number; y: number }[],
-    zones: BuildZone[]
-): void {
-    for (const zone of zones) {
-        const zoneEndX = zone.x + zone.width;
-
-        // Find the minimum Y (highest point) within the zone
-        let minY = Infinity;
-        for (const pt of points) {
-            if (pt.x >= zone.x && pt.x <= zoneEndX) {
-                minY = Math.min(minY, pt.y);
-            }
-        }
-
-        if (minY === Infinity) continue;
-
-        // Set all points in the zone to that Y value
-        for (const pt of points) {
-            if (pt.x >= zone.x && pt.x <= zoneEndX) {
-                pt.y = minY;
-            }
-        }
-
-        // Update the zone's Y to match
-        zone.y = minY;
-    }
-}
-
 interface BuildZone {
     x: number;
     width: number;

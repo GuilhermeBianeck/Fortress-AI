@@ -8,6 +8,12 @@ import {
     CANVAS_HEIGHT,
 } from '../config/constants';
 
+/** Matter.js Body with custom game properties used in hazard checks */
+interface HazardBody extends Matter.Body {
+    blockHp?: number | null;
+    side?: Side;
+}
+
 // Seeded RNG helper
 function seededRandom(seed: number): () => number {
     let s = seed;
@@ -124,16 +130,16 @@ export function checkLavaDamage(
                 const dmg = lava.damage ?? LAVA_DAMAGE_PER_TICK;
 
                 // Damage blocks
-                if ((body as any).blockHp != null) {
-                    (body as any).blockHp = Math.max(0, (body as any).blockHp - dmg * 0.1);
-                    if ((body as any).blockHp <= 0) {
+                if ((body as HazardBody).blockHp != null) {
+                    (body as HazardBody).blockHp = Math.max(0, (body as HazardBody).blockHp - dmg * 0.1);
+                    if ((body as HazardBody).blockHp <= 0) {
                         Matter.Composite.remove(world, body);
                     }
                 }
 
                 // Damage kings
                 if (body.label === 'king') {
-                    const kingSide = (body as any).side as Side;
+                    const kingSide = (body as HazardBody).side as Side;
                     const kingState = kings.get(kingSide);
                     if (kingState && kingState.hp > 0) {
                         kingState.hp = Math.max(0, kingState.hp - dmg * 0.05);
