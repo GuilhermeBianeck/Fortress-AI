@@ -567,7 +567,7 @@ export const Lobby = ({
                     </button>
 
                     {/* Join Room */}
-                    <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full" aria-label="Join existing room">
+                    <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
                         <label htmlFor="room-code-input" className="sr-only">Room code</label>
                         <input
                             id="room-code-input"
