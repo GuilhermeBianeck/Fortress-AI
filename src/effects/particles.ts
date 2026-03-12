@@ -7,7 +7,6 @@ interface Particle {
     maxLife: number;
     color: string;
     size: number;
-    active: boolean;
 }
 
 const MAX_PARTICLES = 200;
@@ -23,7 +22,7 @@ export class ParticleSystem {
         // Pre-allocate the full pool so no objects are created at runtime
         this.pool = new Array<Particle>(MAX_PARTICLES);
         for (let i = 0; i < MAX_PARTICLES; i++) {
-            this.pool[i] = { x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1, color: '', size: 0, active: false };
+            this.pool[i] = { x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1, color: '', size: 0 };
         }
     }
 
@@ -52,7 +51,6 @@ export class ParticleSystem {
             p.maxLife = life;
             p.color = color;
             p.size = 2 + Math.random() * 2;
-            p.active = true;
             this.count++;
         }
     }
@@ -67,7 +65,6 @@ export class ParticleSystem {
             p.life--;
 
             if (p.life <= 0) {
-                p.active = false;
                 // Swap-and-pop: O(1) removal
                 this.count--;
                 const tmp = this.pool[i];

@@ -37,31 +37,39 @@ const SERVER_SNAPSHOT_MS = 50;
 
 // Pre-computed star alpha strings to avoid template literal allocation per star per frame
 // Stars use alpha = twinkle * 0.6 where twinkle ∈ [0.3, 1.0] → alpha ∈ [0.18, 0.60]
-// We quantize into 16 buckets for minimal visual difference
+// Quantized into 16 buckets (range=0.42) for minimal visual difference
+const STAR_ALPHA_MIN = 0.18;
+const STAR_ALPHA_RANGE = 0.42;
+const ALPHA_BUCKETS = 16;
 const STAR_ALPHA_STRINGS: string[] = (() => {
     const arr: string[] = [];
-    for (let i = 0; i < 16; i++) {
-        const alpha = (0.18 + (i / 15) * 0.42).toFixed(2);
+    for (let i = 0; i < ALPHA_BUCKETS; i++) {
+        const alpha = (STAR_ALPHA_MIN + (i / (ALPHA_BUCKETS - 1)) * STAR_ALPHA_RANGE).toFixed(2);
         arr.push(`rgba(200,210,255,${alpha})`);
     }
     return arr;
 })();
 
 // Pre-computed wind particle alpha strings (16 buckets)
+// Wind alpha ∈ [~0.01, ~0.20] from: 0.08 + 0.12 * sin(...)
+const WIND_ALPHA_MIN = 0.01;
+const WIND_ALPHA_RANGE = 0.19;
 const WIND_ALPHA_STRINGS: string[] = (() => {
     const arr: string[] = [];
-    for (let i = 0; i < 16; i++) {
-        const alpha = (0.01 + (i / 15) * 0.19).toFixed(3);
+    for (let i = 0; i < ALPHA_BUCKETS; i++) {
+        const alpha = (WIND_ALPHA_MIN + (i / (ALPHA_BUCKETS - 1)) * WIND_ALPHA_RANGE).toFixed(3);
         arr.push(`rgba(180,215,255,${alpha})`);
     }
     return arr;
 })();
 
-// Pre-computed wind arrow alpha strings (16 buckets)
+// Pre-computed wind arrow alpha strings (16 buckets, alpha * 0.7 of wind alpha)
+const WIND_ARROW_ALPHA_MIN = 0.007;
+const WIND_ARROW_ALPHA_RANGE = 0.133;
 const WIND_ARROW_ALPHA_STRINGS: string[] = (() => {
     const arr: string[] = [];
-    for (let i = 0; i < 16; i++) {
-        const alpha = (0.007 + (i / 15) * 0.133).toFixed(3);
+    for (let i = 0; i < ALPHA_BUCKETS; i++) {
+        const alpha = (WIND_ARROW_ALPHA_MIN + (i / (ALPHA_BUCKETS - 1)) * WIND_ARROW_ALPHA_RANGE).toFixed(3);
         arr.push(`rgba(180,215,255,${alpha})`);
     }
     return arr;
@@ -521,8 +529,8 @@ export const GameCanvas = ({
             const size = 0.5 + (i % 3) * 0.5;
             ctx.beginPath();
             ctx.arc(sx, sy, size, 0, Math.PI * 2);
-            // Use pre-computed alpha string (quantized to 16 buckets)
-            const alphaIdx = Math.min(15, (twinkle * 0.6 - 0.18) / 0.42 * 15 + 0.5 | 0);
+            // Use pre-computed alpha string: map alpha to bucket index
+            const alphaIdx = Math.min(ALPHA_BUCKETS - 1, (twinkle * 0.6 - STAR_ALPHA_MIN) / STAR_ALPHA_RANGE * (ALPHA_BUCKETS - 1) + 0.5 | 0);
             ctx.fillStyle = STAR_ALPHA_STRINGS[alphaIdx];
             ctx.fill();
         }
@@ -813,7 +821,8 @@ export const GameCanvas = ({
                             x + dir * len * 0.4, y + wobble2 - 2,
                             x + dir * len, y + wobble2
                         );
-                        const alphaIdx = Math.min(15, Math.max(0, (alpha - 0.01) / 0.19 * 15 + 0.5 | 0));
+                        // Map alpha to pre-computed bucket index
+                        const alphaIdx = Math.min(ALPHA_BUCKETS - 1, Math.max(0, (alpha - WIND_ALPHA_MIN) / WIND_ALPHA_RANGE * (ALPHA_BUCKETS - 1) + 0.5 | 0));
                         ctx.strokeStyle = WIND_ALPHA_STRINGS[alphaIdx];
                         ctx.lineWidth = 0.8 + (i % 3) * 0.4;
                         ctx.stroke();
@@ -827,7 +836,8 @@ export const GameCanvas = ({
                             ctx.lineTo(tipX - dir * 4, tipY - 2);
                             ctx.moveTo(tipX, tipY);
                             ctx.lineTo(tipX - dir * 4, tipY + 2);
-                            const arrowIdx = Math.min(15, Math.max(0, (alpha * 0.7 - 0.007) / 0.133 * 15 + 0.5 | 0));
+                            // Map arrow alpha (0.7 * wind alpha) to pre-computed bucket index
+                            const arrowIdx = Math.min(ALPHA_BUCKETS - 1, Math.max(0, (alpha * 0.7 - WIND_ARROW_ALPHA_MIN) / WIND_ARROW_ALPHA_RANGE * (ALPHA_BUCKETS - 1) + 0.5 | 0));
                             ctx.strokeStyle = WIND_ARROW_ALPHA_STRINGS[arrowIdx];
                             ctx.lineWidth = 0.6;
                             ctx.stroke();
