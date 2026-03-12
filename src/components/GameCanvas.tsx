@@ -35,6 +35,38 @@ export interface HazardData {
 // Server snapshot rate: 20Hz = 50ms between snapshots (must match SNAPSHOT_RATE in server/physics/loop.ts)
 const SERVER_SNAPSHOT_MS = 50;
 
+// Pre-computed star alpha strings to avoid template literal allocation per star per frame
+// Stars use alpha = twinkle * 0.6 where twinkle ∈ [0.3, 1.0] → alpha ∈ [0.18, 0.60]
+// We quantize into 16 buckets for minimal visual difference
+const STAR_ALPHA_STRINGS: string[] = (() => {
+    const arr: string[] = [];
+    for (let i = 0; i < 16; i++) {
+        const alpha = (0.18 + (i / 15) * 0.42).toFixed(2);
+        arr.push(`rgba(200,210,255,${alpha})`);
+    }
+    return arr;
+})();
+
+// Pre-computed wind particle alpha strings (16 buckets)
+const WIND_ALPHA_STRINGS: string[] = (() => {
+    const arr: string[] = [];
+    for (let i = 0; i < 16; i++) {
+        const alpha = (0.01 + (i / 15) * 0.19).toFixed(3);
+        arr.push(`rgba(180,215,255,${alpha})`);
+    }
+    return arr;
+})();
+
+// Pre-computed wind arrow alpha strings (16 buckets)
+const WIND_ARROW_ALPHA_STRINGS: string[] = (() => {
+    const arr: string[] = [];
+    for (let i = 0; i < 16; i++) {
+        const alpha = (0.007 + (i / 15) * 0.133).toFixed(3);
+        arr.push(`rgba(180,215,255,${alpha})`);
+    }
+    return arr;
+})();
+
 // Material color map (dark medieval theme)
 const MATERIAL_COLORS: Record<string, string> = {
     wood: '#8B6B42',
@@ -174,6 +206,7 @@ export const GameCanvas = ({
         scale: number;
         depth: number; // 0=far, 1=near
         puffs: { dx: number; dy: number; rx: number; ry: number }[];
+        fillStyle: string; // Pre-computed, never changes (depth is constant)
     }
     const cloudsRef = useRef<Cloud[] | null>(null);
 
@@ -194,6 +227,9 @@ export const GameCanvas = ({
 
     // Animation frame ID
     const rafRef = useRef<number>(0);
+
+    // Cached 2D context — avoids getContext('2d') call every frame
+    const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
 
     // Keys pressed for camera
     const keysRef = useRef<Set<string>>(new Set());
@@ -369,8 +405,8 @@ export const GameCanvas = ({
 
     // 60fps render loop
     useEffect(() => {
-        const render = () => {
-            renderFrame();
+        const render = (timestamp: number) => {
+            renderFrame(timestamp);
             rafRef.current = requestAnimationFrame(render);
         };
         rafRef.current = requestAnimationFrame(render);
@@ -380,10 +416,16 @@ export const GameCanvas = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const renderFrame = () => {
+    const renderFrame = (rafTimestamp: number) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const ctx = canvas.getContext('2d');
+
+        // Cache the 2D context — only fetch once
+        let ctx = ctxRef.current;
+        if (!ctx || ctx.canvas !== canvas) {
+            ctx = canvas.getContext('2d');
+            ctxRef.current = ctx;
+        }
         if (!ctx) return;
 
         const dpr = window.devicePixelRatio || 1;
@@ -437,8 +479,8 @@ export const GameCanvas = ({
             shake.remaining--;
         }
 
-        // Single timestamp for the entire frame — avoids multiple Date.now() calls
-        const nowMs = Date.now();
+        // Single timestamp for the entire frame — use rAF timestamp (monotonic, no allocation)
+        const nowMs = rafTimestamp;
 
         // Rebuild gradients only when canvas logical size changes
         const gradCache = gradientCacheRef.current;
@@ -479,7 +521,9 @@ export const GameCanvas = ({
             const size = 0.5 + (i % 3) * 0.5;
             ctx.beginPath();
             ctx.arc(sx, sy, size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(200, 210, 255, ${(twinkle * 0.6).toFixed(2)})`;
+            // Use pre-computed alpha string (quantized to 16 buckets)
+            const alphaIdx = Math.min(15, (twinkle * 0.6 - 0.18) / 0.42 * 15 + 0.5 | 0);
+            ctx.fillStyle = STAR_ALPHA_STRINGS[alphaIdx];
             ctx.fill();
         }
 
@@ -493,6 +537,7 @@ export const GameCanvas = ({
                 const depth = layer === 'far' ? 0.2 : layer === 'mid' ? 0.5 : 0.8;
                 const baseScale = layer === 'far' ? 0.7 : layer === 'mid' ? 1.1 : 1.6;
                 const speed = layer === 'far' ? 0.08 : layer === 'mid' ? 0.15 : 0.25;
+                const cloudAlpha = 0.25 + depth * 0.15;
 
                 return {
                     x: Math.random() * (WORLD_WIDTH * 1.5),
@@ -505,7 +550,8 @@ export const GameCanvas = ({
                         dy: (Math.random() * 20),
                         rx: 30 + Math.random() * 20,
                         ry: 15 + Math.random() * 15
-                    }))
+                    })),
+                    fillStyle: `rgba(35,30,50,${cloudAlpha.toFixed(2)})`,
                 };
             };
 
@@ -610,9 +656,8 @@ export const GameCanvas = ({
 
             // Check visibility
             if (drawX > -300 && drawX < width + 300) {
-                // Dark storm-grey clouds with slight purple tint
-                const cloudAlpha = 0.25 + cloud.depth * 0.15;
-                ctx.fillStyle = `rgba(35, 30, 50, ${cloudAlpha.toFixed(2)})`;
+                // Use pre-computed fillStyle (depth never changes)
+                ctx.fillStyle = cloud.fillStyle;
 
                 for (const puff of cloud.puffs) {
                     const px = drawX + puff.dx * cloud.scale;
@@ -727,7 +772,13 @@ export const GameCanvas = ({
         const hzds = hazardsRef.current;
         if (hzds) {
             const animPhase = nowMs / 1000;
+            const visibleLeft = cam.x - 100;
+            const visibleRight = cam.x + width + 100;
+
             for (const h of hzds) {
+                // Skip zones entirely off-screen
+                if (h.position.x + h.width < visibleLeft || h.position.x > visibleRight) continue;
+
                 if (h.type === 'wind_zone') {
                     // Subtle blue tint
                     ctx.fillStyle = 'rgba(100, 150, 255, 0.03)';
@@ -735,9 +786,7 @@ export const GameCanvas = ({
 
                     // Organic wind particles — curved streaks with wobble
                     const dir = h.windDirection ?? 1;
-                    const visibleLeft = cam.x - 100;
-                    const visibleRight = cam.x + canvas.width + 100;
-                    const particleCount = 50;
+                    const particleCount = 30; // Reduced from 50 for performance
                     const wrapWidth = visibleRight - visibleLeft + 200;
 
                     for (let i = 0; i < particleCount; i++) {
@@ -757,14 +806,15 @@ export const GameCanvas = ({
                         const x = rawX;
                         const y = baseY + wobble;
 
-                        // Draw curved streak
+                        // Draw curved streak — use pre-computed alpha string
                         ctx.beginPath();
                         ctx.moveTo(x, y);
                         ctx.quadraticCurveTo(
                             x + dir * len * 0.4, y + wobble2 - 2,
                             x + dir * len, y + wobble2
                         );
-                        ctx.strokeStyle = `rgba(180, 215, 255, ${alpha.toFixed(3)})`;
+                        const alphaIdx = Math.min(15, Math.max(0, (alpha - 0.01) / 0.19 * 15 + 0.5 | 0));
+                        ctx.strokeStyle = WIND_ALPHA_STRINGS[alphaIdx];
                         ctx.lineWidth = 0.8 + (i % 3) * 0.4;
                         ctx.stroke();
 
@@ -777,7 +827,8 @@ export const GameCanvas = ({
                             ctx.lineTo(tipX - dir * 4, tipY - 2);
                             ctx.moveTo(tipX, tipY);
                             ctx.lineTo(tipX - dir * 4, tipY + 2);
-                            ctx.strokeStyle = `rgba(180, 215, 255, ${(alpha * 0.7).toFixed(3)})`;
+                            const arrowIdx = Math.min(15, Math.max(0, (alpha * 0.7 - 0.007) / 0.133 * 15 + 0.5 | 0));
+                            ctx.strokeStyle = WIND_ARROW_ALPHA_STRINGS[arrowIdx];
                             ctx.lineWidth = 0.6;
                             ctx.stroke();
                         }
@@ -984,8 +1035,20 @@ export const GameCanvas = ({
 
         // Draw dynamic bodies
         if (gs) {
+            // Viewport bounds for culling (with margin for rotation/size)
+            const cullMargin = 80;
+            const vpLeft = cam.x - cullMargin;
+            const vpRight = cam.x + width + cullMargin;
+            const vpTop = -cullMargin;
+            const vpBottom = height + cullMargin;
+
             for (const body of gs.bodies) {
                 if (body.label === 'Terrain' || body.label === 'Boundary') continue;
+
+                // Fast viewport culling — skip bodies entirely off-screen
+                const bx = body.position.x;
+                const by = body.position.y;
+                if (bx < vpLeft || bx > vpRight || by < vpTop || by > vpBottom) continue;
 
                 // Interpolate position and angle for smooth movement between server snapshots
                 let drawX = body.position.x;
@@ -1141,13 +1204,16 @@ export const GameCanvas = ({
         // Draw particles (in world space)
         particles.draw(ctx);
 
-        // Draw floating damage numbers (in world space)
+        // Draw floating damage numbers (in world space) — swap-and-pop removal
         const dmgNums = damageNumbersRef.current;
-        for (let i = dmgNums.length - 1; i >= 0; i--) {
-            const dn = dmgNums[i];
+        let dmgIdx = 0;
+        while (dmgIdx < dmgNums.length) {
+            const dn = dmgNums[dmgIdx];
             dn.age++;
             if (dn.age > 60) {
-                dmgNums.splice(i, 1);
+                // Swap-and-pop: O(1) removal
+                dmgNums[dmgIdx] = dmgNums[dmgNums.length - 1];
+                dmgNums.pop();
                 continue;
             }
             const progress = dn.age / 60;
@@ -1159,13 +1225,15 @@ export const GameCanvas = ({
             ctx.scale(scale, scale);
             ctx.font = 'bold 14px monospace';
             ctx.textAlign = 'center';
-            ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
-            ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.7})`;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgb(239, 68, 68)';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.lineWidth = 3;
             const text = `-${dn.damage}`;
             ctx.strokeText(text, 0, 0);
             ctx.fillText(text, 0, 0);
             ctx.restore();
+            dmgIdx++;
         }
 
         // === End world drawing ===
@@ -1331,18 +1399,14 @@ export const GameCanvas = ({
         ctx.fillRect(barX, barY, barW, barHeight);
 
         if (hpRatio > 0) {
-            const grad = ctx.createLinearGradient(barX, barY, barX + barW * hpRatio, barY);
+            // Use flat color instead of gradient — avoids createLinearGradient() every frame
             if (hpRatio > 0.5) {
-                grad.addColorStop(0, '#27ae60');
-                grad.addColorStop(1, '#2ecc71');
+                ctx.fillStyle = '#2ecc71';
             } else if (hpRatio > 0.25) {
-                grad.addColorStop(0, '#e67e22');
-                grad.addColorStop(1, '#f39c12');
+                ctx.fillStyle = '#f39c12';
             } else {
-                grad.addColorStop(0, '#c0392b');
-                grad.addColorStop(1, '#e74c3c');
+                ctx.fillStyle = '#e74c3c';
             }
-            ctx.fillStyle = grad;
             ctx.fillRect(barX, barY, barW * hpRatio, barHeight);
         }
 
