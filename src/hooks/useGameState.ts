@@ -84,6 +84,8 @@ export const useGameState = () => {
 
     // Body metadata cache for delta-encoded state reconstruction
     const bodyCacheRef = useRef<Map<number, BodyState>>(new Map());
+    // Reusable array for bodies — rebuilt from cache on each snapshot to avoid Array.from() allocation
+    const bodiesArrayRef = useRef<BodyState[]>([]);
 
     // Callback refs for canvas effects
     const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
@@ -141,9 +143,12 @@ export const useGameState = () => {
                 for (const tuple of data.u) {
                     const existing = cache.get(tuple[T_ID]);
                     if (existing) {
-                        existing.position = { x: tuple[T_X], y: tuple[T_Y] };
+                        // Mutate in-place to avoid object allocation
+                        existing.position.x = tuple[T_X];
+                        existing.position.y = tuple[T_Y];
                         existing.angle = tuple[T_ANGLE];
-                        existing.velocity = { x: tuple[T_VX], y: tuple[T_VY] };
+                        existing.velocity.x = tuple[T_VX];
+                        existing.velocity.y = tuple[T_VY];
                         existing.blockHp = tuple[T_HP] === NULL_HP_SENTINEL ? null : tuple[T_HP];
                     }
                 }
@@ -156,14 +161,20 @@ export const useGameState = () => {
                 }
             }
 
-            // Reconstruct full GameState for canvas
+            // Reconstruct full GameState for canvas — reuse array to avoid allocation
             const kings = {
                 left: data.k.l,
                 right: data.k.r,
             };
 
+            const arr = bodiesArrayRef.current;
+            arr.length = 0;
+            for (const v of cache.values()) {
+                arr.push(v);
+            }
+
             setGameState({
-                bodies: Array.from(cache.values()),
+                bodies: arr,
                 timestamp: data.t,
                 kings,
             });
@@ -322,6 +333,7 @@ export const useGameState = () => {
 
         socketRef.current.on('rematch_start', () => {
             bodyCacheRef.current.clear();
+            bodiesArrayRef.current.length = 0;
             setRematchState('none');
             setMatchResult(null);
             setMatchScores(null);
@@ -419,6 +431,7 @@ export const useGameState = () => {
     const returnToLobby = useCallback(() => {
         socketRef.current?.emit('leave_room');
         bodyCacheRef.current.clear();
+        bodiesArrayRef.current.length = 0;
         setGameState(null);
         setTerrain(null);
         setBuildStatus({ status: 'idle', message: '' });
