@@ -67,7 +67,7 @@ export class RoomManager {
             socketId: hostSocketId,
             side: 'left',
             ready: false,
-            name: (name?.trim()) || 'Player 1',
+            name: (name?.trim().slice(0, 20).replace(/[^\w\s-]/g, '')) || 'Player 1',
         };
 
         room.players.set(hostSocketId, playerInfo);
@@ -101,7 +101,7 @@ export class RoomManager {
             socketId,
             side: 'right',
             ready: false,
-            name: (name?.trim()) || 'Player 2',
+            name: (name?.trim().slice(0, 20).replace(/[^\w\s-]/g, '')) || 'Player 2',
         };
 
         room.players.set(socketId, playerInfo);

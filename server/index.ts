@@ -8,27 +8,29 @@ import analyticsRouter from './analytics/events';
 
 dotenv.config();
 
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:5173', 'http://localhost:3001']; // Dev defaults; production sets ALLOWED_ORIGINS env
+
 const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.text({ type: 'text/plain' }));
+app.use(cors({ origin: ALLOWED_ORIGINS }));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.text({ type: 'text/plain', limit: '10kb' }));
 app.use(analyticsRouter);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: "*",
+        origin: ALLOWED_ORIGINS,
         methods: ["GET", "POST"]
     },
-    // Force websocket transport — skip HTTP long-polling upgrade overhead
     transports: ['websocket'],
-    // Enable per-message deflate compression for large payloads
     perMessageDeflate: {
         threshold: 512,
     },
-    // Tighter ping for real-time responsiveness
     pingInterval: 10000,
     pingTimeout: 5000,
+    maxHttpBufferSize: 1e5, // 100KB max per WebSocket message
 });
 
 const PORT = process.env.PORT || 3001;

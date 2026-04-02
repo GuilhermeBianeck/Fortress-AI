@@ -25,24 +25,45 @@ function recordEvent(event: { name: string; uid?: string; ts: number }) {
     hc[event.name] = (hc[event.name] || 0) + 1;
 }
 
+// Rate limiting: max 20 requests per minute per IP
+const eventRateLimits: Map<string, number[]> = new Map();
+const EVENT_RATE_MAX = 20;
+const EVENT_RATE_WINDOW = 60_000;
+const MAX_EVENTS_PER_BATCH = 50;
+const MAX_EVENT_SIZE = 500; // bytes per event
+
 router.post('/api/events', (req, res) => {
     try {
+        // Rate limit by IP
+        const ip = req.ip || 'unknown';
+        const now = Date.now();
+        const timestamps = (eventRateLimits.get(ip) || []).filter(t => now - t < EVENT_RATE_WINDOW);
+        if (timestamps.length >= EVENT_RATE_MAX) {
+            res.status(429).json({ error: 'Rate limited' });
+            return;
+        }
+        timestamps.push(now);
+        eventRateLimits.set(ip, timestamps);
+
         // sendBeacon sends text/plain to avoid CORS preflight; parse if needed
         let body = req.body;
         if (typeof body === 'string') {
             try { body = JSON.parse(body); } catch { body = null; }
         }
-        if (!Array.isArray(body)) {
-            res.status(400).json({ error: 'Expected array of events' });
+        if (!Array.isArray(body) || body.length > MAX_EVENTS_PER_BATCH) {
+            res.status(400).json({ error: 'Invalid payload' });
             return;
         }
 
-        // Process each event: store to file + update in-memory counters
+        // Process each event with size validation
         const lines: string[] = [];
         for (const e of body) {
             if (e && typeof e === 'object' && 'name' in e) {
-                lines.push(JSON.stringify(e));
-                recordEvent(e as { name: string; uid?: string; ts: number });
+                const line = JSON.stringify(e);
+                if (line.length <= MAX_EVENT_SIZE) {
+                    lines.push(line);
+                    recordEvent(e as { name: string; uid?: string; ts: number });
+                }
             }
         }
 
@@ -56,7 +77,13 @@ router.post('/api/events', (req, res) => {
     }
 });
 
-router.get('/api/stats', (_req, res) => {
+// Stats endpoint protected by admin key
+router.get('/api/stats', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (adminKey && req.query.key !== adminKey) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+    }
     // Trim hourly counters to last 48 hours to prevent unbounded growth
     const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().slice(0, 13);
     for (const key of hourlyCounters.keys()) {

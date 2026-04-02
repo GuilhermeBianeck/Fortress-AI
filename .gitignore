@@ -29,3 +29,9 @@ playwright-report/
 tests/screenshots/
 .claude/worktrees/
 server/data/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+server/.env

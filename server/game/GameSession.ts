@@ -260,8 +260,10 @@ export class GameSession {
 
         const { x, y, material = 'wood', shape = 'rectangle' } = data;
 
-        // Validate within player's half
+        // Validate coordinates are finite numbers within world bounds
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
         if (x < player.buildZone.xMin || x > player.buildZone.xMax) return;
+        if (y < -200 || y > CANVAS_HEIGHT + 100) return;
 
         // Use predefined shape dimensions
         const dims = SHAPE_DIMS[shape] || SHAPE_DIMS.rectangle;
@@ -374,9 +376,9 @@ export class GameSession {
             this.scoreManager.recordAIBuild(player.side, spawnedCount);
         } catch (err: unknown) {
             clearInterval(heartbeat);
-            console.error("Build Error:", err);
-            const message = err instanceof Error ? err.message : "AI Generation Failed";
-            socket.emit('build_error', { message });
+            // Log full error server-side but NEVER forward raw error to client (could contain API key)
+            console.error("Build Error:", err instanceof Error ? err.message : err);
+            socket.emit('build_error', { message: 'AI generation failed. Please try again.' });
         } finally {
             this.buildInProgress.delete(socket.id);
         }

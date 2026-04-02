@@ -2,7 +2,11 @@ import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { FortressSchema, FortressPlan } from './schema';
 import { buildSystemPrompt, TerrainContext } from './prompts';
 
+const MAX_PROMPT_LENGTH = 500;
+
 export const generateFortress = async (apiKey: string, userPrompt: string, terrainCtx?: TerrainContext): Promise<FortressPlan> => {
+    // Sanitize user prompt: limit length, strip control chars
+    const sanitizedPrompt = userPrompt.trim().slice(0, MAX_PROMPT_LENGTH).replace(/[\x00-\x1f]/g, '');
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const model = genAI.getGenerativeModel({
@@ -43,7 +47,7 @@ export const generateFortress = async (apiKey: string, userPrompt: string, terra
                 role: 'user',
                 parts: [
                     { text: systemPrompt },
-                    { text: `User Request: "${userPrompt}"` }
+                    { text: `User Request: "${sanitizedPrompt}"` }
                 ]
             }
         ]
