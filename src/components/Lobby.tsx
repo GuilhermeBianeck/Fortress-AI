@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { RankBadge } from './RankBadge';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 import { track } from '../analytics/tracker';
@@ -155,6 +155,7 @@ export const Lobby = ({
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [codeCopied, setCodeCopied] = useState(false);
     const [showHowToPlay, setShowHowToPlay] = useState(false);
+    const [showMoreOptions, setShowMoreOptions] = useState(false);
 
     // Check-in state
     const [checkinStreak, setCheckinStreak] = useState(() => parseInt(localStorage.getItem('fortress_checkin_streak') || '0', 10));
@@ -539,23 +540,7 @@ export const Lobby = ({
                     </p>
                 </div>
 
-                {/* Feature pills — visible on larger screens */}
-                <div className="hidden sm:flex gap-6 mb-8 text-[var(--text-secondary)] text-xs">
-                    <div className="flex items-center gap-2">
-                        <Shield size={14} className="text-[var(--gold-dim)]" />
-                        <span>AI-Powered Castles</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Crosshair size={14} className="text-[var(--ember)]" />
-                        <span>Physics Destruction</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Swords size={14} className="text-[var(--crimson)]" />
-                        <span>Turn-Based Combat</span>
-                    </div>
-                </div>
-
-                {/* Action Panel */}
+                {/* Action Panel — 2 primary CTAs */}
                 <div className="w-full flex flex-col gap-3">
                     {/* Player Name */}
                     <label htmlFor="player-name-input" className="sr-only">Player name</label>
@@ -567,67 +552,78 @@ export const Lobby = ({
                         placeholder="Enter thy name..."
                         maxLength={20}
                         autoComplete="nickname"
-                        className="input-medieval w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-display font-bold tracking-wide touch-manipulation"
+                        className="input-medieval w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-bold tracking-wide touch-manipulation"
                     />
 
-                    {/* Single Player */}
+                    {/* Primary CTA: Play Now */}
                     <button
                         onClick={() => { track('room_created', { mode: 'single' }); onCreateRoom(playerName, 'single'); }}
-                        className="btn-blue w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
+                        className="btn-primary w-full min-h-[56px] py-4 sm:py-5 rounded-xl text-lg sm:text-xl touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        <Zap size={20} aria-hidden="true" />
-                        <span>Single Player</span>
+                        <Zap size={22} aria-hidden="true" />
+                        <span>Play Now</span>
                     </button>
 
-                    {/* Create Kingdom */}
+                    {/* Secondary CTA: Challenge a Friend */}
                     <button
                         onClick={() => { track('room_created', { mode: 'pvp' }); onCreateRoom(playerName, 'pvp'); }}
-                        className="btn-primary w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
+                        className="btn-medieval w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
                     >
-                        <Crown size={20} aria-hidden="true" />
-                        <span>Create Kingdom</span>
-                        <span className="text-xs opacity-70 ml-1">(PvP)</span>
+                        <Swords size={20} aria-hidden="true" />
+                        <span>Challenge a Friend</span>
                     </button>
 
-                    {/* Join Room */}
-                    <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
-                        <label htmlFor="room-code-input" className="sr-only">Room code</label>
-                        <input
-                            id="room-code-input"
-                            type="text"
-                            value={joinCode}
-                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                            placeholder="ROOM CODE"
-                            maxLength={6}
-                            autoComplete="off"
-                            className="input-medieval min-w-0 flex-1 rounded-xl px-3 py-3.5 text-center text-base font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
-                        />
+                    {/* More Options — collapsed by default */}
+                    <div className="card-dark rounded-xl overflow-hidden">
                         <button
-                            type="submit"
-                            disabled={joinCode.trim().length < 4}
-                            className="btn-emerald shrink-0 min-h-[52px] px-6 py-3 rounded-xl text-base touch-manipulation
-                                flex items-center gap-2
-                                disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                            onClick={() => setShowMoreOptions(!showMoreOptions)}
+                            aria-expanded={showMoreOptions}
+                            className="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors touch-manipulation"
                         >
-                            <LogIn size={18} aria-hidden="true" />
-                            Join
+                            <span className="flex items-center gap-2 font-bold tracking-wider">
+                                More Options
+                            </span>
+                            {showMoreOptions ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
                         </button>
-                    </form>
+                        {showMoreOptions && (
+                            <div className="px-4 pb-4 flex flex-col gap-3 animate-scale-in">
+                                {/* Join Room */}
+                                <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
+                                    <label htmlFor="room-code-input" className="sr-only">Room code</label>
+                                    <input
+                                        id="room-code-input"
+                                        type="text"
+                                        value={joinCode}
+                                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                                        placeholder="ROOM CODE"
+                                        maxLength={6}
+                                        autoComplete="off"
+                                        className="input-medieval min-w-0 flex-1 rounded-xl px-3 py-3 text-center text-base font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={joinCode.trim().length < 4}
+                                        className="btn-medieval shrink-0 min-h-[48px] px-5 py-2.5 rounded-xl text-sm touch-manipulation
+                                            flex items-center gap-2
+                                            disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                                    >
+                                        <LogIn size={16} aria-hidden="true" />
+                                        Join
+                                    </button>
+                                </form>
 
-                    {/* Divider */}
-                    <div className="ornament-divider mx-4" role="separator" aria-label="or">
-                        <span className="text-[10px] text-[var(--text-muted)] font-display tracking-widest" aria-hidden="true">OR</span>
+                                {/* Quick Match */}
+                                <button
+                                    onClick={() => { track('queue_joined'); onJoinQueue(playerName); }}
+                                    className="btn-medieval w-full min-h-[48px] py-3 rounded-xl text-sm touch-manipulation flex items-center justify-center gap-2.5"
+                                >
+                                    <Users size={16} aria-hidden="true" />
+                                    <span>Quick Battle</span>
+                                    <ChevronRight size={14} className="opacity-50" aria-hidden="true" />
+                                </button>
+                            </div>
+                        )}
                     </div>
-
-                    {/* Quick Match */}
-                    <button
-                        onClick={() => { track('queue_joined'); onJoinQueue(playerName); }}
-                        className="btn-medieval w-full min-h-[52px] py-3.5 rounded-xl text-base touch-manipulation flex items-center justify-center gap-2.5"
-                    >
-                        <Users size={18} aria-hidden="true" />
-                        <span>Quick Battle</span>
-                        <ChevronRight size={16} className="opacity-50" aria-hidden="true" />
-                    </button>
 
                     {/* How to Play */}
                     <div className="card-dark rounded-xl overflow-hidden">

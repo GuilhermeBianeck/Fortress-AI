@@ -203,21 +203,23 @@ function App() {
               )}
             </button>
           )}
-          {/* API Key toggle */}
-          <button
-            onClick={() => setShowApiKey(!showApiKey)}
-            aria-pressed={showApiKey}
-            aria-label={apiKey ? 'API key configured — click to change' : 'Set Gemini API key to enable AI fortress building'}
-            className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center gap-1.5
-                       ${apiKey
-                ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
-                : 'text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]'
-              }
-                       hover:bg-[var(--bg-elevated)]`}
-          >
-            <Key size={14} aria-hidden="true" />
-            <span className="hidden sm:inline">{apiKey ? 'Key Set' : 'Set API Key'}</span>
-          </button>
+          {/* API Key toggle — only shown when user has a custom key or during build phase */}
+          {(apiKey || (inGame && phase === 'build')) && (
+            <button
+              onClick={() => setShowApiKey(!showApiKey)}
+              aria-pressed={showApiKey}
+              aria-label={apiKey ? 'API key configured — click to change' : 'Set your own API key for unlimited AI builds'}
+              className={`min-w-[44px] min-h-[44px] px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center gap-1.5
+                         ${apiKey
+                  ? 'text-[var(--emerald)] bg-[rgba(39,174,96,0.1)] border border-[rgba(39,174,96,0.3)]'
+                  : 'text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]'
+                }
+                         hover:bg-[var(--bg-elevated)]`}
+            >
+              <Key size={14} aria-hidden="true" />
+              <span className="hidden sm:inline">{apiKey ? 'Key Set' : 'API Key'}</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -473,6 +475,14 @@ function App() {
 
             {/* Prompt Input — only in build mode during build phase */}
             {phase === 'build' && gameMode === 'build' && (
+              <div className="w-full relative">
+                {/* First-build tutorial callout */}
+                {spawnCount === 0 && !isBuilding && buildStatus.status === 'idle' && (
+                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[var(--gold)] text-[var(--bg-deepest)] text-xs font-bold px-3 py-1.5 rounded-lg animate-bounce z-20 pointer-events-none">
+                    Describe your fortress and AI will build it!
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-[var(--gold)]" />
+                  </div>
+                )}
               <form onSubmit={handleSubmitPrompt} className="w-full card-dark rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3" role="search" aria-label="AI fortress builder">
                 <div className="p-2 sm:p-2.5 bg-[var(--bg-deep)] rounded-lg shrink-0" aria-hidden="true">
                   <Terminal size={16} className="text-[var(--gold)]" />
@@ -500,6 +510,7 @@ function App() {
                   {isBuilding ? <Loader2 size={16} className="animate-spin text-[var(--bg-deepest)]" aria-hidden="true" /> : <Send size={16} className="text-[var(--bg-deepest)]" aria-hidden="true" />}
                 </button>
               </form>
+              </div>
             )}
 
             {/* Combat hint — desktop only (mobile hint is shown in PhaseOverlay) */}

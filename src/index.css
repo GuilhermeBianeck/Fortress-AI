@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=MedievalSharp&family=Cinzel:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════
@@ -61,7 +61,7 @@ body {
 
 /* Font classes */
 .font-heading {
-  font-family: 'Uncial Antiqua', 'MedievalSharp', cursive;
+  font-family: 'Cinzel', Georgia, serif;
 }
 
 .font-medieval {
