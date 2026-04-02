@@ -562,6 +562,7 @@ export const Lobby = ({
                     >
                         <Zap size={22} aria-hidden="true" />
                         <span>Play Now</span>
+                        <span className="text-xs opacity-60 ml-1">vs Bot</span>
                     </button>
 
                     {/* Secondary CTA: Challenge a Friend */}
