@@ -4,7 +4,7 @@ import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X
 import { ParticleSystem } from '../effects/particles';
 import { debugStats, debugVisible, toggleDebug } from '../debug/debugStats';
 import { track } from '../analytics/tracker';
-import { sprites } from '../sprites';
+import { sprites, AnimatedSprite, ANIMATIONS } from '../sprites';
 
 interface GameCanvasProps {
     gameState: GameState | null;
@@ -261,6 +261,15 @@ const GameCanvasInner = ({
     // Cached king glow gradient (avoid createRadialGradient per frame)
     const kingGlowRef = useRef<{ radius: number; gradient: CanvasGradient } | null>(null);
 
+    // Camera flash on king hit (white overlay that fades)
+    const flashRef = useRef(0);
+
+    // Active one-shot sprite animations (explosions, sparks)
+    const activeAnimsRef = useRef<{ anim: AnimatedSprite; x: number; y: number; size: number }[]>([]);
+
+    // Terrain tile pattern (cached)
+    const terrainPatternRef = useRef<CanvasPattern | null>(null);
+
     // Sync refs
     useEffect(() => {
         // On each new server snapshot, capture previous positions for interpolation
@@ -314,12 +323,24 @@ const GameCanvasInner = ({
     // Register socket callbacks
     useEffect(() => {
         setBlockDestroyedCallback((data) => {
-            const color = MATERIAL_COLORS[data.material] || '#888';
-            particlesRef.current.emit(data.position.x, data.position.y, 10, color, data.velocity);
-            triggerShake(2, 8);
+            const particles = particlesRef.current;
+            // Material-specific debris
+            particles.emitMaterial(data.position.x, data.position.y, data.material, data.velocity);
+            // Lingering smoke
+            particles.emitSmoke(data.position.x, data.position.y);
+            // Explosion sprite animation
+            const expl = new AnimatedSprite({ ...ANIMATIONS.explosion });
+            activeAnimsRef.current.push({ anim: expl, x: data.position.x, y: data.position.y, size: 40 });
+            triggerShake(3, 10);
         });
         setProjectileImpactCallback((data) => {
-            particlesRef.current.emit(data.position.x, data.position.y, 6, '#888');
+            const particles = particlesRef.current;
+            // Bright impact flash sparks
+            particles.emitImpact(data.position.x, data.position.y);
+            // Spark sprite animation
+            const spark = new AnimatedSprite({ ...ANIMATIONS.spark });
+            activeAnimsRef.current.push({ anim: spark, x: data.position.x, y: data.position.y, size: 24 });
+            triggerShake(1, 4);
         });
         setKingDamageCallback((data) => {
             const kingHp = kingsHpRef.current[data.side];
@@ -332,6 +353,8 @@ const GameCanvasInner = ({
                 y,
                 age: 0,
             });
+            // White camera flash on king hit
+            flashRef.current = 6;
         });
         return () => {
             setBlockDestroyedCallback(null);
@@ -504,6 +527,13 @@ const GameCanvasInner = ({
             const sy = (Math.random() - 0.5) * 2 * amp;
             ctx.translate(sx, sy);
             shake.remaining--;
+        }
+
+        // Camera flash on king hit (white overlay that fades)
+        if (flashRef.current > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${(flashRef.current / 6 * 0.15).toFixed(3)})`;
+            ctx.fillRect(-10, -10, width + 20, height + 20);
+            flashRef.current--;
         }
 
         // Single timestamp for the entire frame — use rAF timestamp (monotonic, no allocation)
@@ -695,19 +725,40 @@ const GameCanvasInner = ({
             ctx.lineTo(WORLD_WIDTH, canvas.height);
             ctx.closePath();
 
-            // Dark earth terrain gradient (cached)
-            ctx.fillStyle = gradCache.terrainFill!;
+            // Earth terrain fill — use tiled texture if sprites loaded, else fallback to gradient
+            if (!terrainPatternRef.current && sprites.isReady()) {
+                const earthTile = sprites.get('terrain_earth');
+                if (earthTile) {
+                    terrainPatternRef.current = ctx.createPattern(earthTile, 'repeat');
+                }
+            }
+            if (terrainPatternRef.current) {
+                ctx.fillStyle = terrainPatternRef.current;
+            } else {
+                ctx.fillStyle = gradCache.terrainFill!;
+            }
             ctx.fill();
 
-            // Gold-tinted terrain edge
-            ctx.beginPath();
-            ctx.moveTo(terr.points[0].x, terr.points[0].y);
-            for (let i = 1; i < terr.points.length; i++) {
-                ctx.lineTo(terr.points[i].x, terr.points[i].y);
+            // Grass edge sprites along terrain surface
+            const grassTile = sprites.get('terrain_grass');
+            if (grassTile) {
+                ctx.imageSmoothingEnabled = false;
+                for (let i = 0; i < terr.points.length - 1; i++) {
+                    const p = terr.points[i];
+                    ctx.drawImage(grassTile, p.x, p.y - 6, 32, 8);
+                }
+                ctx.imageSmoothingEnabled = true;
+            } else {
+                // Fallback: gold-tinted edge line
+                ctx.beginPath();
+                ctx.moveTo(terr.points[0].x, terr.points[0].y);
+                for (let i = 1; i < terr.points.length; i++) {
+                    ctx.lineTo(terr.points[i].x, terr.points[i].y);
+                }
+                ctx.strokeStyle = 'rgba(180, 150, 80, 0.25)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
-            ctx.strokeStyle = 'rgba(180, 150, 80, 0.25)';
-            ctx.lineWidth = 2;
-            ctx.stroke();
 
             // Build zone overlays (more visible during build phase)
             const isBuildPhase = currentPhase === 'build';
@@ -832,12 +883,28 @@ const GameCanvasInner = ({
                         }
                     }
                 } else if (h.type === 'lava_pool') {
-                    // Glowing orange/red
-                    const glow = 0.4 + 0.1 * Math.sin(animPhase * 3);
-                    ctx.fillStyle = `rgba(255, 80, 20, ${glow})`;
-                    ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
-                    ctx.fillStyle = `rgba(255, 200, 50, ${glow * 0.5})`;
-                    ctx.fillRect(h.position.x + 2, h.position.y + 2, h.width - 4, h.height - 4);
+                    // Animated lava sprite (4 frames at 200ms each)
+                    const lavaFrame = Math.floor((nowMs / 200) % 4);
+                    const lavaSprite = sprites.get(`lava_${lavaFrame}`);
+                    if (lavaSprite) {
+                        ctx.imageSmoothingEnabled = false;
+                        for (let lx = h.position.x; lx < h.position.x + h.width; lx += 32) {
+                            const tw = Math.min(32, h.position.x + h.width - lx);
+                            ctx.drawImage(lavaSprite, 0, 0, Math.round(tw * (lavaSprite.width / 32)), lavaSprite.height, lx, h.position.y, tw, h.height);
+                        }
+                        ctx.imageSmoothingEnabled = true;
+                        // Glow overlay
+                        const glow = 0.1 + 0.05 * Math.sin(animPhase * 3);
+                        ctx.fillStyle = `rgba(255, 100, 30, ${glow})`;
+                        ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
+                    } else {
+                        // Fallback
+                        const glow = 0.4 + 0.1 * Math.sin(animPhase * 3);
+                        ctx.fillStyle = `rgba(255, 80, 20, ${glow})`;
+                        ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
+                        ctx.fillStyle = `rgba(255, 200, 50, ${glow * 0.5})`;
+                        ctx.fillRect(h.position.x + 2, h.position.y + 2, h.width - 4, h.height - 4);
+                    }
                 } else if (h.type === 'falling_rocks') {
                     // Dashed danger column
                     ctx.strokeStyle = 'rgba(255, 200, 50, 0.3)';
@@ -1251,6 +1318,23 @@ const GameCanvasInner = ({
 
         // Draw particles (in world space)
         particles.draw(ctx, cam.x, width);
+
+        // Draw active sprite animations (explosions, sparks) — swap-and-pop removal
+        const anims = activeAnimsRef.current;
+        let ai = 0;
+        while (ai < anims.length) {
+            const a = anims[ai];
+            a.anim.update(16.67);
+            ctx.imageSmoothingEnabled = false;
+            a.anim.draw(ctx, a.x - a.size / 2, a.y - a.size / 2, a.size, a.size);
+            ctx.imageSmoothingEnabled = true;
+            if (a.anim.finished) {
+                anims[ai] = anims[anims.length - 1];
+                anims.pop();
+            } else {
+                ai++;
+            }
+        }
 
         // Draw floating damage numbers (in world space) — swap-and-pop removal
         const dmgNums = damageNumbersRef.current;

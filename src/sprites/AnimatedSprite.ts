@@ -5,7 +5,7 @@
 import { sprites } from './SpriteLoader';
 
 interface AnimationDef {
-    frames: string[];
+    frames: readonly string[];
     frameTimeMs: number;
     loop: boolean;
 }
