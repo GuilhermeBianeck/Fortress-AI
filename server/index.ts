@@ -192,7 +192,8 @@ io.on('connection', (socket) => {
     socket.on('request_build', (data) => {
         const room = roomManager.getRoom(socket.id);
         if (!room?.session) return;
-        room.session.handleRequestBuild(socket, data);
+        const uuid = roomManager.getPlayerUuid(socket.id);
+        room.session.handleRequestBuild(socket, data, uuid);
     });
 
     socket.on('fire_projectile', (data) => {

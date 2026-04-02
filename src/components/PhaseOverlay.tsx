@@ -387,11 +387,25 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         </div>
                     )}
 
-                    {/* New Game — return to lobby cleanly */}
-                    <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                    {/* Actions — challenge + new game */}
+                    <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] flex flex-col gap-2 items-center">
+                        <button
+                            onClick={() => {
+                                track('challenge_friend');
+                                if (navigator.share) {
+                                    navigator.share({ title: 'Fortress Battle', text: 'I challenge you to a fortress battle!', url: window.location.origin }).catch(() => {});
+                                } else {
+                                    navigator.clipboard.writeText(window.location.origin).catch(() => {});
+                                }
+                            }}
+                            className="btn-blue min-h-[40px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5"
+                        >
+                            <Swords size={13} />
+                            Challenge a Friend
+                        </button>
                         <button
                             onClick={() => { track('return_to_lobby'); onReturnToLobby?.(); }}
-                            className="btn-medieval min-h-[40px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 mx-auto"
+                            className="btn-medieval min-h-[40px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5"
                         >
                             <Home size={13} />
                             New Game

@@ -435,9 +435,9 @@ export const useGameState = () => {
     }, []);
 
     const requestBuild = useCallback((apiKey: string, prompt: string) => {
-        if (!apiKey || !prompt) return;
+        if (!prompt) return;
         setBuildStatus({ status: 'generating', message: 'Sending to Architect...' });
-        socketRef.current?.emit('request_build', { apiKey, prompt });
+        socketRef.current?.emit('request_build', { apiKey: apiKey || undefined, prompt });
     }, []);
 
     const fireProjectile = useCallback((angle: number, power: number) => {

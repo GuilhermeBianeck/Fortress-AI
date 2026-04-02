@@ -360,6 +360,10 @@ export class RoomManager {
         return this.matchmakingQueue.indexOf(socketId);
     }
 
+    getPlayerUuid(socketId: string): string | undefined {
+        return this.socketUuids.get(socketId);
+    }
+
     getProfile(socketId: string): PlayerProfile | null {
         const uuid = this.socketUuids.get(socketId);
         if (uuid) return this.playerProfiles.get(uuid) ?? null;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
@@ -44,16 +44,51 @@ function App() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showRankPanel, setShowRankPanel] = useState(false);
 
+  // Auto-start first game for new users (ref-based to survive Strict Mode double-invocation)
+  const autoStartRef = useRef(false);
+  const hasBeenInGameRef = useRef(false);
+  useEffect(() => {
+    if (autoStartRef.current) return;
+    const hasPlayed = localStorage.getItem('fortress_has_played');
+    const urlRoom = new URLSearchParams(window.location.search).get('room');
+    if (!hasPlayed && !urlRoom && phase === 'lobby' && isConnected && !roomState) {
+      autoStartRef.current = true;
+      // Delay to ensure socket connection is fully established
+      const t = setTimeout(() => createRoom(undefined, 'single'), 1000);
+      return () => { clearTimeout(t); autoStartRef.current = false; };
+    }
+  }, [phase, isConnected, roomState, createRoom]);
+
+  // Mark as played after first auto-started match returns to lobby
+  useEffect(() => {
+    if (phase !== 'lobby') hasBeenInGameRef.current = true;
+    if (phase === 'lobby' && hasBeenInGameRef.current && autoStartRef.current) {
+      localStorage.setItem('fortress_has_played', '1');
+    }
+  }, [phase]);
+
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
 
-  // Track app load
+  // Track app load + auto-join from URL
   useEffect(() => {
     track('app_loaded', {
       viewport_width: window.innerWidth,
       viewport_height: window.innerHeight,
     });
-  }, []);
+
+    // Support ?room=XXXXXX invite links
+    const urlRoom = new URLSearchParams(window.location.search).get('room');
+    if (urlRoom && urlRoom.length >= 4) {
+      // Small delay to ensure socket is connected
+      const timer = setTimeout(() => {
+        joinRoom(urlRoom, playerName);
+        // Clean URL without reload
+        window.history.replaceState({}, '', window.location.pathname);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tab key to toggle mode (only during build phase)
   useEffect(() => {
@@ -93,15 +128,11 @@ function App() {
     e.preventDefault();
     if (!prompt.trim()) return;
 
-    if (!apiKey.trim()) {
-      setShowApiKey(true);
-      return;
-    }
-
     track('ai_prompt_submitted', {
       prompt_length: prompt.length,
+      has_own_key: !!apiKey,
     });
-    requestBuild(apiKey, prompt);
+    requestBuild(apiKey, prompt); // apiKey may be empty — server uses its own key as fallback
     setPrompt('');
   };
 

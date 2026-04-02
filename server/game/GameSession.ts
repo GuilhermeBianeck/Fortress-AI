@@ -24,6 +24,25 @@ import {
 } from '../config/constants';
 import { generateHazards, applyWindForce, checkLavaDamage } from '../physics/hazards';
 
+// Rate limiting for server-side AI key usage (shared across all sessions)
+const AI_RATE_LIMIT_MAX = 3;
+const AI_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const aiRateLimits: Map<string, number[]> = new Map(); // uuid → timestamps
+
+function isAiRateLimited(uuid: string): boolean {
+    const now = Date.now();
+    const timestamps = aiRateLimits.get(uuid) || [];
+    const recent = timestamps.filter(t => now - t < AI_RATE_LIMIT_WINDOW_MS);
+    aiRateLimits.set(uuid, recent);
+    return recent.length >= AI_RATE_LIMIT_MAX;
+}
+
+function recordAiUsage(uuid: string): void {
+    const timestamps = aiRateLimits.get(uuid) || [];
+    timestamps.push(Date.now());
+    aiRateLimits.set(uuid, timestamps);
+}
+
 /** Matter.js Body extended with custom game properties */
 interface GameBody extends Matter.Body {
     blockHp?: number | null;
@@ -255,7 +274,7 @@ export class GameSession {
         this.scoreManager.recordResourceUsed(player.side);
     }
 
-    async handleRequestBuild(socket: Socket, data: { apiKey: string; prompt: string }) {
+    async handleRequestBuild(socket: Socket, data: { apiKey?: string; prompt: string }, playerUuid?: string) {
         const phase = this.stateMachine.getPhase();
         if (phase !== 'build') {
             socket.emit('build_error', { message: 'Building is only allowed during the build phase.' });
@@ -271,10 +290,28 @@ export class GameSession {
             return;
         }
 
-        const { apiKey, prompt } = data;
-        if (!apiKey || !prompt) {
-            socket.emit('build_error', { message: "Missing API Key or Prompt" });
+        const { apiKey: clientKey, prompt } = data;
+        if (!prompt) {
+            socket.emit('build_error', { message: 'Missing prompt' });
             return;
+        }
+
+        // Use client key if provided, otherwise fall back to server key
+        const apiKey = clientKey || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            socket.emit('build_error', { message: 'AI unavailable — no API key configured.' });
+            return;
+        }
+
+        // Rate limit when using server key (not client's own key)
+        if (!clientKey && playerUuid) {
+            if (isAiRateLimited(playerUuid)) {
+                socket.emit('build_error', {
+                    message: 'Free AI limit reached (3/hour). Set your own Gemini API key for unlimited builds.',
+                });
+                return;
+            }
+            recordAiUsage(playerUuid);
         }
 
         this.buildInProgress.add(socket.id);

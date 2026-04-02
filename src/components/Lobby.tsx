@@ -279,16 +279,22 @@ export const Lobby = ({
     };
 
     const handleCopyCode = (code: string) => {
+        const shareUrl = `${window.location.origin}?room=${code}`;
         const resetCopy = () => {
             setCodeCopied(true);
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
             copyTimeoutRef.current = setTimeout(() => setCodeCopied(false), 2000);
         };
-        navigator.clipboard.writeText(code).then(resetCopy).catch(() => {
-            // Clipboard API requires HTTPS / user gesture — silently ignore
-            // (text is already selectable with the select-all class on the code element)
-            resetCopy();
-        });
+        navigator.clipboard.writeText(shareUrl).then(resetCopy).catch(resetCopy);
+    };
+
+    const handleShare = (code: string) => {
+        const shareUrl = `${window.location.origin}?room=${code}`;
+        if (navigator.share) {
+            navigator.share({ title: 'Fortress Battle', text: 'Join my fortress battle!', url: shareUrl }).catch(() => {});
+        } else {
+            handleCopyCode(code);
+        }
     };
 
     // ─── Waiting Room View — VS Card ───
@@ -320,7 +326,7 @@ export const Lobby = ({
                                 </div>
                                 <button
                                     onClick={() => handleCopyCode(roomState.roomId)}
-                                    title="Copy room code"
+                                    title="Copy invite link"
                                     className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border transition-all duration-200 touch-manipulation ${
                                         codeCopied
                                             ? 'text-[var(--emerald)] border-[rgba(46,204,113,0.4)] bg-[rgba(46,204,113,0.1)]'
@@ -330,8 +336,15 @@ export const Lobby = ({
                                     {codeCopied ? <Check size={16} /> : <Copy size={16} />}
                                 </button>
                             </div>
+                            <button
+                                onClick={() => handleShare(roomState.roomId)}
+                                className="btn-blue min-h-[40px] px-4 py-2 rounded-lg text-sm mb-4 flex items-center justify-center gap-2"
+                            >
+                                <ChevronRight size={14} />
+                                <span>Share Invite Link</span>
+                            </button>
                             <p className="text-xs text-[var(--text-secondary)] mb-6">
-                                {codeCopied ? '✓ Copied to clipboard!' : 'Share this code with your opponent'}
+                                {codeCopied ? '✓ Link copied!' : 'Send the link to your opponent'}
                             </p>
                         </>
                     )}
