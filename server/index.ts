@@ -256,3 +256,11 @@ io.on('connection', (socket) => {
 httpServer.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`Game Server running on port ${PORT} (all interfaces)`);
 });
+
+const shutdown = () => {
+    console.log('Shutting down gracefully...');
+    roomManager.destroy();
+    process.exit(0);
+};
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

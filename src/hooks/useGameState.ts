@@ -81,11 +81,15 @@ export const useGameState = () => {
 
     const socketRef = useRef<Socket | null>(null);
     const mySideRef = useRef<Side>('left');
+    const mountedRef = useRef(true);
 
     // Body metadata cache for delta-encoded state reconstruction
     const bodyCacheRef = useRef<Map<number, BodyState>>(new Map());
     // Reusable array for bodies — rebuilt from cache on each snapshot to avoid Array.from() allocation
     const bodiesArrayRef = useRef<BodyState[]>([]);
+
+    // Mark unmounted so high-frequency socket handlers can bail out early
+    useEffect(() => () => { mountedRef.current = false; }, []);
 
     // Callback refs for canvas effects
     const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
@@ -110,6 +114,7 @@ export const useGameState = () => {
         // --- Game state (compact delta-encoded format) ---
 
         socketRef.current.on('gameState', (data: CompactGameState) => {
+            if (!mountedRef.current) return;
             const cache = bodyCacheRef.current;
 
             // On full sync, clear cache so stale entries don't linger

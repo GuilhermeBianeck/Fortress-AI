@@ -385,6 +385,11 @@ export const GameCanvas = ({
         } else {
             hasPannedForPhaseRef.current = phase;
         }
+
+        // Release cloud data for GC between matches — they'll be lazily re-created
+        if (phase === 'result' || phase === 'build') {
+            cloudsRef.current = null;
+        }
     }, [phase, mySide, currentCanvasWidth, kingsHp]);
 
     // Auto-pan to active cannon when it's their turn
