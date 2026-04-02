@@ -906,7 +906,7 @@ const GameCanvasInner = ({
                         ctx.fillRect(h.position.x + 2, h.position.y + 2, h.width - 4, h.height - 4);
                     }
                 } else if (h.type === 'falling_rocks') {
-                    // Dashed danger column
+                    // Dashed danger column outline
                     ctx.strokeStyle = 'rgba(255, 200, 50, 0.3)';
                     ctx.lineWidth = 1;
                     ctx.setLineDash([4, 6]);
@@ -918,6 +918,21 @@ const GameCanvasInner = ({
                     ctx.fillStyle = 'rgba(255, 200, 50, 0.5)';
                     ctx.textAlign = 'center';
                     ctx.fillText('DANGER', h.position.x + h.width / 2, h.position.y + 15);
+
+                    // Animated falling rock boulders within the zone
+                    const rockSprite = sprites.get('rock');
+                    if (rockSprite) {
+                        ctx.imageSmoothingEnabled = false;
+                        for (let ri = 0; ri < 3; ri++) {
+                            const rx = h.position.x + ((ri * 97 + Math.floor(animPhase * 20)) % Math.max(1, h.width - 16));
+                            const ry = h.position.y + ((ri * 137 + Math.floor(animPhase * 40)) % Math.max(1, h.height - 16));
+                            const rockAlpha = 0.4 + 0.3 * Math.sin(animPhase * 2 + ri * 2.1);
+                            ctx.globalAlpha = rockAlpha;
+                            ctx.drawImage(rockSprite, rx, ry, 16, 16);
+                        }
+                        ctx.globalAlpha = 1;
+                        ctx.imageSmoothingEnabled = true;
+                    }
                 }
             }
         }
@@ -943,38 +958,46 @@ const GameCanvasInner = ({
                     ctx.fill();
                 }
 
-                // Barrel — dark iron with gold accent
-                ctx.save();
-                ctx.translate(cannonX, cannonY);
+                // Cannon — sprite or fallback
                 const barrelAngle = facingRight ? -currentAngle : -(Math.PI - currentAngle);
-                ctx.rotate(barrelAngle);
-                ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
-                ctx.fillRect(0, -4, 24, 8);
-                ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
-                ctx.lineWidth = 1.5;
-                ctx.strokeRect(0, -4, 24, 8);
-                // Gold rivet at muzzle
-                if (isActive) {
+                const cannonSprite = sprites.get(facingRight ? 'cannon_right' : 'cannon_left');
+                if (cannonSprite) {
+                    ctx.save();
+                    ctx.translate(cannonX, cannonY);
+                    ctx.rotate(barrelAngle);
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(cannonSprite, -4, -8, 32, 16);
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.restore();
+                } else {
+                    // Fallback: programmatic barrel + base
+                    ctx.save();
+                    ctx.translate(cannonX, cannonY);
+                    ctx.rotate(barrelAngle);
+                    ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
+                    ctx.fillRect(0, -4, 24, 8);
+                    ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(0, -4, 24, 8);
+                    if (isActive) {
+                        ctx.beginPath();
+                        ctx.arc(22, 0, 1.5, 0, Math.PI * 2);
+                        ctx.fillStyle = '#FFD700';
+                        ctx.fill();
+                    }
+                    ctx.restore();
                     ctx.beginPath();
-                    ctx.arc(22, 0, 1.5, 0, Math.PI * 2);
-                    ctx.fillStyle = '#FFD700';
+                    ctx.arc(cannonX, cannonY, 7, 0, Math.PI * 2);
+                    ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
+                    ctx.fill();
+                    ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(cannonX, cannonY, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = isActive ? '#FFD700' : '#6a6a7a';
                     ctx.fill();
                 }
-                ctx.restore();
-
-                // Base — dark iron wheel
-                ctx.beginPath();
-                ctx.arc(cannonX, cannonY, 7, 0, Math.PI * 2);
-                ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
-                ctx.fill();
-                ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-                // Gold center dot
-                ctx.beginPath();
-                ctx.arc(cannonX, cannonY, 2, 0, Math.PI * 2);
-                ctx.fillStyle = isActive ? '#FFD700' : '#6a6a7a';
-                ctx.fill();
 
                 // Trajectory preview (only for active cannon during fire mode)
                 if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
@@ -1179,7 +1202,10 @@ const GameCanvasInner = ({
 
                     // Draw circle body — use sprite if available
                     if (body.label === 'king') {
-                        const kingSprite = sprites.get('king_idle_0');
+                        // Animated king: breathing (2 frames at 500ms) + hit flash
+                        const isKingHit = flashRef.current > 3; // First 3 frames of flash = king was just hit
+                        const kingFrame = isKingHit ? 'king_hit' : `king_idle_${Math.floor(nowMs / 500) % 2}`;
+                        const kingSprite = sprites.get(kingFrame);
                         if (kingSprite) {
                             ctx.imageSmoothingEnabled = false;
                             const sz = body.circleRadius * 2.5;
@@ -1193,10 +1219,18 @@ const GameCanvasInner = ({
                             ctx.strokeStyle = strokeColor;
                             ctx.lineWidth = 1.5;
                             ctx.stroke();
-                            ctx.font = 'bold 14px sans-serif';
-                            ctx.textAlign = 'center';
-                            ctx.fillStyle = '#FFD700';
-                            ctx.fillText('\u265B', 0, -body.circleRadius - 4);
+                            // Crown sprite or Unicode fallback
+                            const crownImg = sprites.get('crown');
+                            if (crownImg) {
+                                ctx.imageSmoothingEnabled = false;
+                                ctx.drawImage(crownImg, -6, -body.circleRadius - 14, 12, 12);
+                                ctx.imageSmoothingEnabled = true;
+                            } else {
+                                ctx.font = 'bold 14px sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.fillStyle = '#FFD700';
+                                ctx.fillText('\u265B', 0, -body.circleRadius - 4);
+                            }
                         }
                     } else if (body.label === 'projectile') {
                         const projSprite = sprites.get('projectile');
@@ -1525,7 +1559,15 @@ const GameCanvasInner = ({
         ctx.font = 'bold 10px monospace';
         ctx.fillStyle = '#FFD700';
         ctx.textAlign = 'left';
-        ctx.fillText(`♛ ${label}`, hudX + 4, hudY + 13);
+        const crownHud = sprites.get('crown');
+        if (crownHud) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(crownHud, hudX + 2, hudY + 3, 10, 10);
+            ctx.imageSmoothingEnabled = true;
+            ctx.fillText(` ${label}`, hudX + 14, hudY + 13);
+        } else {
+            ctx.fillText(`\u265B ${label}`, hudX + 4, hudY + 13);
+        }
 
         // HP bar with gradient fill
         const barY = hudY + 18;
