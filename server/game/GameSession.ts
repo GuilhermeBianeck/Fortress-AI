@@ -452,6 +452,9 @@ export class GameSession {
     }
 
     startFallingRocks(): void {
+        // Prevent duplicate falling rock intervals
+        if (this.hazardTimers.length > 0) return;
+
         const rockHazards = this.hazards.filter(h => h.type === 'falling_rocks');
         if (rockHazards.length === 0) return;
 

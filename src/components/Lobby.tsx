@@ -151,6 +151,7 @@ export const Lobby = ({
     const [missionToast, setMissionToast] = useState<string | null>(null);
     const [claimedMissionDay, setClaimedMissionDay] = useState(() => localStorage.getItem('fortress_missions_claim_day') || '');
     const claimToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [codeCopied, setCodeCopied] = useState(false);
     const [showHowToPlay, setShowHowToPlay] = useState(false);
 
@@ -276,14 +277,15 @@ export const Lobby = ({
     };
 
     const handleCopyCode = (code: string) => {
-        navigator.clipboard.writeText(code).then(() => {
+        const resetCopy = () => {
             setCodeCopied(true);
-            setTimeout(() => setCodeCopied(false), 2000);
-        }).catch(() => {
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+            copyTimeoutRef.current = setTimeout(() => setCodeCopied(false), 2000);
+        };
+        navigator.clipboard.writeText(code).then(resetCopy).catch(() => {
             // Clipboard API requires HTTPS / user gesture — silently ignore
             // (text is already selectable with the select-all class on the code element)
-            setCodeCopied(true);
-            setTimeout(() => setCodeCopied(false), 2000);
+            resetCopy();
         });
     };
 
