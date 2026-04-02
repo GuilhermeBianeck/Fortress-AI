@@ -77,9 +77,15 @@ export class ParticleSystem {
         }
     }
 
-    draw(ctx: CanvasRenderingContext2D) {
+    draw(ctx: CanvasRenderingContext2D, cameraX: number = 0, viewportWidth: number = 800) {
+        const margin = 50;
+        const cullLeft = cameraX - margin;
+        const cullRight = cameraX + viewportWidth + margin;
+
         for (let i = 0; i < this.count; i++) {
             const p = this.pool[i];
+            // Viewport culling — skip particles off-screen horizontally
+            if (p.x < cullLeft || p.x > cullRight) continue;
             ctx.globalAlpha = p.life / p.maxLife;
             ctx.fillStyle = p.color;
             ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);

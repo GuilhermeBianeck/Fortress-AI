@@ -203,6 +203,9 @@ export const GameCanvas = ({
     // Floating damage numbers
     const damageNumbersRef = useRef<DamageNumber[]>([]);
 
+    // Trajectory preview cache — avoids 240 physics iterations when aim is unchanged
+    const trajectoryCache = useRef<{ angle: number; power: number; cannonX: number; cannonY: number; path: {x: number; y: number}[] } | null>(null);
+
     // Particles
     const particlesRef = useRef(new ParticleSystem());
 
@@ -527,12 +530,11 @@ export const GameCanvas = ({
             const sy = ((i * 97.3 + starSeed * 31) % (height * 0.55));
             const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(starTime * (0.5 + (i % 5) * 0.3) + i * 1.7));
             const size = 0.5 + (i % 3) * 0.5;
-            ctx.beginPath();
-            ctx.arc(sx, sy, size, 0, Math.PI * 2);
             // Use pre-computed alpha string: map alpha to bucket index
             const alphaIdx = Math.min(ALPHA_BUCKETS - 1, (twinkle * 0.6 - STAR_ALPHA_MIN) / STAR_ALPHA_RANGE * (ALPHA_BUCKETS - 1) + 0.5 | 0);
             ctx.fillStyle = STAR_ALPHA_STRINGS[alphaIdx];
-            ctx.fill();
+            // fillRect instead of beginPath+arc+fill: stars at 0.5-1.5px are too small for shape to matter
+            ctx.fillRect(sx - size, sy - size, size * 2, size * 2);
         }
 
         // Subtle horizon glow (cached)
@@ -923,70 +925,73 @@ export const GameCanvas = ({
 
                 // Trajectory preview (only for active cannon during fire mode)
                 if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
-                    // Match server physics exactly
-                    // Server: delta = 1000/60
-                    // Update loop: 2 sub-steps of delta/2
+                    // Trajectory cache thresholds
+                    const TRAJ_ANGLE_THRESHOLD = 0.005; // ~0.3 degrees
+                    const TRAJ_POWER_THRESHOLD = 0.3;
 
-                    const dt = 1000 / 60 / 2; // ~8.3333ms
+                    const cache = trajectoryCache.current;
+                    let trajPath: {x: number; y: number}[];
 
-                    // Gravity force = mass * gravity.y * gravity.scale
-                    // Acceleration = force / mass = gravity.y * gravity.scale
-                    // Velocity += acceleration * dt
-                    // But Matter.js applies gravity as: velocity.y += gravity.y * gravity.scale * dt
-                    // Wait, Matter.js Engine.update uses correction:
-                    // correction = delta / lastDelta
-                    // velocity += (force * dt / mass) + (gravity * dt)
+                    // Reuse cached path if aim hasn't changed meaningfully
+                    if (cache &&
+                        Math.abs(cache.angle - aim.angle) < TRAJ_ANGLE_THRESHOLD &&
+                        Math.abs(cache.power - aim.power) < TRAJ_POWER_THRESHOLD &&
+                        Math.abs(cache.cannonX - cannonX) < 1 &&
+                        Math.abs(cache.cannonY - cannonY) < 1) {
+                        trajPath = cache.path;
+                    } else {
+                        // Compute new trajectory (match server physics exactly)
+                        const dt = 1000 / 60 / 2; // ~8.3333ms
+                        const gravityAccel = PHYSICS_GRAVITY * PHYSICS_GRAVITY_SCALE * dt;
+                        const airDamp = 1 - PHYSICS_AIR_FRICTION;
 
-                    // Let's use the explicit trusted formula from Matter.js source logic:
-                    // position += velocity
-                    // velocity.x *= airFriction
-                    // velocity.y *= airFriction
-                    // velocity.y += gravity * scale * dt
+                        const dirMult = facingRight ? 1 : -1;
+                        let px = cannonX + dirMult * Math.cos(currentAngle) * 24;
+                        let py = cannonY - Math.sin(currentAngle) * 24;
 
-                    const gravityAccel = PHYSICS_GRAVITY * PHYSICS_GRAVITY_SCALE * dt;
-                    const airDamp = 1 - PHYSICS_AIR_FRICTION;
+                        let vx = dirMult * (aim.power * PHYSICS_POWER_MULTIPLIER) * Math.cos(currentAngle);
+                        let vy = -(aim.power * PHYSICS_POWER_MULTIPLIER) * Math.sin(currentAngle);
 
-                    const dirMult = facingRight ? 1 : -1;
-                    let px = cannonX + dirMult * Math.cos(currentAngle) * 24;
-                    let py = cannonY - Math.sin(currentAngle) * 24;
-
-                    // Initial velocity
-                    let vx = dirMult * (aim.power * PHYSICS_POWER_MULTIPLIER) * Math.cos(currentAngle);
-                    let vy = -(aim.power * PHYSICS_POWER_MULTIPLIER) * Math.sin(currentAngle);
-
-                    // Speed Cap
-                    let speed = Math.sqrt(vx * vx + vy * vy);
-                    if (speed > PHYSICS_MAX_SPEED) {
-                        const s = PHYSICS_MAX_SPEED / speed;
-                        vx *= s;
-                        vy *= s;
-                    }
-
-                    // Full trajectory arc preview - solid dashed line
-                    const frames = 120;
-                    ctx.beginPath();
-                    ctx.moveTo(px, py);
-
-                    for (let f = 0; f < frames; f++) {
-                        // Simulate 2 sub-steps per frame to match server
-                        for (let sub = 0; sub < 2; sub++) {
-                            vy += gravityAccel;
-                            vx *= airDamp;
-                            vy *= airDamp;
-                            px += vx;
-                            py += vy;
-
-                            // Per-tick speed cap matching server
-                            speed = Math.sqrt(vx * vx + vy * vy);
-                            if (speed > PHYSICS_MAX_SPEED) {
-                                const cap = PHYSICS_MAX_SPEED / speed;
-                                vx *= cap;
-                                vy *= cap;
-                            }
+                        let speed = Math.sqrt(vx * vx + vy * vy);
+                        if (speed > PHYSICS_MAX_SPEED) {
+                            const s = PHYSICS_MAX_SPEED / speed;
+                            vx *= s;
+                            vy *= s;
                         }
 
-                        ctx.lineTo(px, py);
-                        if (py > canvas.height + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
+                        trajPath = [{ x: px, y: py }];
+                        const frames = 120;
+
+                        for (let f = 0; f < frames; f++) {
+                            for (let sub = 0; sub < 2; sub++) {
+                                vy += gravityAccel;
+                                vx *= airDamp;
+                                vy *= airDamp;
+                                px += vx;
+                                py += vy;
+
+                                speed = Math.sqrt(vx * vx + vy * vy);
+                                if (speed > PHYSICS_MAX_SPEED) {
+                                    const cap = PHYSICS_MAX_SPEED / speed;
+                                    vx *= cap;
+                                    vy *= cap;
+                                }
+                            }
+
+                            trajPath.push({ x: px, y: py });
+                            if (py > canvas.height + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
+                        }
+
+                        trajectoryCache.current = { angle: aim.angle, power: aim.power, cannonX, cannonY, path: trajPath };
+                    }
+
+                    // Draw the trajectory path
+                    ctx.beginPath();
+                    if (trajPath.length > 0) {
+                        ctx.moveTo(trajPath[0].x, trajPath[0].y);
+                        for (let i = 1; i < trajPath.length; i++) {
+                            ctx.lineTo(trajPath[i].x, trajPath[i].y);
+                        }
                     }
 
                     ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
@@ -1085,34 +1090,32 @@ export const GameCanvas = ({
 
                 if (body.circleRadius > 0) {
                     if (body.label === 'king') {
-                        // King: golden glow drop shadow
-                        ctx.shadowColor = 'rgba(255, 215, 0, 0.4)';
-                        ctx.shadowBlur = 8;
-                        ctx.shadowOffsetX = 0;
-                        ctx.shadowOffsetY = 0;
+                        // Draw golden glow behind king (radial gradient replaces expensive shadowBlur)
+                        const glowRadius = body.circleRadius + 10;
+                        const glow = ctx.createRadialGradient(0, 0, body.circleRadius * 0.5, 0, 0, glowRadius);
+                        glow.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
+                        glow.addColorStop(1, 'rgba(255, 215, 0, 0)');
+                        ctx.fillStyle = glow;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+                        ctx.fill();
                     }
-                    // Skip shadowBlur for projectiles and other circles — they use the glow effect below
 
+                    // Draw circle body (no shadow filters)
                     ctx.beginPath();
                     ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
                     ctx.fillStyle = fillColor;
                     ctx.fill();
-                    ctx.shadowColor = 'transparent';
-                    ctx.shadowBlur = 0;
                     ctx.strokeStyle = strokeColor;
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
 
                     if (body.label === 'king') {
-                        // Crown icon — larger and on top
+                        // Crown icon — larger and on top (no shadow)
                         ctx.font = 'bold 14px sans-serif';
                         ctx.textAlign = 'center';
                         ctx.fillStyle = '#FFD700';
-                        ctx.shadowColor = 'rgba(255, 215, 0, 0.6)';
-                        ctx.shadowBlur = 6;
                         ctx.fillText('♛', 0, -body.circleRadius - 4);
-                        ctx.shadowColor = 'transparent';
-                        ctx.shadowBlur = 0;
                     }
 
                     // Projectile glow
@@ -1212,7 +1215,7 @@ export const GameCanvas = ({
         }
 
         // Draw particles (in world space)
-        particles.draw(ctx);
+        particles.draw(ctx, cam.x, width);
 
         // Draw floating damage numbers (in world space) — swap-and-pop removal
         const dmgNums = damageNumbersRef.current;
