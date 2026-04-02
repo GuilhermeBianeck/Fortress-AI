@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHpState } from '../types';
 import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X } from '../types';
 import { ParticleSystem } from '../effects/particles';
@@ -120,7 +120,7 @@ const PHYSICS_AIR_FRICTION = 0.005;
 
 interface DamageNumber { side: Side; damage: number; x: number; y: number; age: number; }
 
-export const GameCanvas = ({
+const GameCanvasInner = ({
     gameState, terrain, onSpawn, kingsHp, mySide,
     gameMode, phase, turnPlayer, onFire,
     setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback,
@@ -1804,3 +1804,24 @@ export const GameCanvas = ({
         </div>
     );
 };
+
+export const GameCanvas = React.memo(GameCanvasInner, (prev, next) => {
+    // Skip re-render when only gameState or kingsHp changed (consumed via refs)
+    // Return true = props are equal = skip re-render
+    if (prev.terrain !== next.terrain) return false;
+    if (prev.mySide !== next.mySide) return false;
+    if (prev.gameMode !== next.gameMode) return false;
+    if (prev.phase !== next.phase) return false;
+    if (prev.turnPlayer !== next.turnPlayer) return false;
+    if (prev.onSpawn !== next.onSpawn) return false;
+    if (prev.onFire !== next.onFire) return false;
+    if (prev.setBlockDestroyedCallback !== next.setBlockDestroyedCallback) return false;
+    if (prev.setProjectileImpactCallback !== next.setProjectileImpactCallback) return false;
+    if (prev.setKingDamageCallback !== next.setKingDamageCallback) return false;
+    if (prev.playerNames !== next.playerNames) return false;
+    if (prev.hazards !== next.hazards) return false;
+    if (prev.roundScore !== next.roundScore) return false;
+    if (prev.currentRound !== next.currentRound) return false;
+    // gameState and kingsHp are consumed via refs — changes don't need re-render
+    return true;
+});

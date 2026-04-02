@@ -178,7 +178,19 @@ export const useGameState = () => {
                 timestamp: data.t,
                 kings,
             });
-            setKingsHp(kings);
+
+            // Only update kingsHp state if HP values actually changed.
+            // Position (x/y) changes every frame but is consumed via refs in GameCanvas,
+            // so we skip updates that only differ in position to avoid unnecessary re-renders.
+            setKingsHp(prev => {
+                if (prev.left.hp !== kings.left.hp ||
+                    prev.left.maxHp !== kings.left.maxHp ||
+                    prev.right.hp !== kings.right.hp ||
+                    prev.right.maxHp !== kings.right.maxHp) {
+                    return kings;
+                }
+                return prev;
+            });
         });
 
         socketRef.current.on('terrain', (data: TerrainData & { hazards?: { type: string; id: string; position: { x: number; y: number }; width: number; height: number; windDirection?: number; windStrength?: number }[] }) => {
