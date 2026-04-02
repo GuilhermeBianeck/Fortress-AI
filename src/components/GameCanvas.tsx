@@ -962,11 +962,28 @@ const GameCanvasInner = ({
                         trajPath = [{ x: px, y: py }];
                         const frames = 120;
 
+                        // Wind hazard data for trajectory simulation
+                        const windHazard = hazardsRef.current?.find(h => h.type === 'wind_zone');
+
                         for (let f = 0; f < frames; f++) {
                             for (let sub = 0; sub < 2; sub++) {
                                 vy += gravityAccel;
                                 vx *= airDamp;
                                 vy *= airDamp;
+
+                                // Apply wind force between sub-steps (matching server's onTick between Engine.update calls)
+                                if (sub === 0 && windHazard) {
+                                    const wx = windHazard.position.x;
+                                    const wy = windHazard.position.y;
+                                    const ww = windHazard.width;
+                                    const wh = windHazard.height;
+                                    if (px >= wx && px <= wx + ww && py >= wy && py <= wy + wh) {
+                                        const windDir = windHazard.windDirection ?? 1;
+                                        const windStr = windHazard.windStrength ?? 0.0003;
+                                        vx += windDir * windStr * 0.4 * 4;
+                                    }
+                                }
+
                                 px += vx;
                                 py += vy;
 
@@ -1688,8 +1705,9 @@ const GameCanvasInner = ({
             const dy = currentScreenY - touchStartRef.current.sy;
             const dragDist = Math.sqrt(dx * dx + dy * dy);
 
-            // Map 0-300px of drag to 0-100 power
-            const dragPower = (dragDist / 300) * 100;
+            // Map drag to 0-100 power using 40% of smaller canvas dimension (responsive)
+            const maxDragPx = Math.min(canvas.width / dpr, canvas.height / dpr) * 0.4;
+            const dragPower = (dragDist / maxDragPx) * 100;
             // Start at 25 (minimum viable shot) and add drag power
             aim.power = Math.max(5, Math.min(100, 25 + dragPower));
         }

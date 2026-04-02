@@ -34,12 +34,12 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         }
 
         const tick = () => {
-            const remaining = Math.max(0, Math.ceil((phaseEndsAt - Date.now()) / 1000));
+            const remaining = Math.max(0, Math.round((phaseEndsAt - Date.now()) / 1000));
             setTimeLeft(remaining);
         };
 
         tick();
-        const interval = setInterval(tick, 250);
+        const interval = setInterval(tick, 100);
         return () => clearInterval(interval);
     }, [phaseEndsAt]);
 
@@ -207,7 +207,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     }`} style={{ background: isWinner ? 'rgba(22, 33, 62, 0.95)' : 'rgba(22, 20, 30, 0.95)' }}>
 
                     {/* Header row: Grade + Result + AI badge */}
-                    <div className="flex items-center justify-between mb-2 gap-2">
+                    <div className="flex items-center justify-between mb-2 gap-2 animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
                         {/* Performance grade */}
                         {grade && (
                             <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl shrink-0"
@@ -246,7 +246,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
                     {/* Score breakdown */}
                     {myScore && (
-                        <div className="border-t border-[var(--border-subtle)] pt-2 mt-1">
+                        <div className="border-t border-[var(--border-subtle)] pt-2 mt-1 animate-fade-in" style={{ animationDelay: '200ms', animationFillMode: 'backwards' }}>
                             <p className="text-xs sm:text-sm font-bold text-[var(--gold)] mb-1.5 font-display">
                                 YOUR SCORE: +{myScore.totalScore}
                             </p>
@@ -278,7 +278,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
                     {/* Newly unlocked achievements */}
                     {newlyUnlocked.length > 0 && (
-                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
+                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2 animate-fade-in" style={{ animationDelay: '400ms', animationFillMode: 'backwards' }}>
                             <p className="text-[10px] font-bold text-[var(--emerald)] uppercase tracking-wider mb-1.5 flex items-center justify-center gap-1">
                                 <Zap size={10} />
                                 Achievement{newlyUnlocked.length > 1 ? 's' : ''} Unlocked!
@@ -297,7 +297,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
                     {/* First Win of the Day badge */}
                     {isFirstWinOfDay && (
-                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
+                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2 animate-fade-in" style={{ animationDelay: '600ms', animationFillMode: 'backwards' }}>
                             <div className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2"
                                 style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.35)' }}>
                                 <span className="text-base leading-none">⭐</span>
@@ -311,7 +311,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
 
                     {/* Rank progression */}
                     {currentRankInfo && (
-                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2">
+                        <div className="mt-2 border-t border-[var(--border-subtle)] pt-2 animate-fade-in" style={{ animationDelay: '800ms', animationFillMode: 'backwards' }}>
                             {didRankUp ? (
                                 <div className="text-center animate-pulse mb-1.5">
                                     <p className="text-xs font-bold text-[var(--emerald)]">🎉 RANK UP!</p>
