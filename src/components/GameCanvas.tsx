@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHpState } from '../types';
 import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X } from '../types';
 import { ParticleSystem } from '../effects/particles';
+import { debugStats, debugVisible, toggleDebug } from '../debug/debugStats';
 
 interface GameCanvasProps {
     gameState: GameState | null;
@@ -434,6 +435,8 @@ const GameCanvasInner = ({
     }, []);
 
     const renderFrame = (rafTimestamp: number) => {
+        if (debugVisible) debugStats.updateFrame(rafTimestamp);
+
         const canvas = canvasRef.current;
         if (!canvas) return;
 
@@ -1049,6 +1052,7 @@ const GameCanvasInner = ({
             const vpRight = cam.x + width + cullMargin;
             const vpTop = -cullMargin;
             const vpBottom = height + cullMargin;
+            let _dbgDrawn = 0, _dbgCulled = 0;
 
             for (const body of gs.bodies) {
                 if (body.label === 'Terrain' || body.label === 'Boundary') continue;
@@ -1056,7 +1060,7 @@ const GameCanvasInner = ({
                 // Fast viewport culling — skip bodies entirely off-screen
                 const bx = body.position.x;
                 const by = body.position.y;
-                if (bx < vpLeft || bx > vpRight || by < vpTop || by > vpBottom) continue;
+                if (bx < vpLeft || bx > vpRight || by < vpTop || by > vpBottom) { _dbgCulled++; continue; }
 
                 // Interpolate position and angle for smooth movement between server snapshots
                 let drawX = body.position.x;
@@ -1209,6 +1213,16 @@ const GameCanvasInner = ({
                     ctx.fillStyle = getHpColor(hpRatio);
                     ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
                 }
+                _dbgDrawn++;
+            }
+
+            // Update debug stats (zero cost when overlay hidden)
+            if (debugVisible) {
+                debugStats.bodiesDrawn = _dbgDrawn;
+                debugStats.bodiesCulled = _dbgCulled;
+                debugStats.totalBodies = gs.bodies.length;
+                debugStats.particlesActive = particles.count;
+                debugStats.phase = currentPhase;
             }
         }
 
@@ -1268,6 +1282,11 @@ const GameCanvasInner = ({
 
         // === Minimap ===
         drawMinimap(ctx, canvas, terr, gs, cam, hazardsRef.current);
+
+        // === Debug Overlay ===
+        if (debugVisible) {
+            drawDebugOverlay(ctx, width, height);
+        }
 
         ctx.restore();
     };
@@ -1429,6 +1448,64 @@ const GameCanvasInner = ({
         ctx.fillStyle = '#e0d0b0';
         ctx.textAlign = 'center';
         ctx.fillText(`${Math.ceil(king.hp)} / ${king.maxHp}`, barX + barW / 2, barY + 9);
+    }
+
+    function drawDebugOverlay(ctx: CanvasRenderingContext2D, _canvasW: number, canvasH: number) {
+        const s = debugStats;
+        const x = 10;
+        const w = 230;
+        const lineH = 14;
+        const lines = [
+            `FPS: ${s.fps.toFixed(1)}  (${s.fpsMin.toFixed(0)}-${s.fpsMax.toFixed(0)})`,
+            `Frame: ${s.frameTimeMs.toFixed(1)}ms`,
+            `Bodies: ${s.totalBodies}  drawn:${s.bodiesDrawn} culled:${s.bodiesCulled}`,
+            `Net: ${s.snapshotsPerSec}/s  lat:${s.lastSnapshotLatencyMs}ms`,
+            `  ~${(s.bytesPerSec / 1024).toFixed(1)} KB/s`,
+            `Particles: ${s.particlesActive}`,
+            `Phase: ${s.phase}`,
+            `Heap: ${s.jsHeapMB > 0 ? `${s.jsHeapMB.toFixed(1)}/${s.jsHeapLimitMB.toFixed(0)} MB` : 'N/A'}`,
+        ];
+        const h = lines.length * lineH + 28;
+        const y = canvasH - h - 10;
+
+        // Background panel
+        ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
+        const r = 6;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.arcTo(x, y + h, x, y + h - r, r);
+        ctx.arcTo(x, y, x + r, y, r);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Title
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.textAlign = 'left';
+        ctx.fillText('DEBUG (` to hide)', x + 8, y + 14);
+
+        // Frame time color bar
+        const barX = x + 8;
+        const barY2 = y + 20;
+        const barW = 100;
+        const barH = 4;
+        const ftRatio = Math.min(1, s.frameTimeMs / 50);
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.fillRect(barX, barY2, barW, barH);
+        ctx.fillStyle = s.frameTimeMs < 16.67 ? '#22c55e' : s.frameTimeMs < 33.33 ? '#eab308' : '#ef4444';
+        ctx.fillRect(barX, barY2, barW * ftRatio, barH);
+
+        // Stats lines
+        ctx.font = '10px monospace';
+        ctx.fillStyle = 'rgba(200, 210, 220, 0.9)';
+        for (let i = 0; i < lines.length; i++) {
+            ctx.fillText(lines[i], x + 8, y + 34 + i * lineH);
+        }
     }
 
     // Mouse coordinate helper — converts screen coords to world coords
@@ -1718,6 +1795,12 @@ const GameCanvasInner = ({
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            // Debug overlay toggle
+            if (e.key === '`') {
+                toggleDebug();
+                return;
+            }
 
             // Camera pan keys
             if (e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D') {

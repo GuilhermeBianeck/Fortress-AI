@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile, CompactGameState, BodyState } from '../types';
+import { debugStats, debugVisible } from '../debug/debugStats';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
@@ -110,6 +111,9 @@ export const useGameState = () => {
         // --- Game state (compact delta-encoded format) ---
 
         socketRef.current.on('gameState', (data: CompactGameState) => {
+            // Debug network stats (zero cost when overlay hidden)
+            if (debugVisible) debugStats.recordSnapshot(data.t, data);
+
             const cache = bodyCacheRef.current;
 
             // On full sync, clear cache so stale entries don't linger
