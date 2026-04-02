@@ -16,7 +16,8 @@ export const REVEAL_DURATION_MS = 5_000;
 export const SETTLE_TIMEOUT_MS = 1_000;
 export const SETTLE_MAX_TIMEOUT_MS = 5_000;
 export const SETTLE_POLL_INTERVAL_MS = 200;
-export const SETTLE_SPEED_THRESHOLD = 1.5;
+export const SETTLE_SPEED_THRESHOLD = 2.5;
+export const SETTLE_CONFIRM_COUNT = 3; // Require N consecutive settled polls
 
 // === Materials ===
 export const MATERIAL_PROPS: Record<string, { density: number; friction: number; frictionStatic: number; restitution: number }> = {

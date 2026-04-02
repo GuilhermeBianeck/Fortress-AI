@@ -5,10 +5,10 @@ import {
     BUILD_PHASE_DURATION_MS,
     REVEAL_DURATION_MS,
     COMBAT_TURN_DURATION_MS,
-    SETTLE_TIMEOUT_MS,
     SETTLE_MAX_TIMEOUT_MS,
     SETTLE_POLL_INTERVAL_MS,
     SETTLE_SPEED_THRESHOLD,
+    SETTLE_CONFIRM_COUNT,
 } from '../config/constants';
 
 export interface MatchCallbacks {
@@ -29,7 +29,7 @@ export class MatchStateMachine {
     private phaseTimer: ReturnType<typeof setTimeout> | null = null;
     private settleInterval: ReturnType<typeof setInterval> | null = null;
     private settleStart: number = 0;
-    private settledSince: number = 0;
+    private settleConfirmCount: number = 0;
 
     private currentTurn: Side = 'left';
     private playersReady: Set<string> = new Set(); // socketIds that clicked ready during build
@@ -133,7 +133,7 @@ export class MatchStateMachine {
 
     waitForSettle(): void {
         this.settleStart = Date.now();
-        this.settledSince = 0;
+        this.settleConfirmCount = 0;
 
         this.settleInterval = setInterval(() => {
             const world = this.callbacks.getWorld();
@@ -148,16 +148,15 @@ export class MatchStateMachine {
             const now = Date.now();
 
             if (allSettled) {
-                if (this.settledSince === 0) {
-                    this.settledSince = now;
-                }
-                if (now - this.settledSince >= SETTLE_TIMEOUT_MS) {
+                this.settleConfirmCount++;
+                // Require N consecutive settled polls before advancing
+                if (this.settleConfirmCount >= SETTLE_CONFIRM_COUNT) {
                     this.clearSettleInterval();
                     this.onProjectileSettled();
                     return;
                 }
             } else {
-                this.settledSince = 0;
+                this.settleConfirmCount = 0;
             }
 
             // Hard max timeout
