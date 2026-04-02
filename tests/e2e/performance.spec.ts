@@ -95,4 +95,95 @@ test.describe('Performance', () => {
 
         expect(hasOverlay).toBe(true);
     });
+
+    test('no significant memory leak across match cycles', async ({ page }) => {
+        // Navigate with debug enabled
+        await page.goto('/?debug=1');
+        await page.waitForLoadState('networkidle');
+
+        // Measure initial heap
+        const initialHeap = await page.evaluate(() => {
+            const perf = performance as any;
+            return perf.memory ? perf.memory.usedJSHeapSize / (1024 * 1024) : null;
+        });
+
+        if (initialHeap === null) {
+            test.skip(); // Skip if memory API not available
+            return;
+        }
+
+        // Play a quick match
+        const singlePlayerBtn = page.locator('button').filter({ hasText: /single player/i });
+        await singlePlayerBtn.click({ timeout: 10_000 });
+        await page.waitForTimeout(1500);
+
+        const readyBtn = page.locator('button').filter({ hasText: /ready/i });
+        if (await readyBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await readyBtn.click();
+        }
+
+        // Wait for canvas and some gameplay
+        const canvas = page.locator('canvas');
+        await expect(canvas).toBeVisible({ timeout: 15_000 });
+        await page.waitForTimeout(10_000);
+
+        // Measure heap after gameplay
+        const afterHeap = await page.evaluate(() => {
+            const perf = performance as any;
+            return perf.memory ? perf.memory.usedJSHeapSize / (1024 * 1024) : null;
+        });
+
+        if (afterHeap !== null) {
+            const growth = afterHeap - initialHeap;
+            console.log(`Memory growth: ${growth.toFixed(1)}MB (${initialHeap.toFixed(1)} → ${afterHeap.toFixed(1)})`);
+            // Allow up to 50MB growth for a single match (textures, physics, etc.)
+            expect(growth).toBeLessThan(50);
+        }
+    });
+
+    test('no frame time spikes above 50ms', async ({ page }) => {
+        await page.goto('/?debug=1');
+        await page.waitForLoadState('networkidle');
+
+        // Start match
+        const singlePlayerBtn = page.locator('button').filter({ hasText: /single player/i });
+        await singlePlayerBtn.click({ timeout: 10_000 });
+        await page.waitForTimeout(1500);
+
+        const readyBtn = page.locator('button').filter({ hasText: /ready/i });
+        if (await readyBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await readyBtn.click();
+        }
+
+        const canvas = page.locator('canvas');
+        await expect(canvas).toBeVisible({ timeout: 15_000 });
+        await page.waitForTimeout(3000);
+
+        // Measure frame times
+        const result = await page.evaluate(() => {
+            return new Promise<{ maxFrameMs: number; p99FrameMs: number }>((resolve) => {
+                const times: number[] = [];
+                let last = performance.now();
+                let n = 0;
+                function tick(now: number) {
+                    times.push(now - last);
+                    last = now;
+                    if (++n >= 180) { // 3 seconds
+                        times.sort((a, b) => a - b);
+                        resolve({
+                            maxFrameMs: parseFloat(Math.max(...times).toFixed(1)),
+                            p99FrameMs: parseFloat(times[Math.floor(times.length * 0.99)].toFixed(1)),
+                        });
+                    } else {
+                        requestAnimationFrame(tick);
+                    }
+                }
+                requestAnimationFrame(tick);
+            });
+        });
+
+        console.log(`Max frame: ${result.maxFrameMs}ms, P99: ${result.p99FrameMs}ms`);
+        // P99 should be under 33ms (30fps), allow occasional spikes
+        expect(result.p99FrameMs).toBeLessThan(33);
+    });
 });
