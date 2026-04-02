@@ -15,8 +15,8 @@ export const createWorld = (seed?: number): WorldResult => {
 
     engine.gravity.y = 2;
     engine.enableSleeping = true;
-    engine.positionIterations = 12; // Increased for stability
-    engine.velocityIterations = 10;
+    engine.positionIterations = 8; // Balanced for performance and stability
+    engine.velocityIterations = 6;
 
     const terrainSeed = seed ?? getRandomSeed();
 

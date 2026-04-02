@@ -83,7 +83,7 @@ export function generateHazards(terrain: TerrainResult, seed: number): HazardDat
     return hazards;
 }
 
-export function applyWindForce(bodies: Matter.Body[], windHazards: HazardData[]): void {
+export function applyWindForce(bodies: Matter.Body[], windHazards: HazardData[], forceMultiplier: number = 1): void {
     if (windHazards.length === 0) return;
 
     for (const body of bodies) {
@@ -102,7 +102,7 @@ export function applyWindForce(bodies: Matter.Body[], windHazards: HazardData[])
                 const WIND_INFLUENCE_FACTOR = 0.4;
 
                 Matter.Body.applyForce(body, body.position, {
-                    x: dir * str * WIND_INFLUENCE_FACTOR,
+                    x: dir * str * WIND_INFLUENCE_FACTOR * forceMultiplier,
                     y: 0,
                 });
             }
@@ -152,11 +152,20 @@ export function checkLavaDamage(
 }
 
 function interpolateTerrainY(points: { x: number; y: number }[], x: number): number {
-    for (let i = 0; i < points.length - 1; i++) {
-        if (points[i].x <= x && points[i + 1].x >= x) {
-            const t = (x - points[i].x) / (points[i + 1].x - points[i].x);
-            return points[i].y + t * (points[i + 1].y - points[i].y);
-        }
+    if (points.length === 0) return 500;
+    if (x <= points[0].x) return points[0].y;
+    if (x >= points[points.length - 1].x) return points[points.length - 1].y;
+
+    // Binary search for the segment containing x
+    let lo = 0, hi = points.length - 1;
+    while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (points[mid].x <= x) lo = mid;
+        else hi = mid;
     }
-    return points[points.length - 1]?.y ?? 500;
+
+    const p1 = points[lo];
+    const p2 = points[hi];
+    const t = (x - p1.x) / (p2.x - p1.x);
+    return p1.y + t * (p2.y - p1.y);
 }

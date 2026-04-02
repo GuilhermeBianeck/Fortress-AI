@@ -55,6 +55,9 @@ export class GameSession {
     private hazardTimers: ReturnType<typeof setInterval>[] = [];
     private scoreManager: ScoreManager = new ScoreManager();
     private botAI: BotAI | null = null;
+    private hazardTickCounter = 0;
+    private leftPlayer: PlayerState | null = null;
+    private rightPlayer: PlayerState | null = null;
 
     constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void, onRoundEnd?: (winner: Side, reason: string) => 'continue' | 'match_over') {
         this.onPhaseChangeCallback = onPhaseChange;
@@ -85,6 +88,8 @@ export class GameSession {
             };
 
             this.players.set(info.socketId, playerState);
+            if (playerState.side === 'left') this.leftPlayer = playerState;
+            else if (playerState.side === 'right') this.rightPlayer = playerState;
         }
 
         // Pre-build kingsMap for use in tickHazards (avoids per-tick allocation)
@@ -221,9 +226,8 @@ export class GameSession {
     }
 
     getPlayerBySide(side: Side): PlayerState | undefined {
-        for (const ps of this.players.values()) {
-            if (ps.side === side) return ps;
-        }
+        if (side === 'left') return this.leftPlayer ?? undefined;
+        if (side === 'right') return this.rightPlayer ?? undefined;
         return undefined;
     }
 
@@ -455,11 +459,15 @@ export class GameSession {
     private tickHazards(): void {
         if (this.hazards.length === 0) return;
 
+        // Throttle hazard processing to 15Hz (every 4th tick at 60Hz)
+        this.hazardTickCounter++;
+        if (this.hazardTickCounter % 4 !== 0) return;
+
         // Fetch all bodies once and share between hazard helpers
         const bodies = Matter.Composite.allBodies(this.world);
 
-        // Wind
-        applyWindForce(bodies, this.windHazards);
+        // Wind — multiply force by 4 to compensate for reduced tick rate
+        applyWindForce(bodies, this.windHazards, 4);
 
         // Lava — reuse the pre-built kingsMap member variable
         checkLavaDamage(bodies, this.world, this.lavaHazards, this.kingsMap, (side, damage) => {
@@ -767,13 +775,22 @@ export class GameSession {
 
     private interpolateTerrainY(x: number): number {
         const pts = this.terrain.points;
-        for (let i = 0; i < pts.length - 1; i++) {
-            if (pts[i].x <= x && pts[i + 1].x >= x) {
-                const t = (x - pts[i].x) / (pts[i + 1].x - pts[i].x);
-                return pts[i].y + t * (pts[i + 1].y - pts[i].y);
-            }
+        if (!pts || pts.length === 0) return 500;
+        if (x <= pts[0].x) return pts[0].y;
+        if (x >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
+
+        // Binary search for the segment containing x
+        let lo = 0, hi = pts.length - 1;
+        while (hi - lo > 1) {
+            const mid = (lo + hi) >> 1;
+            if (pts[mid].x <= x) lo = mid;
+            else hi = mid;
         }
-        return pts[pts.length - 1].y;
+
+        const p1 = pts[lo];
+        const p2 = pts[hi];
+        const t = (x - p1.x) / (p2.x - p1.x);
+        return p1.y + t * (p2.y - p1.y);
     }
 
     private checkProjectileBounds() {
