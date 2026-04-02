@@ -13,6 +13,8 @@ interface AnalyticsEvent {
     uid: string;
 }
 
+const ANALYTICS_URL = (import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`) + '/api/events';
+
 const queue: AnalyticsEvent[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 let userId = '';
@@ -51,7 +53,9 @@ function flush(): void {
     const payload = JSON.stringify(batch);
     try {
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-            navigator.sendBeacon('/api/events', payload);
+            // Use Blob with JSON content type so Express json() middleware can parse it
+            const blob = new Blob([payload], { type: 'application/json' });
+            navigator.sendBeacon(ANALYTICS_URL, blob);
         }
     } catch {
         // Silently fail -- analytics should never break the app
