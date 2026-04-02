@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, AlertTriangle, TrendingUp, Zap, Home } from 'lucide-react';
 import type { MatchPhase, Side, MatchScores, PlayerProfile } from '../types';
 import { getRankTier, getNextRankProgress, getUnlockedAchievements, getPerformanceGrade, PERFORMANCE_GRADE_COLORS, ACHIEVEMENT_RARITY_COLORS, getUtcDayStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS } from '../types';
+import { track } from '../analytics/tracker';
 interface PhaseOverlayProps {
     phase: MatchPhase;
     phaseEndsAt: number | null;
@@ -357,7 +358,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         <div className="mt-3">
                             {rematchState === 'none' && (
                                 <button
-                                    onClick={onRequestRematch}
+                                    onClick={() => { track('rematch_requested'); onRequestRematch(); }}
                                     className="btn-primary min-h-[44px] min-w-[120px] px-6 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 mx-auto"
                                 >
                                     <RotateCcw size={16} />
@@ -376,7 +377,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                         <Swords size={14} /> The enemy demands a rematch!
                                     </p>
                                     <button
-                                        onClick={onRequestRematch}
+                                        onClick={() => { track('rematch_requested'); onRequestRematch(); }}
                                         className="btn-emerald min-h-[44px] min-w-[120px] px-6 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 mx-auto"
                                     >
                                         ACCEPT CHALLENGE
@@ -389,7 +390,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     {/* New Game — return to lobby cleanly */}
                     <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
                         <button
-                            onClick={() => onReturnToLobby?.()}
+                            onClick={() => { track('return_to_lobby'); onReturnToLobby?.(); }}
                             className="btn-medieval min-h-[40px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 mx-auto"
                         >
                             <Home size={13} />

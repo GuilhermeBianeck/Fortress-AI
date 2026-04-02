@@ -3,6 +3,7 @@ import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHp
 import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X } from '../types';
 import { ParticleSystem } from '../effects/particles';
 import { debugStats, debugVisible, toggleDebug } from '../debug/debugStats';
+import { track } from '../analytics/tracker';
 
 interface GameCanvasProps {
     gameState: GameState | null;
@@ -1631,6 +1632,10 @@ const GameCanvasInner = ({
         const aim = aimRef.current;
         if (!aim.active) return;
         aim.active = false;
+        track('projectile_fired', {
+            angle: Math.round(aim.angle * 180 / Math.PI),
+            power: Math.round(aim.power),
+        });
         onFireRef.current(aim.angle, aim.power);
     };
 
@@ -1793,6 +1798,10 @@ const GameCanvasInner = ({
         e.preventDefault();
         aim.active = false;
         touchStartRef.current = null;
+        track('projectile_fired', {
+            angle: Math.round(aim.angle * 180 / Math.PI),
+            power: Math.round(aim.power),
+        });
         onFireRef.current(aim.angle, aim.power);
     };
 
@@ -1840,6 +1849,10 @@ const GameCanvasInner = ({
                         break;
                     case ' ':
                         e.preventDefault();
+                        track('projectile_fired', {
+                            angle: Math.round(aim.angle * 180 / Math.PI),
+                            power: Math.round(aim.power),
+                        });
                         onFireRef.current(aim.angle, aim.power);
                         break;
                 }

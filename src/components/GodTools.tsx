@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Hammer, Eye, Check, Swords } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode, MatchPhase } from '../types';
 import { MATERIAL_COLORS } from '../types';
+import { track } from '../analytics/tracker';
 
 interface GodToolsProps {
     selectedMaterial: MaterialType;
@@ -76,6 +77,7 @@ export const GodTools = ({
 
     const handleReady = () => {
         if (isReady) return;
+        track('build_phase_skipped');
         setIsReady(true);
         onReady();
     };
@@ -113,7 +115,7 @@ export const GodTools = ({
                             return (
                                 <button
                                     key={mat.key}
-                                    onClick={() => onMaterialChange(mat.key)}
+                                    onClick={() => { track('material_selected', { material: mat.key }); onMaterialChange(mat.key); }}
                                     aria-pressed={isActive}
                                     aria-label={MATERIAL_TIPS[mat.key]}
                                     className={`
@@ -151,7 +153,7 @@ export const GodTools = ({
                             return (
                                 <button
                                     key={shape.key}
-                                    onClick={() => onShapeChange(shape.key)}
+                                    onClick={() => { track('shape_selected', { shape: shape.key }); onShapeChange(shape.key); }}
                                     aria-pressed={isActive}
                                     aria-label={shape.label}
                                     className={`
@@ -231,6 +233,7 @@ export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onRead
 
     const handleReady = () => {
         if (isReady) return;
+        track('build_phase_skipped');
         setIsReady(true);
         onReady();
     };

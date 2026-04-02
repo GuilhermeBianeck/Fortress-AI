@@ -10,6 +10,7 @@ import { RankBadge } from './components/RankBadge';
 import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, WifiOff } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
+import { track } from './analytics/tracker';
 
 function App() {
   const {
@@ -45,6 +46,14 @@ function App() {
 
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
+
+  // Track app load
+  useEffect(() => {
+    track('app_loaded', {
+      viewport_width: window.innerWidth,
+      viewport_height: window.innerHeight,
+    });
+  }, []);
 
   // Tab key to toggle mode (only during build phase)
   useEffect(() => {
@@ -89,6 +98,9 @@ function App() {
       return;
     }
 
+    track('ai_prompt_submitted', {
+      prompt_length: prompt.length,
+    });
     requestBuild(apiKey, prompt);
     setPrompt('');
   };
