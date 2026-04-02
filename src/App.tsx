@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
 import { GodTools, MobileDoneButton } from './components/GodTools';
+import { sprites } from './sprites';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
@@ -70,8 +71,10 @@ function App() {
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
 
-  // Track app load + auto-join from URL
+  // Load sprites + track app load + auto-join from URL
   useEffect(() => {
+    sprites.loadAll();
+
     track('app_loaded', {
       viewport_width: window.innerWidth,
       viewport_height: window.innerHeight,

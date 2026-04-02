@@ -4,6 +4,7 @@ import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X
 import { ParticleSystem } from '../effects/particles';
 import { debugStats, debugVisible, toggleDebug } from '../debug/debugStats';
 import { track } from '../analytics/tracker';
+import { sprites } from '../sprites';
 
 interface GameCanvasProps {
     gameState: GameState | null;
@@ -1109,21 +1110,51 @@ const GameCanvasInner = ({
                         ctx.fill();
                     }
 
-                    // Draw circle body (no shadow filters)
-                    ctx.beginPath();
-                    ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
-                    ctx.fillStyle = fillColor;
-                    ctx.fill();
-                    ctx.strokeStyle = strokeColor;
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-
+                    // Draw circle body — use sprite if available
                     if (body.label === 'king') {
-                        // Crown icon — larger and on top (no shadow)
-                        ctx.font = 'bold 14px sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.fillStyle = '#FFD700';
-                        ctx.fillText('♛', 0, -body.circleRadius - 4);
+                        const kingSprite = sprites.get('king_idle_0');
+                        if (kingSprite) {
+                            ctx.imageSmoothingEnabled = false;
+                            const sz = body.circleRadius * 2.5;
+                            ctx.drawImage(kingSprite, -sz / 2, -sz / 2, sz, sz);
+                            ctx.imageSmoothingEnabled = true;
+                        } else {
+                            ctx.beginPath();
+                            ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
+                            ctx.fillStyle = fillColor;
+                            ctx.fill();
+                            ctx.strokeStyle = strokeColor;
+                            ctx.lineWidth = 1.5;
+                            ctx.stroke();
+                            ctx.font = 'bold 14px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.fillStyle = '#FFD700';
+                            ctx.fillText('\u265B', 0, -body.circleRadius - 4);
+                        }
+                    } else if (body.label === 'projectile') {
+                        const projSprite = sprites.get('projectile');
+                        if (projSprite) {
+                            ctx.imageSmoothingEnabled = false;
+                            const sz = body.circleRadius * 2.5;
+                            ctx.drawImage(projSprite, -sz / 2, -sz / 2, sz, sz);
+                            ctx.imageSmoothingEnabled = true;
+                        } else {
+                            ctx.beginPath();
+                            ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
+                            ctx.fillStyle = fillColor;
+                            ctx.fill();
+                            ctx.strokeStyle = strokeColor;
+                            ctx.lineWidth = 1.5;
+                            ctx.stroke();
+                        }
+                    } else {
+                        ctx.beginPath();
+                        ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
+                        ctx.fillStyle = fillColor;
+                        ctx.fill();
+                        ctx.strokeStyle = strokeColor;
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
                     }
 
                     // Projectile glow
@@ -1136,44 +1167,30 @@ const GameCanvasInner = ({
                 } else if (!body.isStatic || body.label === 'foundation') {
                     const w = body.width || 50;
                     const h = body.height || 50;
-                    ctx.fillStyle = fillColor;
-                    ctx.fillRect(-w / 2, -h / 2, w, h);
-                    ctx.strokeStyle = strokeColor;
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(-w / 2, -h / 2, w, h);
 
-                    // Inner highlight — warm gold tint
-                    ctx.fillStyle = 'rgba(255, 215, 0, 0.06)';
-                    ctx.fillRect(-w / 2 + 2, -h / 2 + 2, w - 4, h / 3);
+                    // Sprite-based block rendering with fallback
+                    const mat = body.material || body.label || 'wood';
+                    const hpRatio = (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0)
+                        ? body.blockHp / body.blockMaxHp : 1;
+                    const dmgSuffix = hpRatio > 0.66 ? '' : hpRatio > 0.33 ? '_damaged' : '_critical';
+                    const blockSprite = sprites.get(`block_${mat}${dmgSuffix}`);
 
-                    // Block damage visuals (cracks + desaturation)
-                    if (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0) {
-                        const hpRatio = body.blockHp / body.blockMaxHp;
-
-                        if (hpRatio <= 0.66) {
-                            // Draw cracks
-                            ctx.strokeStyle = 'rgba(30, 30, 30, 0.6)';
-                            ctx.lineWidth = 1;
-                            const seed = body.id % 7;
-                            const crackCount = hpRatio <= 0.33 ? 5 + seed % 3 : 2 + seed % 2;
-
-                            for (let c = 0; c < crackCount; c++) {
-                                const cx1 = ((c * 31 + seed * 13) % (w | 1)) - w / 2;
-                                const cy1 = ((c * 17 + seed * 7) % (h | 1)) - h / 2;
-                                const cx2 = cx1 + ((c % 2 === 0 ? 1 : -1) * (5 + (c * 3 + seed) % 10));
-                                const cy2 = cy1 + ((c % 2 === 0 ? -1 : 1) * (3 + (c * 5 + seed) % 8));
-                                ctx.beginPath();
-                                ctx.moveTo(cx1, cy1);
-                                ctx.lineTo(cx2, cy2);
-                                ctx.stroke();
-                            }
-                        }
-
-                        if (hpRatio <= 0.33) {
-                            // Desaturation overlay
-                            ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
-                            ctx.fillRect(-w / 2, -h / 2, w, h);
-                        }
+                    if (blockSprite) {
+                        // Pixelated scaling for crisp pixel art
+                        ctx.imageSmoothingEnabled = false;
+                        ctx.drawImage(blockSprite, -w / 2, -h / 2, w, h);
+                        ctx.imageSmoothingEnabled = true;
+                        // Subtle border for depth
+                        ctx.strokeStyle = strokeColor;
+                        ctx.lineWidth = 0.5;
+                        ctx.strokeRect(-w / 2, -h / 2, w, h);
+                    } else {
+                        // Fallback: flat color rendering
+                        ctx.fillStyle = fillColor;
+                        ctx.fillRect(-w / 2, -h / 2, w, h);
+                        ctx.strokeStyle = strokeColor;
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeRect(-w / 2, -h / 2, w, h);
                     }
                 }
 

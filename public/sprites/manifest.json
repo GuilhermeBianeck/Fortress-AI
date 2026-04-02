@@ -1,0 +1,238 @@
+{
+  "sprites": [
+    {
+      "name": "block_wood",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_wood.png"
+    },
+    {
+      "name": "block_stone",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_stone.png"
+    },
+    {
+      "name": "block_ice",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_ice.png"
+    },
+    {
+      "name": "block_rubber",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_rubber.png"
+    },
+    {
+      "name": "block_steel",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_steel.png"
+    },
+    {
+      "name": "block_wood_damaged",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_wood_damaged.png"
+    },
+    {
+      "name": "block_stone_damaged",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_stone_damaged.png"
+    },
+    {
+      "name": "block_ice_damaged",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_ice_damaged.png"
+    },
+    {
+      "name": "block_rubber_damaged",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_rubber_damaged.png"
+    },
+    {
+      "name": "block_steel_damaged",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_steel_damaged.png"
+    },
+    {
+      "name": "block_wood_critical",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_wood_critical.png"
+    },
+    {
+      "name": "block_stone_critical",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_stone_critical.png"
+    },
+    {
+      "name": "block_ice_critical",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_ice_critical.png"
+    },
+    {
+      "name": "block_rubber_critical",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_rubber_critical.png"
+    },
+    {
+      "name": "block_steel_critical",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/block_steel_critical.png"
+    },
+    {
+      "name": "king_idle_0",
+      "width": 24,
+      "height": 24,
+      "path": "/sprites/king_idle_0.png"
+    },
+    {
+      "name": "king_idle_1",
+      "width": 24,
+      "height": 24,
+      "path": "/sprites/king_idle_1.png"
+    },
+    {
+      "name": "king_hit",
+      "width": 24,
+      "height": 24,
+      "path": "/sprites/king_hit.png"
+    },
+    {
+      "name": "cannon_left",
+      "width": 32,
+      "height": 16,
+      "path": "/sprites/cannon_left.png"
+    },
+    {
+      "name": "cannon_right",
+      "width": 32,
+      "height": 16,
+      "path": "/sprites/cannon_right.png"
+    },
+    {
+      "name": "projectile",
+      "width": 12,
+      "height": 12,
+      "path": "/sprites/projectile.png"
+    },
+    {
+      "name": "projectile_trail",
+      "width": 8,
+      "height": 8,
+      "path": "/sprites/projectile_trail.png"
+    },
+    {
+      "name": "terrain_grass",
+      "width": 32,
+      "height": 8,
+      "path": "/sprites/terrain_grass.png"
+    },
+    {
+      "name": "terrain_earth",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/terrain_earth.png"
+    },
+    {
+      "name": "terrain_deep",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/terrain_deep.png"
+    },
+    {
+      "name": "lava_0",
+      "width": 32,
+      "height": 16,
+      "path": "/sprites/lava_0.png"
+    },
+    {
+      "name": "lava_1",
+      "width": 32,
+      "height": 16,
+      "path": "/sprites/lava_1.png"
+    },
+    {
+      "name": "lava_2",
+      "width": 32,
+      "height": 16,
+      "path": "/sprites/lava_2.png"
+    },
+    {
+      "name": "lava_3",
+      "width": 32,
+      "height": 16,
+      "path": "/sprites/lava_3.png"
+    },
+    {
+      "name": "wind_streak",
+      "width": 16,
+      "height": 4,
+      "path": "/sprites/wind_streak.png"
+    },
+    {
+      "name": "rock",
+      "width": 16,
+      "height": 16,
+      "path": "/sprites/rock.png"
+    },
+    {
+      "name": "crown",
+      "width": 12,
+      "height": 12,
+      "path": "/sprites/crown.png"
+    },
+    {
+      "name": "explosion_0",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/explosion_0.png"
+    },
+    {
+      "name": "explosion_1",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/explosion_1.png"
+    },
+    {
+      "name": "explosion_2",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/explosion_2.png"
+    },
+    {
+      "name": "explosion_3",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/explosion_3.png"
+    },
+    {
+      "name": "spark_0",
+      "width": 16,
+      "height": 16,
+      "path": "/sprites/spark_0.png"
+    },
+    {
+      "name": "spark_1",
+      "width": 16,
+      "height": 16,
+      "path": "/sprites/spark_1.png"
+    },
+    {
+      "name": "spark_2",
+      "width": 16,
+      "height": 16,
+      "path": "/sprites/spark_2.png"
+    }
+  ]
+}
