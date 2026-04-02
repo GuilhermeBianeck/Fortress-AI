@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHpState } from '../types';
 import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X } from '../types';
 import { ParticleSystem } from '../effects/particles';
+import { track } from '../analytics/tracker';
 
 interface GameCanvasProps {
     gameState: GameState | null;
@@ -1549,6 +1550,10 @@ export const GameCanvas = ({
         const aim = aimRef.current;
         if (!aim.active) return;
         aim.active = false;
+        track('projectile_fired', {
+            angle: Math.round(aim.angle * 180 / Math.PI),
+            power: Math.round(aim.power),
+        });
         onFireRef.current(aim.angle, aim.power);
     };
 
@@ -1710,6 +1715,10 @@ export const GameCanvas = ({
         e.preventDefault();
         aim.active = false;
         touchStartRef.current = null;
+        track('projectile_fired', {
+            angle: Math.round(aim.angle * 180 / Math.PI),
+            power: Math.round(aim.power),
+        });
         onFireRef.current(aim.angle, aim.power);
     };
 
@@ -1751,6 +1760,10 @@ export const GameCanvas = ({
                         break;
                     case ' ':
                         e.preventDefault();
+                        track('projectile_fired', {
+                            angle: Math.round(aim.angle * 180 / Math.PI),
+                            power: Math.round(aim.power),
+                        });
                         onFireRef.current(aim.angle, aim.power);
                         break;
                 }

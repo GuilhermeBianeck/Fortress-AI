@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile, CompactGameState, BodyState } from '../types';
+import { track } from '../analytics/tracker';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
@@ -105,6 +106,7 @@ export const useGameState = () => {
 
         socketRef.current.on('connect', () => {
             setIsConnected(true);
+            track('connection_restored');
         });
 
         // --- Game state (compact delta-encoded format) ---
@@ -278,6 +280,7 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('match_started', (data: { side: Side, kingsHp?: { left: KingHpState; right: KingHpState } }) => {
+            track('match_started', { side: data.side });
             setRoomState(prev => prev ? { ...prev, side: data.side, phase: 'build' } : prev);
             if (data.kingsHp) {
                 setKingsHp(data.kingsHp);
@@ -299,6 +302,10 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('match_result', (data: { winner: Side; reason: string; kings: { left: KingHpState; right: KingHpState } }) => {
+            track('match_ended', {
+                winner: data.winner,
+                reason: data.reason,
+            });
             setMatchResult({ winner: data.winner, reason: data.reason });
             setKingsHp(data.kings);
             setPhase('result');
@@ -364,6 +371,7 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('disconnect', () => {
+            track('connection_lost');
             setIsConnected(false);
         });
 

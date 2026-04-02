@@ -4,6 +4,7 @@ import type { RoomState, PlayerProfile } from '../types';
 import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { RankBadge } from './RankBadge';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
+import { track } from '../analytics/tracker';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -221,6 +222,7 @@ export const Lobby = ({
     const handleJoinSubmit = (e: FormEvent) => {
         e.preventDefault();
         if (joinCode.trim().length >= 4) {
+            track('room_joined', { room_code: joinCode.trim() });
             onJoinRoom(joinCode.trim(), playerName);
         }
     };
@@ -418,7 +420,7 @@ export const Lobby = ({
                     <h2 className="text-2xl font-bold text-[var(--gold)] mb-3 font-heading text-glow-gold">Seeking Challenger...</h2>
                     <p className="text-base text-[var(--text-secondary)]">Queue position: {queuePosition + 1}</p>
                     <button
-                        onClick={onLeaveQueue}
+                        onClick={() => { track('queue_left'); onLeaveQueue(); }}
                         className="mt-6 btn-medieval min-h-[48px] px-8 py-3 rounded-xl text-base"
                     >
                         Retreat
@@ -549,7 +551,7 @@ export const Lobby = ({
 
                     {/* Single Player */}
                     <button
-                        onClick={() => onCreateRoom(playerName, 'single')}
+                        onClick={() => { track('room_created', { mode: 'single' }); onCreateRoom(playerName, 'single'); }}
                         className="btn-blue w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
                     >
                         <Zap size={20} aria-hidden="true" />
@@ -558,7 +560,7 @@ export const Lobby = ({
 
                     {/* Create Kingdom */}
                     <button
-                        onClick={() => onCreateRoom(playerName, 'pvp')}
+                        onClick={() => { track('room_created', { mode: 'pvp' }); onCreateRoom(playerName, 'pvp'); }}
                         className="btn-primary w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
                     >
                         <Crown size={20} aria-hidden="true" />
@@ -598,7 +600,7 @@ export const Lobby = ({
 
                     {/* Quick Match */}
                     <button
-                        onClick={() => onJoinQueue(playerName)}
+                        onClick={() => { track('queue_joined'); onJoinQueue(playerName); }}
                         className="btn-medieval w-full min-h-[52px] py-3.5 rounded-xl text-base touch-manipulation flex items-center justify-center gap-2.5"
                     >
                         <Users size={18} aria-hidden="true" />

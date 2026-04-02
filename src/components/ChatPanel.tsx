@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import type { ChatMessage, Side } from '../types';
 import { Send, X, MessageCircle } from 'lucide-react';
+import { track } from '../analytics/tracker';
 
 interface ChatPanelProps {
     messages: ChatMessage[];
@@ -30,6 +31,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
         e.preventDefault();
         const trimmed = text.trim();
         if (!trimmed) return;
+        track('chat_message_sent', { message_length: trimmed.length });
         onSend(trimmed);
         setText('');
     };
