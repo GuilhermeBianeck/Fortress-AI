@@ -13,7 +13,11 @@ if (!fs.existsSync(DATA_DIR)) {
 
 router.post('/api/events', (req, res) => {
     try {
-        const body = req.body;
+        // sendBeacon sends text/plain to avoid CORS preflight; parse if needed
+        let body = req.body;
+        if (typeof body === 'string') {
+            try { body = JSON.parse(body); } catch { body = null; }
+        }
         if (!Array.isArray(body)) {
             res.status(400).json({ error: 'Expected array of events' });
             return;

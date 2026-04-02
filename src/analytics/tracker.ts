@@ -53,8 +53,8 @@ function flush(): void {
     const payload = JSON.stringify(batch);
     try {
         if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-            // Use Blob with JSON content type so Express json() middleware can parse it
-            const blob = new Blob([payload], { type: 'application/json' });
+            // Use text/plain to avoid CORS preflight (sendBeacon can't handle preflight)
+            const blob = new Blob([payload], { type: 'text/plain' });
             navigator.sendBeacon(ANALYTICS_URL, blob);
         }
     } catch {
