@@ -131,8 +131,8 @@ export function checkLavaDamage(
 
                 // Damage blocks
                 if ((body as HazardBody).blockHp != null) {
-                    (body as HazardBody).blockHp = Math.max(0, (body as HazardBody).blockHp - dmg * 0.1);
-                    if ((body as HazardBody).blockHp <= 0) {
+                    (body as HazardBody).blockHp = Math.max(0, ((body as HazardBody).blockHp ?? 0) - dmg * 0.1);
+                    if (((body as HazardBody).blockHp ?? 0) <= 0) {
                         Matter.Composite.remove(world, body);
                     }
                 }

@@ -778,7 +778,7 @@ export class GameSession {
                             const blockDamage = impactForce * PROJECTILE_BLOCK_DAMAGE_MULT;
                             (block as GameBody).blockHp = Math.max(0, blockHp - blockDamage);
 
-                            if ((block as GameBody).blockHp <= 0) {
+                            if (((block as GameBody).blockHp ?? 0) <= 0) {
                                 this.io.to(this.roomId).emit('block_destroyed', {
                                     bodyId: block.id,
                                     position: { x: block.position.x, y: block.position.y },
