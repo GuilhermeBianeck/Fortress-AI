@@ -9,30 +9,53 @@ interface SafeSpawnResult {
     adjustmentCount: number;
 }
 
+interface AABB {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+}
+
+function bodyToAABB(body: Matter.Body): AABB {
+    return {
+        minX: body.bounds.min.x,
+        minY: body.bounds.min.y,
+        maxX: body.bounds.max.x,
+        maxY: body.bounds.max.y,
+    };
+}
+
+function planToAABB(plan: BodyPlan, x: number, y: number): AABB {
+    if (plan.shape === 'circle') {
+        const r = plan.dimensions[0] || 15;
+        return { minX: x - r, minY: y - r, maxX: x + r, maxY: y + r };
+    }
+    const w = plan.dimensions[0] || 30;
+    const h = plan.dimensions[1] || plan.dimensions[0] || 30;
+    // For rotated rectangles, use the bounding box of the rotated shape
+    if (plan.angle) {
+        const cos = Math.abs(Math.cos(plan.angle));
+        const sin = Math.abs(Math.sin(plan.angle));
+        const rw = (w * cos + h * sin) / 2;
+        const rh = (w * sin + h * cos) / 2;
+        return { minX: x - rw, minY: y - rh, maxX: x + rw, maxY: y + rh };
+    }
+    return { minX: x - w / 2, minY: y - h / 2, maxX: x + w / 2, maxY: y + h / 2 };
+}
+
+function aabbOverlap(a: AABB, b: AABB): boolean {
+    return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+}
+
 /**
  * Checks AI-generated body plans for overlaps with terrain, existing world bodies
- * (including King), and previously placed ghost bodies. Shifts overlapping bodies
- * upward until they no longer collide (max 10 attempts / 50px).
+ * (including King), and previously placed bodies using pure AABB math.
+ * Shifts overlapping bodies upward until they no longer collide (max 10 attempts / 50px).
  */
 export function safeSpawn(plans: BodyPlan[], existingWorld: Matter.World): SafeSpawnResult {
-    // Create a temporary engine/world for ghost collision detection
-    const ghostEngine = Matter.Engine.create();
-    const ghostWorld = ghostEngine.world;
-    ghostEngine.gravity.y = 0; // No gravity in ghost world
-
-    // Clone all existing world bodies as static ghosts for collision testing
+    // Collect AABBs from all existing world bodies
     const existingBodies = Matter.Composite.allBodies(existingWorld);
-    for (const body of existingBodies) {
-        const clone = Matter.Bodies.fromVertices(
-            body.position.x,
-            body.position.y,
-            [body.vertices.map(v => ({ x: v.x, y: v.y }))],
-            { isStatic: true, label: body.label }
-        );
-        if (clone) {
-            Matter.World.add(ghostWorld, clone);
-        }
-    }
+    const occupied: AABB[] = existingBodies.map(bodyToAABB);
 
     let totalAdjustments = 0;
     const adjustedBodies: BodyPlan[] = [];
@@ -43,14 +66,11 @@ export function safeSpawn(plans: BodyPlan[], existingWorld: Matter.World): SafeS
         let adjusted = false;
 
         for (let attempt = 0; attempt < MAX_SHIFT_ATTEMPTS; attempt++) {
-            const ghostBody = createGhostBody(plan, x, y);
-            const collisions = Matter.Query.collides(ghostBody, Matter.Composite.allBodies(ghostWorld));
+            const aabb = planToAABB(plan, x, y);
+            const hasCollision = occupied.some(occ => aabbOverlap(aabb, occ));
 
-            if (collisions.length === 0) {
-                // No collision — place the ghost body for future collision checks
-                const permanentGhost = createGhostBody(plan, x, y);
-                Matter.Body.setStatic(permanentGhost, true);
-                Matter.World.add(ghostWorld, permanentGhost);
+            if (!hasCollision) {
+                occupied.push(aabb);
                 break;
             }
 
@@ -59,10 +79,8 @@ export function safeSpawn(plans: BodyPlan[], existingWorld: Matter.World): SafeS
             adjusted = true;
 
             if (attempt === MAX_SHIFT_ATTEMPTS - 1) {
-                // Last attempt — place anyway at adjusted position
-                const permanentGhost = createGhostBody(plan, x, y);
-                Matter.Body.setStatic(permanentGhost, true);
-                Matter.World.add(ghostWorld, permanentGhost);
+                // Last attempt -- place anyway at adjusted position
+                occupied.push(planToAABB(plan, x, y));
             }
         }
 
@@ -70,33 +88,5 @@ export function safeSpawn(plans: BodyPlan[], existingWorld: Matter.World): SafeS
         adjustedBodies.push({ ...plan, x, y });
     }
 
-    // Clean up ghost world
-    Matter.World.clear(ghostWorld, false);
-    Matter.Engine.clear(ghostEngine);
-
     return { adjustedBodies, adjustmentCount: totalAdjustments };
-}
-
-function createGhostBody(plan: BodyPlan, x: number, y: number): Matter.Body {
-    let body: Matter.Body;
-
-    if (plan.shape === 'circle') {
-        const radius = plan.dimensions[0] || 15;
-        body = Matter.Bodies.circle(x, y, radius, { isStatic: true });
-    } else if (plan.shape === 'triangle') {
-        const size = plan.dimensions[0] || 30;
-        const vertices = [
-            { x: 0, y: -size / 2 },
-            { x: -size / 2, y: size / 2 },
-            { x: size / 2, y: size / 2 },
-        ];
-        body = Matter.Bodies.fromVertices(x, y, [vertices], { isStatic: true });
-    } else {
-        const w = plan.dimensions[0] || 30;
-        const h = plan.dimensions[1] || plan.dimensions[0] || 30;
-        body = Matter.Bodies.rectangle(x, y, w, h, { isStatic: true });
-    }
-
-    if (plan.angle) Matter.Body.setAngle(body, plan.angle);
-    return body;
 }

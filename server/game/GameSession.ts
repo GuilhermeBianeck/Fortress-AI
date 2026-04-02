@@ -58,6 +58,7 @@ export class GameSession {
     private hazardTickCounter = 0;
     private leftPlayer: PlayerState | null = null;
     private rightPlayer: PlayerState | null = null;
+    private buildInProgress: Set<string> = new Set(); // socketIds with active builds
 
     constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void, onRoundEnd?: (winner: Side, reason: string) => 'continue' | 'match_over') {
         this.onPhaseChangeCallback = onPhaseChange;
@@ -264,11 +265,26 @@ export class GameSession {
         const player = this.players.get(socket.id);
         if (!player) return;
 
+        // Prevent duplicate build requests
+        if (this.buildInProgress.has(socket.id)) {
+            socket.emit('build_error', { message: 'Build already in progress' });
+            return;
+        }
+
         const { apiKey, prompt } = data;
         if (!apiKey || !prompt) {
             socket.emit('build_error', { message: "Missing API Key or Prompt" });
             return;
         }
+
+        this.buildInProgress.add(socket.id);
+
+        // Start heartbeat so the client knows the build is still running
+        const buildStart = Date.now();
+        const heartbeat = setInterval(() => {
+            const elapsed = Math.round((Date.now() - buildStart) / 1000);
+            socket.emit('build_status', { status: 'generating', message: `Generating fortress... (${elapsed}s)` });
+        }, 3000);
 
         try {
             socket.emit('build_status', { status: 'generating', message: 'Architect is thinking...' });
@@ -284,6 +300,8 @@ export class GameSession {
             };
 
             const plan = await generateFortress(apiKey, prompt, terrainCtx);
+
+            clearInterval(heartbeat);
 
             socket.emit('build_status', { status: 'building', message: plan.thought_chain });
 
@@ -318,9 +336,12 @@ export class GameSession {
             this.scoreManager.recordResourceUsed(player.side, spawnedCount);
             this.scoreManager.recordAIBuild(player.side, spawnedCount);
         } catch (err: unknown) {
+            clearInterval(heartbeat);
             console.error("Build Error:", err);
             const message = err instanceof Error ? err.message : "AI Generation Failed";
             socket.emit('build_error', { message });
+        } finally {
+            this.buildInProgress.delete(socket.id);
         }
     }
 
