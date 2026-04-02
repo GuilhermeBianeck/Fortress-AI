@@ -218,6 +218,9 @@ const GameCanvasInner = ({
         depth: number; // 0=far, 1=near
         puffs: { dx: number; dy: number; rx: number; ry: number }[];
         fillStyle: string; // Pre-computed, never changes (depth is constant)
+        offscreen?: HTMLCanvasElement; // Pre-rendered puffs (lazily created)
+        offX: number; // Offset from cloud center to offscreen canvas origin
+        offY: number;
     }
     const cloudsRef = useRef<Cloud[] | null>(null);
 
@@ -251,6 +254,9 @@ const GameCanvasInner = ({
     // Interpolation state: store previous snapshot for smooth movement
     const prevBodiesRef = useRef<Map<number, { x: number; y: number; angle: number }>>(new Map());
     const snapshotTimeRef = useRef<number>(0);
+
+    // Cached king glow gradient (avoid createRadialGradient per frame)
+    const kingGlowRef = useRef<{ radius: number; gradient: CanvasGradient } | null>(null);
 
     // Sync refs
     useEffect(() => {
@@ -562,6 +568,8 @@ const GameCanvasInner = ({
                         ry: 15 + Math.random() * 15
                     })),
                     fillStyle: `rgba(35,30,50,${cloudAlpha.toFixed(2)})`,
+                    offX: 0,
+                    offY: 0,
                 };
             };
 
@@ -614,85 +622,53 @@ const GameCanvasInner = ({
         drawLayer('#0e1610', 80, 0.3, 789, 40, 0.008);
 
 
-        // Update and draw clouds (sorted by depth for correct occlusion if they overlap, though purely additive here)
+        // Draw clouds — pre-render each cloud's puffs to an offscreen canvas on first use
         const clouds = cloudsRef.current;
-        // Optimization: Don't sort every frame, they maintain relative depth usually. 
-        // Just draw them.
+        const totalWidth = WORLD_WIDTH + 800;
 
         for (const cloud of clouds) {
-            // Move cloud
             cloud.x -= cloud.speed;
-
-            // Wrap logic: needs to wrap based on WORLD_WIDTH effectively
-            const totalWidth = WORLD_WIDTH + 800;
             if (cloud.x < -400) cloud.x += totalWidth;
 
-            // Parallax offset computation
-            // "depth" defines how much it *follows* the camera.
-            // 0 depth = grounded (moves 1:1 with camera, effectively staying in world spot).
-            // 1 depth = HUD (moves 1:1 with camera view, effectively static on screen).
-            // Actually, usually parallax factor < 1 means it moves slower.
-            // Screen X = (World X - Camera X * ParallaxFactor)
+            const drawX = cloud.x - (cam.x * cloud.depth);
+            if (drawX < -300 || drawX > width + 300) continue;
 
-            const parallaxFactor = cloud.depth; // 0.2 (far), 0.5 (mid), 0.8 (near)
-            // Wait, standard parallax:
-            // Far objects move slower. So if cam moves 100px right, far object moves 20px left on screen.
-            // Near objects move faster.
-
-            // Let's use standard factor:
-            // far (0.2) -> cam moves 100, cloud shifts 20 on screen (looks far).
-            // near (0.8) -> cam moves 100, cloud shifts 80 on screen (looks closer).
-
-            // We need to handle wrapping relative to the camera view to avoid popping.
-            // Simple approach: Render at screen coords.
-
-            const screenX = cloud.x - (cam.x * parallaxFactor);
-
-            // Handle visible wrapping for infinite scroll effect on screen?
-            // Since world is finite (WORLD_WIDTH), but clouds drift...
-            // Let's just draw them where they are.
-
-            // Wrap the *screen* position to keep them around? 
-            // Better: Keep world position wrapping, just apply parallax.
-            // If explicit wrapping is needed for infinite background feel:
-            // const modX = ((cloud.x - cam.x * parallaxFactor) % (canvas.width + 500));
-            // simplified:
-
-            const drawX = screenX;
-            // Provide localized wrapping if it goes too far off screen?
-            // For a fixed world size, standard parallax is fine.
-
-            const drawY = cloud.y;
-
-            // Check visibility
-            if (drawX > -300 && drawX < width + 300) {
-                // Use pre-computed fillStyle (depth never changes)
-                ctx.fillStyle = cloud.fillStyle;
-
+            // Lazily render cloud puffs to an offscreen canvas (once per cloud)
+            if (!cloud.offscreen) {
+                // Compute bounding box of all puffs
+                let minPx = Infinity, minPy = Infinity, maxPx = -Infinity, maxPy = -Infinity;
                 for (const puff of cloud.puffs) {
-                    const px = drawX + puff.dx * cloud.scale;
-                    const py = drawY + puff.dy * cloud.scale;
+                    const px = puff.dx * cloud.scale;
+                    const py = puff.dy * cloud.scale;
                     const rx = puff.rx * cloud.scale;
                     const ry = puff.ry * cloud.scale;
-
-                    ctx.beginPath();
-                    ctx.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Flat bottom effect (subtle cut)
-                    // const cutY = py + ry * 0.4;
-                    // ctx.fillRect(px - rx, cutY, rx * 2, ry); 
-                    // (Actually ellipse looks fine for cumulus if aspect ratio is right)
+                    if (px - rx < minPx) minPx = px - rx;
+                    if (py - ry < minPy) minPy = py - ry;
+                    if (px + rx > maxPx) maxPx = px + rx;
+                    if (py + ry > maxPy) maxPy = py + ry;
                 }
-
-                // Draw a flat bottom to make it look like a cumulus cloud
-                ctx.beginPath();
-
-                // Gradient fade for bottom?
-                // Simple rect approximation for base
-                // ctx.roundRect(drawX - width/2, bottomY - 10, width, 20, 10);
-                // ctx.fill();
+                const pad = 2;
+                const ow = Math.ceil(maxPx - minPx) + pad * 2;
+                const oh = Math.ceil(maxPy - minPy) + pad * 2;
+                const oc = document.createElement('canvas');
+                oc.width = ow;
+                oc.height = oh;
+                const octx = oc.getContext('2d')!;
+                octx.fillStyle = cloud.fillStyle;
+                for (const puff of cloud.puffs) {
+                    const px = puff.dx * cloud.scale - minPx + pad;
+                    const py = puff.dy * cloud.scale - minPy + pad;
+                    octx.beginPath();
+                    octx.ellipse(px, py, puff.rx * cloud.scale, puff.ry * cloud.scale, 0, 0, Math.PI * 2);
+                    octx.fill();
+                }
+                cloud.offscreen = oc;
+                cloud.offX = minPx - pad;
+                cloud.offY = minPy - pad;
             }
+
+            // Blit the pre-rendered cloud (single drawImage instead of N ellipses)
+            ctx.drawImage(cloud.offscreen, drawX + cloud.offX, cloud.y + cloud.offY);
         }
 
         // === Apply camera offset for world drawing ===
@@ -1107,12 +1083,17 @@ const GameCanvasInner = ({
 
                 if (body.circleRadius > 0) {
                     if (body.label === 'king') {
-                        // Draw golden glow behind king (radial gradient replaces expensive shadowBlur)
+                        // Draw golden glow behind king (cached radial gradient)
                         const glowRadius = body.circleRadius + 10;
-                        const glow = ctx.createRadialGradient(0, 0, body.circleRadius * 0.5, 0, 0, glowRadius);
-                        glow.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
-                        glow.addColorStop(1, 'rgba(255, 215, 0, 0)');
-                        ctx.fillStyle = glow;
+                        let glowCache = kingGlowRef.current;
+                        if (!glowCache || glowCache.radius !== glowRadius) {
+                            const glow = ctx.createRadialGradient(0, 0, body.circleRadius * 0.5, 0, 0, glowRadius);
+                            glow.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
+                            glow.addColorStop(1, 'rgba(255, 215, 0, 0)');
+                            glowCache = { radius: glowRadius, gradient: glow };
+                            kingGlowRef.current = glowCache;
+                        }
+                        ctx.fillStyle = glowCache.gradient;
                         ctx.beginPath();
                         ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
                         ctx.fill();
@@ -1361,21 +1342,20 @@ const GameCanvasInner = ({
             }
         }
 
-        // Bodies: kings and projectiles
+        // Bodies: kings and projectiles only (skip the full body iteration)
         if (gs) {
             for (const body of gs.bodies) {
+                if (body.label !== 'king' && body.label !== 'projectile') continue;
+                const bx = mmX + body.position.x * scaleX;
+                const by = mmY + body.position.y * scaleY;
                 if (body.label === 'king') {
-                    const kx = mmX + body.position.x * scaleX;
-                    const ky = mmY + body.position.y * scaleY;
                     ctx.beginPath();
-                    ctx.arc(kx, ky, 3, 0, Math.PI * 2);
+                    ctx.arc(bx, by, 3, 0, Math.PI * 2);
                     ctx.fillStyle = body.position.x < WORLD_WIDTH / 2 ? '#22c55e' : '#ef4444';
                     ctx.fill();
-                } else if (body.label === 'projectile') {
-                    const px = mmX + body.position.x * scaleX;
-                    const py = mmY + body.position.y * scaleY;
+                } else {
                     ctx.beginPath();
-                    ctx.arc(px, py, 2, 0, Math.PI * 2);
+                    ctx.arc(bx, by, 2, 0, Math.PI * 2);
                     ctx.fillStyle = '#fbbf24';
                     ctx.fill();
                 }
@@ -1824,22 +1804,22 @@ const GameCanvasInner = ({
 };
 
 export const GameCanvas = React.memo(GameCanvasInner, (prev, next) => {
-    // Skip re-render when only gameState or kingsHp changed (consumed via refs)
-    // Return true = props are equal = skip re-render
+    // GameCanvas syncs high-frequency props (gameState, kingsHp) to refs via useEffect.
+    // Those effects MUST fire on prop changes, so we cannot skip re-renders for them.
+    // The render itself is cheap (just returns a <canvas> element), so 20Hz re-renders
+    // from gameState are acceptable (~0.1ms each). We still memoize to prevent re-renders
+    // from parent re-renders that don't change any GameCanvas props.
+    if (prev.gameState !== next.gameState) return false;
+    if (prev.kingsHp !== next.kingsHp) return false;
     if (prev.terrain !== next.terrain) return false;
     if (prev.mySide !== next.mySide) return false;
     if (prev.gameMode !== next.gameMode) return false;
     if (prev.phase !== next.phase) return false;
     if (prev.turnPlayer !== next.turnPlayer) return false;
-    if (prev.onSpawn !== next.onSpawn) return false;
-    if (prev.onFire !== next.onFire) return false;
-    if (prev.setBlockDestroyedCallback !== next.setBlockDestroyedCallback) return false;
-    if (prev.setProjectileImpactCallback !== next.setProjectileImpactCallback) return false;
-    if (prev.setKingDamageCallback !== next.setKingDamageCallback) return false;
     if (prev.playerNames !== next.playerNames) return false;
     if (prev.hazards !== next.hazards) return false;
     if (prev.roundScore !== next.roundScore) return false;
     if (prev.currentRound !== next.currentRound) return false;
-    // gameState and kingsHp are consumed via refs — changes don't need re-render
+    // Callback refs are stable — skip comparison
     return true;
 });
