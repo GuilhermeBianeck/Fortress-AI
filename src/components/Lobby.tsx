@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
 import { Swords, Zap, Check, Shield, Crown, Crosshair, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -183,6 +183,12 @@ export const Lobby = ({
         : weeklyClaimableEmbers > 0
             ? `Claim ${weeklyClaimableEmbers} Embers`
             : 'Complete challenges to claim';
+
+    // Memoize achievement unlocked set to avoid re-creating on every render
+    const unlockedIds = useMemo(
+        () => new Set(playerProfile ? getUnlockedAchievements(playerProfile).map(a => a.id) : []),
+        [playerProfile]
+    );
 
     useEffect(() => {
         onGetProfile?.();
@@ -863,48 +869,42 @@ export const Lobby = ({
                             )}
 
                             {/* Achievements Panel */}
-                            {(() => {
-                                const unlockedIds = new Set(getUnlockedAchievements(playerProfile).map(a => a.id));
-                                const unlockedCount = unlockedIds.size;
-                                return (
-                                    <div className="mt-2 card-dark rounded-xl p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
-                                                <Star size={12} />
-                                                Achievements
-                                            </p>
-                                            <span className="text-[10px] text-[var(--gold)] font-bold font-mono">
-                                                {unlockedCount}/{ACHIEVEMENTS.length}
-                                            </span>
-                                        </div>
-                                        {/* Progress bar */}
-                                        <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                                            <div className="h-full rounded-full transition-all duration-500"
-                                                style={{ width: `${Math.round((unlockedCount / ACHIEVEMENTS.length) * 100)}%`, background: 'linear-gradient(90deg, #A78BFA, #F59E0B)' }} />
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {ACHIEVEMENTS.map(achievement => {
-                                                const unlocked = unlockedIds.has(achievement.id);
-                                                return (
-                                                    <div key={achievement.id}
-                                                        title={`${achievement.title}: ${achievement.description}`}
-                                                        className="flex items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] font-bold transition-all cursor-default"
-                                                        style={{
-                                                            background: unlocked ? `${ACHIEVEMENT_RARITY_COLORS[achievement.rarity]}18` : 'rgba(255,255,255,0.04)',
-                                                            border: `1px solid ${unlocked ? ACHIEVEMENT_RARITY_COLORS[achievement.rarity] + '55' : 'rgba(255,255,255,0.08)'}`,
-                                                            color: unlocked ? ACHIEVEMENT_RARITY_COLORS[achievement.rarity] : 'var(--text-muted)',
-                                                            opacity: unlocked ? 1 : 0.45,
-                                                            filter: unlocked ? 'none' : 'grayscale(100%)',
-                                                        }}>
-                                                        <span className="text-sm leading-none">{achievement.icon}</span>
-                                                        <span className="hidden sm:inline">{achievement.title}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                            <div className="mt-2 card-dark rounded-xl p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
+                                        <Star size={12} />
+                                        Achievements
+                                    </p>
+                                    <span className="text-[10px] text-[var(--gold)] font-bold font-mono">
+                                        {unlockedIds.size}/{ACHIEVEMENTS.length}
+                                    </span>
+                                </div>
+                                {/* Progress bar */}
+                                <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                    <div className="h-full rounded-full transition-all duration-500"
+                                        style={{ width: `${Math.round((unlockedIds.size / ACHIEVEMENTS.length) * 100)}%`, background: 'linear-gradient(90deg, #A78BFA, #F59E0B)' }} />
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {ACHIEVEMENTS.map(achievement => {
+                                        const unlocked = unlockedIds.has(achievement.id);
+                                        return (
+                                            <div key={achievement.id}
+                                                title={`${achievement.title}: ${achievement.description}`}
+                                                className="flex items-center gap-1 rounded-lg px-1.5 py-1 text-[10px] font-bold transition-all cursor-default"
+                                                style={{
+                                                    background: unlocked ? `${ACHIEVEMENT_RARITY_COLORS[achievement.rarity]}18` : 'rgba(255,255,255,0.04)',
+                                                    border: `1px solid ${unlocked ? ACHIEVEMENT_RARITY_COLORS[achievement.rarity] + '55' : 'rgba(255,255,255,0.08)'}`,
+                                                    color: unlocked ? ACHIEVEMENT_RARITY_COLORS[achievement.rarity] : 'var(--text-muted)',
+                                                    opacity: unlocked ? 1 : 0.45,
+                                                    filter: unlocked ? 'none' : 'grayscale(100%)',
+                                                }}>
+                                                <span className="text-sm leading-none">{achievement.icon}</span>
+                                                <span className="hidden sm:inline">{achievement.title}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
                             {playerProfile.history.length > 0 && (
                                 <div className="mt-2 card-dark rounded-xl p-3">
