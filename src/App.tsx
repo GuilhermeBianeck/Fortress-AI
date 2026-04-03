@@ -47,26 +47,18 @@ function App() {
 
   // Auto-start first game for new users (ref-based to survive Strict Mode double-invocation)
   const autoStartRef = useRef(false);
-  const hasBeenInGameRef = useRef(false);
   useEffect(() => {
     if (autoStartRef.current) return;
     const hasPlayed = localStorage.getItem('fortress_has_played');
     const urlRoom = new URLSearchParams(window.location.search).get('room');
     if (!hasPlayed && !urlRoom && phase === 'lobby' && isConnected && !roomState) {
       autoStartRef.current = true;
-      // Delay to ensure socket connection is fully established
+      // Mark as played IMMEDIATELY so it never triggers again, even if user refreshes mid-match
+      localStorage.setItem('fortress_has_played', '1');
       const t = setTimeout(() => createRoom(undefined, 'single'), 1000);
       return () => { clearTimeout(t); autoStartRef.current = false; };
     }
   }, [phase, isConnected, roomState, createRoom]);
-
-  // Mark as played after first auto-started match returns to lobby
-  useEffect(() => {
-    if (phase !== 'lobby') hasBeenInGameRef.current = true;
-    if (phase === 'lobby' && hasBeenInGameRef.current && autoStartRef.current) {
-      localStorage.setItem('fortress_has_played', '1');
-    }
-  }, [phase]);
 
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
