@@ -436,6 +436,200 @@ body {
 }
 
 /* ═══════════════════════
+   Landing Page — Title & Atmosphere
+   ═══════════════════════ */
+
+/* Title letter reveal — staggered rise from below */
+@keyframes letter-rise {
+  0% { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.animate-letter-rise {
+  opacity: 0;
+  animation: letter-rise 0.4s ease-out forwards;
+}
+
+/* Gold shimmer sweep across title text */
+@keyframes title-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.title-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--gold) 0%,
+    var(--gold) 40%,
+    #fff8dc 50%,
+    var(--gold) 60%,
+    var(--gold) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: title-shimmer 3s ease-in-out 1.2s 1;
+}
+
+/* Crown drop from above */
+@keyframes crown-drop {
+  0% { opacity: 0; transform: translateY(-40px) scale(0.5); }
+  60% { opacity: 1; transform: translateY(4px) scale(1.1); }
+  80% { transform: translateY(-2px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.animate-crown-drop {
+  opacity: 0;
+  animation: crown-drop 0.6s ease-out 0.1s forwards;
+}
+
+/* Subtitle fade in after title */
+.animate-subtitle-fade {
+  opacity: 0;
+  animation: fade-in 0.6s ease-out 0.9s forwards;
+}
+
+/* Castle window candlelight flicker */
+@keyframes candle-flicker {
+  0%, 100% { opacity: 0.12; }
+  10% { opacity: 0.25; }
+  20% { opacity: 0.10; }
+  30% { opacity: 0.30; }
+  50% { opacity: 0.15; }
+  70% { opacity: 0.28; }
+  90% { opacity: 0.18; }
+}
+
+.animate-candle {
+  animation: candle-flicker 2s ease-in-out infinite;
+}
+
+/* Torch flame flicker */
+@keyframes flame-dance {
+  0%, 100% { transform: scaleY(1) scaleX(1); opacity: 0.7; }
+  25% { transform: scaleY(1.2) scaleX(0.9); opacity: 0.9; }
+  50% { transform: scaleY(0.85) scaleX(1.1); opacity: 0.6; }
+  75% { transform: scaleY(1.15) scaleX(0.95); opacity: 0.85; }
+}
+
+.animate-flame {
+  transform-origin: bottom center;
+  animation: flame-dance 0.4s ease-in-out infinite;
+}
+
+.animate-flame-delay {
+  transform-origin: bottom center;
+  animation: flame-dance 0.5s ease-in-out 0.15s infinite;
+}
+
+/* Flag wave */
+@keyframes flag-wave {
+  0%, 100% { transform: skewX(0deg); }
+  50% { transform: skewX(-5deg); }
+}
+
+.animate-flag {
+  transform-origin: left center;
+  animation: flag-wave 2s ease-in-out infinite;
+}
+
+/* Shooting star */
+@keyframes shooting-star {
+  0% { opacity: 0; transform: translate(0, 0) rotate(-35deg); }
+  5% { opacity: 1; }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(300px, 180px) rotate(-35deg); }
+}
+
+.shooting-star {
+  position: absolute;
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.8), transparent);
+  border-radius: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shooting-star-1 {
+  top: 8%;
+  left: 15%;
+  animation: shooting-star 1.5s ease-out 2s infinite;
+  animation-delay: 2s;
+}
+
+.shooting-star-2 {
+  top: 15%;
+  left: 55%;
+  animation: shooting-star 1.2s ease-out 7s infinite;
+  animation-delay: 7s;
+}
+
+.shooting-star-3 {
+  top: 5%;
+  left: 35%;
+  animation: shooting-star 1.8s ease-out 12s infinite;
+  animation-delay: 12s;
+}
+
+/* Drifting clouds */
+@keyframes cloud-drift {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120vw); }
+}
+
+.lobby-cloud {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.06;
+  filter: blur(2px);
+}
+
+/* Pulsing horizon glow */
+@keyframes horizon-pulse {
+  0%, 100% { opacity: 0.08; }
+  50% { opacity: 0.15; }
+}
+
+.animate-horizon-pulse {
+  animation: horizon-pulse 4s ease-in-out infinite;
+}
+
+/* Fog lateral drift */
+@keyframes fog-drift {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(20px); }
+  100% { transform: translateX(0); }
+}
+
+.animate-fog-drift {
+  animation: fog-drift 8s ease-in-out infinite;
+}
+
+/* Button hover glow */
+.btn-glow-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-glow-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,215,0,0.15), transparent 70%);
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.btn-glow-hover:hover::after {
+  opacity: 1;
+}
+
+/* ═══════════════════════
    Parallax Landing
    ═══════════════════════ */
 .parallax-container {

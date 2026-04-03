@@ -5,6 +5,7 @@ import { Swords, Zap, Check, Shield, Crown, LogIn, ChevronRight, Target, Gift, S
 import { RankBadge } from './RankBadge';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 import { track } from '../analytics/tracker';
+import { playClick, playSwitch, playBoom } from '../audio/SoundManager';
 
 export interface LobbyProps {
     roomState: RoomState | null;
@@ -95,11 +96,10 @@ const CastleSilhouette = ({ side, className }: { side: 'left' | 'right'; classNa
             {/* Right turret */}
             <rect x="80" y="40" width="25" height="100" fill="#0d1117" />
             <rect x="75" y="35" width="35" height="8" fill="#0d1117" />
-            {/* Battlements left */}
+            {/* Battlements */}
             <rect x="10" y="42" width="8" height="10" fill="#0d1117" />
             <rect x="22" y="42" width="8" height="10" fill="#0d1117" />
             <rect x="34" y="42" width="8" height="10" fill="#0d1117" />
-            {/* Battlements right */}
             <rect x="75" y="32" width="8" height="10" fill="#0d1117" />
             <rect x="87" y="32" width="8" height="10" fill="#0d1117" />
             <rect x="99" y="32" width="8" height="10" fill="#0d1117" />
@@ -107,16 +107,23 @@ const CastleSilhouette = ({ side, className }: { side: 'left' | 'right'; classNa
             <rect x="45" y="10" width="30" height="25" fill="#0d1117" />
             <rect x="40" y="5" width="8" height="30" fill="#0d1117" />
             <rect x="72" y="5" width="8" height="30" fill="#0d1117" />
-            {/* Flag pole */}
+            {/* Flag pole + animated flag */}
             <rect x="57" y="0" width="2" height="15" fill="#0d1117" />
-            <polygon points="59,0 59,8 68,4" fill="#0d1117" />
+            <polygon points="59,0 59,8 68,4" fill="#1a0a0a" className="animate-flag" />
             {/* Gate */}
             <rect x="48" y="105" width="24" height="35" rx="12" fill="#060810" />
-            {/* Windows - subtle glow */}
-            <rect x="52" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.6" />
-            <rect x="62" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.6" />
-            <rect x="52" y="80" width="6" height="8" fill="#ffd700" opacity="0.15" />
-            <rect x="62" y="80" width="6" height="8" fill="#ffd700" opacity="0.15" />
+            {/* Windows — animated candlelight flicker */}
+            <rect x="52" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.5" />
+            <rect x="62" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.5" />
+            <rect x="52" y="80" width="6" height="8" fill="#ffd700" className="animate-candle" />
+            <rect x="62" y="80" width="6" height="8" fill="#ffd700" className="animate-candle" style={{ animationDelay: '0.7s' }} />
+            <rect x="22" y="70" width="5" height="6" fill="#ffd700" className="animate-candle" style={{ animationDelay: '1.2s' }} />
+            <rect x="88" y="55" width="5" height="6" fill="#ffd700" className="animate-candle" style={{ animationDelay: '0.3s' }} />
+            {/* Torch flames on turret tops */}
+            <ellipse cx="14" cy="40" rx="3" ry="5" fill="#ff6a00" className="animate-flame" opacity="0.6" />
+            <ellipse cx="14" cy="39" rx="2" ry="3" fill="#ffaa00" className="animate-flame-delay" opacity="0.5" />
+            <ellipse cx="103" cy="30" rx="3" ry="5" fill="#ff6a00" className="animate-flame" opacity="0.6" />
+            <ellipse cx="103" cy="29" rx="2" ry="3" fill="#ffaa00" className="animate-flame-delay" opacity="0.5" />
         </svg>
     </div>
 );
@@ -230,6 +237,7 @@ export const Lobby = ({
     const handleJoinSubmit = (e: FormEvent) => {
         e.preventDefault();
         if (joinCode.trim().length >= 4) {
+            playClick();
             track('room_joined', { room_code: joinCode.trim() });
             onJoinRoom(joinCode.trim(), playerName);
         }
@@ -468,14 +476,24 @@ export const Lobby = ({
                 style={{ transform: `translate(${mousePos.x * -5}px, ${mousePos.y * -5}px)` }}
             />
 
-            {/* Horizon glow */}
+            {/* Horizon glow — pulsing */}
             <div
-                className="absolute bottom-0 left-0 right-0 h-[40%] pointer-events-none"
+                className="absolute bottom-0 left-0 right-0 h-[40%] pointer-events-none animate-horizon-pulse"
                 style={{
-                    background: 'radial-gradient(ellipse 80% 40% at 50% 100%, rgba(230, 126, 34, 0.08) 0%, transparent 70%)',
+                    background: 'radial-gradient(ellipse 80% 40% at 50% 100%, rgba(230, 126, 34, 0.12) 0%, transparent 70%)',
                     transform: `translate(${mousePos.x * -3}px, ${mousePos.y * -2}px)`,
                 }}
             />
+
+            {/* Shooting stars */}
+            <div className="shooting-star shooting-star-1" />
+            <div className="shooting-star shooting-star-2" />
+            <div className="shooting-star shooting-star-3" />
+
+            {/* Drifting clouds */}
+            <div className="lobby-cloud" style={{ top: '12%', width: '180px', height: '40px', background: 'radial-gradient(ellipse, rgba(200,200,220,0.08), transparent)', animation: 'cloud-drift 45s linear infinite' }} />
+            <div className="lobby-cloud" style={{ top: '22%', width: '240px', height: '50px', background: 'radial-gradient(ellipse, rgba(200,200,220,0.05), transparent)', animation: 'cloud-drift 60s linear 15s infinite' }} />
+            <div className="lobby-cloud" style={{ top: '8%', width: '140px', height: '30px', background: 'radial-gradient(ellipse, rgba(200,200,220,0.06), transparent)', animation: 'cloud-drift 35s linear 8s infinite' }} />
 
             {/* Layer 1: Far mountains */}
             <MountainLayerAlt
@@ -503,9 +521,9 @@ export const Lobby = ({
                 offset="0px"
             />
 
-            {/* Fog overlay */}
+            {/* Fog overlay — drifting */}
             <div
-                className="absolute bottom-0 left-0 right-0 h-[25%] pointer-events-none z-[2]"
+                className="absolute bottom-0 left-0 right-0 h-[25%] pointer-events-none z-[2] animate-fog-drift"
                 style={{
                     background: 'linear-gradient(0deg, rgba(10, 10, 18, 0.95) 0%, rgba(10, 10, 18, 0.5) 40%, transparent 100%)',
                 }}
@@ -517,25 +535,35 @@ export const Lobby = ({
             {/* ═══ CONTENT ═══ */}
             <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full max-w-lg px-6 py-8 sm:py-12">
 
-                {/* Logo & Branding */}
-                <div className="flex flex-col items-center mb-8 sm:mb-10 animate-float">
-                    {/* Crown icon */}
-                    <div className="relative mb-3">
+                {/* Logo & Branding — animated entrance */}
+                <div className="flex flex-col items-center mb-8 sm:mb-10">
+                    {/* Crown — drops from above with bounce */}
+                    <div className="relative mb-3 animate-crown-drop">
                         <div className="absolute inset-0 blur-xl bg-[var(--gold)] opacity-20 rounded-full scale-150" />
                         <Crown size={48} className="text-[var(--gold)] relative" strokeWidth={1.5} />
                     </div>
 
+                    {/* Title — staggered letter reveal with shimmer */}
                     <h1
-                        className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wide text-[var(--gold)] font-heading text-glow-gold"
+                        className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wide font-heading text-glow-gold title-shimmer-text"
+                        aria-label="FORTRESS AI"
                     >
-                        FORTRESS AI
+                        {'FORTRESS AI'.split('').map((char, i) => (
+                            <span
+                                key={i}
+                                className="animate-letter-rise inline-block"
+                                style={{ animationDelay: `${0.2 + i * 0.05}s` }}
+                            >
+                                {char === ' ' ? '\u00A0' : char}
+                            </span>
+                        ))}
                     </h1>
 
-                    <div className="ornament-divider w-48 my-3">
+                    <div className="ornament-divider w-48 my-3 animate-subtitle-fade">
                         <span className="text-[var(--gold-dim)] text-xs font-display tracking-[0.3em]">✦</span>
                     </div>
 
-                    <p className="text-sm sm:text-base text-[var(--text-secondary)] font-display tracking-wider">
+                    <p className="text-sm sm:text-base text-[var(--text-secondary)] font-display tracking-wider animate-subtitle-fade">
                         CASTLE WAR — BUILD & CONQUER
                     </p>
                 </div>
@@ -560,7 +588,7 @@ export const Lobby = ({
                         <button
                             role="radio"
                             aria-checked={battleMode === 'solo'}
-                            onClick={() => setBattleMode('solo')}
+                            onClick={() => { setBattleMode('solo'); playSwitch(); }}
                             className={`flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide transition-all duration-200 touch-manipulation
                                 ${battleMode === 'solo'
                                     ? 'bg-[var(--gold)] text-[var(--bg-deepest)]'
@@ -573,7 +601,7 @@ export const Lobby = ({
                         <button
                             role="radio"
                             aria-checked={battleMode === 'pvp'}
-                            onClick={() => setBattleMode('pvp')}
+                            onClick={() => { setBattleMode('pvp'); playSwitch(); }}
                             className={`flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide transition-all duration-200 touch-manipulation
                                 ${battleMode === 'pvp'
                                     ? 'bg-[var(--gold)] text-[var(--bg-deepest)]'
@@ -588,6 +616,7 @@ export const Lobby = ({
                     {/* BATTLE Button */}
                     <button
                         onClick={() => {
+                            playBoom();
                             if (battleMode === 'solo') {
                                 track('room_created', { mode: 'single' });
                                 onCreateRoom(playerName, 'single');
