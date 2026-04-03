@@ -585,7 +585,7 @@ export const Lobby = ({
                         </button>
                     </div>
 
-                    {/* BATTLE Button — dominant CTA */}
+                    {/* BATTLE Button */}
                     <button
                         onClick={() => {
                             if (battleMode === 'solo') {
@@ -596,14 +596,18 @@ export const Lobby = ({
                                 onJoinQueue(playerName);
                             }
                         }}
-                        className="btn-primary w-full min-h-[64px] py-5 sm:py-6 rounded-xl text-xl sm:text-2xl touch-manipulation flex flex-col items-center justify-center gap-0.5"
+                        className="w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-bold touch-manipulation
+                            flex items-center justify-center gap-2.5
+                            bg-gradient-to-b from-emerald-500 to-emerald-700 text-white
+                            border border-emerald-400/30
+                            shadow-lg shadow-emerald-900/30
+                            hover:from-emerald-400 hover:to-emerald-600
+                            active:scale-[0.98] transition-all duration-200"
                     >
-                        <div className="flex items-center gap-2.5">
-                            <Swords size={24} aria-hidden="true" />
-                            <span>BATTLE</span>
-                        </div>
-                        <span className="text-[10px] sm:text-xs opacity-70 font-normal">
-                            {battleMode === 'solo' ? 'vs Training Bot' : 'Find Opponent'}
+                        <Swords size={18} aria-hidden="true" />
+                        <span>BATTLE</span>
+                        <span className="text-xs opacity-70 font-normal ml-1">
+                            {battleMode === 'solo' ? '— vs Bot' : '— Find Opponent'}
                         </span>
                     </button>
 
