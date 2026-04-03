@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, Users, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Swords, Zap, Check, Shield, Crown, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { RankBadge } from './RankBadge';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 import { track } from '../analytics/tracker';
@@ -155,7 +155,7 @@ export const Lobby = ({
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [codeCopied, setCodeCopied] = useState(false);
     const [showHowToPlay, setShowHowToPlay] = useState(false);
-    const [showMoreOptions, setShowMoreOptions] = useState(false);
+    const [battleMode, setBattleMode] = useState<'solo' | 'pvp'>('solo');
 
     // Check-in state
     const [checkinStreak, setCheckinStreak] = useState(() => parseInt(localStorage.getItem('fortress_checkin_streak') || '0', 10));
@@ -540,7 +540,7 @@ export const Lobby = ({
                     </p>
                 </div>
 
-                {/* Action Panel — 2 primary CTAs */}
+                {/* Action Panel */}
                 <div className="w-full flex flex-col gap-3">
                     {/* Player Name */}
                     <label htmlFor="player-name-input" className="sr-only">Player name</label>
@@ -555,76 +555,82 @@ export const Lobby = ({
                         className="input-medieval w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-bold tracking-wide touch-manipulation"
                     />
 
-                    {/* Primary CTA: Play Now */}
-                    <button
-                        onClick={() => { track('room_created', { mode: 'single' }); onCreateRoom(playerName, 'single'); }}
-                        className="btn-primary w-full min-h-[56px] py-4 sm:py-5 rounded-xl text-lg sm:text-xl touch-manipulation flex items-center justify-center gap-2.5"
-                    >
-                        <Zap size={22} aria-hidden="true" />
-                        <span>Play Now</span>
-                        <span className="text-xs opacity-60 ml-1">vs Bot</span>
-                    </button>
-
-                    {/* Secondary CTA: Challenge a Friend */}
-                    <button
-                        onClick={() => { track('room_created', { mode: 'pvp' }); onCreateRoom(playerName, 'pvp'); }}
-                        className="btn-medieval w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg touch-manipulation flex items-center justify-center gap-2.5"
-                    >
-                        <Swords size={20} aria-hidden="true" />
-                        <span>Challenge a Friend</span>
-                    </button>
-
-                    {/* More Options — collapsed by default */}
-                    <div className="card-dark rounded-xl overflow-hidden">
+                    {/* Mode Selector — segmented control */}
+                    <div className="flex w-full rounded-xl overflow-hidden border border-[var(--border-subtle)]" role="radiogroup" aria-label="Game mode">
                         <button
-                            onClick={() => setShowMoreOptions(!showMoreOptions)}
-                            aria-expanded={showMoreOptions}
-                            className="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors touch-manipulation"
+                            role="radio"
+                            aria-checked={battleMode === 'solo'}
+                            onClick={() => setBattleMode('solo')}
+                            className={`flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide transition-all duration-200 touch-manipulation
+                                ${battleMode === 'solo'
+                                    ? 'bg-[var(--gold)] text-[var(--bg-deepest)]'
+                                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
+                                }`}
                         >
-                            <span className="flex items-center gap-2 font-bold tracking-wider">
-                                More Options
-                            </span>
-                            {showMoreOptions ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+                            <Zap size={16} aria-hidden="true" />
+                            Solo
                         </button>
-                        {showMoreOptions && (
-                            <div className="px-4 pb-4 flex flex-col gap-3 animate-scale-in">
-                                {/* Join Room */}
-                                <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
-                                    <label htmlFor="room-code-input" className="sr-only">Room code</label>
-                                    <input
-                                        id="room-code-input"
-                                        type="text"
-                                        value={joinCode}
-                                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                                        placeholder="ROOM CODE"
-                                        maxLength={6}
-                                        autoComplete="off"
-                                        className="input-medieval min-w-0 flex-1 rounded-xl px-3 py-3 text-center text-base font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={joinCode.trim().length < 4}
-                                        className="btn-medieval shrink-0 min-h-[48px] px-5 py-2.5 rounded-xl text-sm touch-manipulation
-                                            flex items-center gap-2
-                                            disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                                    >
-                                        <LogIn size={16} aria-hidden="true" />
-                                        Join
-                                    </button>
-                                </form>
-
-                                {/* Quick Match */}
-                                <button
-                                    onClick={() => { track('queue_joined'); onJoinQueue(playerName); }}
-                                    className="btn-medieval w-full min-h-[48px] py-3 rounded-xl text-sm touch-manipulation flex items-center justify-center gap-2.5"
-                                >
-                                    <Users size={16} aria-hidden="true" />
-                                    <span>Quick Battle</span>
-                                    <ChevronRight size={14} className="opacity-50" aria-hidden="true" />
-                                </button>
-                            </div>
-                        )}
+                        <button
+                            role="radio"
+                            aria-checked={battleMode === 'pvp'}
+                            onClick={() => setBattleMode('pvp')}
+                            className={`flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide transition-all duration-200 touch-manipulation
+                                ${battleMode === 'pvp'
+                                    ? 'bg-[var(--gold)] text-[var(--bg-deepest)]'
+                                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
+                                }`}
+                        >
+                            <Swords size={16} aria-hidden="true" />
+                            PvP
+                        </button>
                     </div>
+
+                    {/* BATTLE Button — dominant CTA */}
+                    <button
+                        onClick={() => {
+                            if (battleMode === 'solo') {
+                                track('room_created', { mode: 'single' });
+                                onCreateRoom(playerName, 'single');
+                            } else {
+                                track('queue_joined');
+                                onJoinQueue(playerName);
+                            }
+                        }}
+                        className="btn-primary w-full min-h-[64px] py-5 sm:py-6 rounded-xl text-xl sm:text-2xl touch-manipulation flex flex-col items-center justify-center gap-0.5"
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <Swords size={24} aria-hidden="true" />
+                            <span>BATTLE</span>
+                        </div>
+                        <span className="text-[10px] sm:text-xs opacity-70 font-normal">
+                            {battleMode === 'solo' ? 'vs Training Bot' : 'Find Opponent'}
+                        </span>
+                    </button>
+
+                    {/* Join by Room Code — always visible */}
+                    <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
+                        <label htmlFor="room-code-input" className="sr-only">Room code</label>
+                        <input
+                            id="room-code-input"
+                            type="text"
+                            value={joinCode}
+                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                            placeholder="ROOM CODE"
+                            maxLength={6}
+                            autoComplete="off"
+                            className="input-medieval min-w-0 flex-1 rounded-xl px-3 py-3 text-center text-sm font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
+                        />
+                        <button
+                            type="submit"
+                            disabled={joinCode.trim().length < 4}
+                            className="btn-medieval shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-sm touch-manipulation
+                                flex items-center gap-1.5
+                                disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                        >
+                            <LogIn size={14} aria-hidden="true" />
+                            Join
+                        </button>
+                    </form>
 
                     {/* How to Play */}
                     <div className="card-dark rounded-xl overflow-hidden">
