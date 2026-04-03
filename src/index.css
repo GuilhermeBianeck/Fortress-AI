@@ -439,15 +439,16 @@ body {
    Landing Page — Title & Atmosphere
    ═══════════════════════ */
 
-/* Title letter reveal — staggered rise from below */
+/* Title letter reveal — staggered rise from below, blur resolves quickly */
 @keyframes letter-rise {
-  0% { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+  0% { opacity: 0; transform: translateY(16px); filter: blur(2px); }
+  50% { opacity: 0.8; filter: blur(0); }
   100% { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 .animate-letter-rise {
   opacity: 0;
-  animation: letter-rise 0.4s ease-out forwards;
+  animation: letter-rise 0.5s ease-out forwards;
 }
 
 /* Gold shimmer sweep across title text */
@@ -506,22 +507,23 @@ body {
   animation: candle-flicker 2s ease-in-out infinite;
 }
 
-/* Torch flame flicker */
+/* Torch flame flicker — slow, organic breathing */
 @keyframes flame-dance {
-  0%, 100% { transform: scaleY(1) scaleX(1); opacity: 0.7; }
-  25% { transform: scaleY(1.2) scaleX(0.9); opacity: 0.9; }
-  50% { transform: scaleY(0.85) scaleX(1.1); opacity: 0.6; }
-  75% { transform: scaleY(1.15) scaleX(0.95); opacity: 0.85; }
+  0%, 100% { transform: scaleY(1) scaleX(1); opacity: 0.55; }
+  15% { transform: scaleY(1.08) scaleX(0.96); opacity: 0.65; }
+  35% { transform: scaleY(0.94) scaleX(1.04); opacity: 0.50; }
+  55% { transform: scaleY(1.05) scaleX(0.97); opacity: 0.60; }
+  80% { transform: scaleY(0.97) scaleX(1.02); opacity: 0.52; }
 }
 
 .animate-flame {
   transform-origin: bottom center;
-  animation: flame-dance 0.4s ease-in-out infinite;
+  animation: flame-dance 1.8s ease-in-out infinite;
 }
 
 .animate-flame-delay {
   transform-origin: bottom center;
-  animation: flame-dance 0.5s ease-in-out 0.15s infinite;
+  animation: flame-dance 2.2s ease-in-out 0.6s infinite;
 }
 
 /* Flag wave */

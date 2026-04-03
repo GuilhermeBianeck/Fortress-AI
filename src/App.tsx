@@ -316,8 +316,8 @@ function App() {
           /* Desktop: constrained 4:3. Mobile: full width, fills available height. */
           <div className="flex flex-col items-center flex-1 w-full h-full min-h-0 sm:gap-3 game-container safe-area-bottom">
 
-            {/* Canvas + Chat row */}
-            <div className="flex flex-1 min-h-0 gap-4 items-stretch sm:items-start w-full justify-center">
+            {/* Canvas + Chat row — leave room for prompt bar on mobile during build */}
+            <div className={`flex flex-1 min-h-0 gap-4 items-stretch sm:items-start w-full justify-center ${phase === 'build' ? 'max-h-[calc(100dvh-180px)] sm:max-h-none' : ''}`}>
               <div className="relative group flex-1 min-w-0">
                 {/* Glow border — desktop only */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-[var(--gold)] to-[var(--ember)] rounded-xl blur opacity-10 group-hover:opacity-20 transition duration-1000 pointer-events-none hidden sm:block"></div>

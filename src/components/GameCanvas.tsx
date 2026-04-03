@@ -1016,9 +1016,10 @@ const GameCanvasInner = ({
                         Math.abs(cache.cannonY - cannonY) < 1) {
                         trajPath = cache.path;
                     } else {
-                        // Compute new trajectory (match server physics exactly)
-                        const dt = 1000 / 60 / 2; // ~8.3333ms
-                        const gravityAccel = PHYSICS_GRAVITY * PHYSICS_GRAVITY_SCALE * dt;
+                        // Compute new trajectory (match Matter.js physics exactly)
+                        // Matter.js applies gravity as: vy += gravity.y * gravity.scale (per Engine.update call)
+                        // NOT multiplied by dt — it's a velocity increment, not acceleration
+                        const gravityAccel = PHYSICS_GRAVITY * PHYSICS_GRAVITY_SCALE;
                         const airDamp = 1 - PHYSICS_AIR_FRICTION;
 
                         const dirMult = facingRight ? 1 : -1;
