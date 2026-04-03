@@ -1680,6 +1680,19 @@ const GameCanvasInner = ({
         return { x: cannonX, y: interpolateTerrainY(terr.points, cannonX) - 20 };
     };
 
+    // Muzzle flash + smoke when cannon fires
+    const emitMuzzleFlash = () => {
+        const cannon = getMyCannonPos();
+        const aim = aimRef.current;
+        const facingRight = mySideRef.current === 'left';
+        const muzzleX = cannon.x + (facingRight ? 1 : -1) * Math.cos(aim.angle) * 28;
+        const muzzleY = cannon.y - Math.sin(aim.angle) * 28;
+        particlesRef.current.emitImpact(muzzleX, muzzleY);
+        particlesRef.current.emitSmoke(muzzleX, muzzleY);
+        const flash = new AnimatedSprite({ ...ANIMATIONS.spark });
+        activeAnimsRef.current.push({ anim: flash, x: muzzleX, y: muzzleY, size: 20 });
+    };
+
     const handleMouseDown = (e: React.MouseEvent) => {
         // Skip synthesized mouse events from touch
         if (Date.now() - lastTouchRef.current < 500) return;
@@ -1780,6 +1793,7 @@ const GameCanvasInner = ({
             angle: Math.round(aim.angle * 180 / Math.PI),
             power: Math.round(aim.power),
         });
+        emitMuzzleFlash();
         onFireRef.current(aim.angle, aim.power);
     };
 
@@ -1946,6 +1960,7 @@ const GameCanvasInner = ({
             angle: Math.round(aim.angle * 180 / Math.PI),
             power: Math.round(aim.power),
         });
+        emitMuzzleFlash();
         onFireRef.current(aim.angle, aim.power);
     };
 
@@ -1997,6 +2012,7 @@ const GameCanvasInner = ({
                             angle: Math.round(aim.angle * 180 / Math.PI),
                             power: Math.round(aim.power),
                         });
+                        emitMuzzleFlash();
                         onFireRef.current(aim.angle, aim.power);
                         break;
                 }

@@ -534,7 +534,7 @@ export const Lobby = ({
             <EmberParticles />
 
             {/* ═══ CONTENT ═══ */}
-            <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full max-w-lg px-6 py-8 sm:py-12">
+            <div className="relative z-10 flex flex-col items-center flex-1 w-full max-w-lg px-6 py-8 sm:py-12">
 
                 {/* Logo & Branding — animated entrance */}
                 <div className="flex flex-col items-center mb-8 sm:mb-10">
