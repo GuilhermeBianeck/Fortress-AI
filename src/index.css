@@ -540,54 +540,61 @@ body {
 }
 
 /* ═══════════════════════
-   Shooting Stars — subtle background detail, not a feature.
-   Single tiny dot with a faint stretched box-shadow that acts as the tail.
-   Very rare (20s+ intervals), very fast (0.6s), very dim.
+   Shooting Stars — rare background ambiance.
+   The keyframes include long dead periods (opacity:0) so the star
+   only flashes briefly within a long total animation cycle.
    ═══════════════════════ */
 
+/* 15s cycle — visible only during the first ~4% (0.6s) */
 @keyframes meteor-1 {
   0%   { opacity: 0; transform: translate(0, 0); }
-  8%   { opacity: 0.6; }
+  1%   { opacity: 0.5; }
+  4%   { opacity: 0; transform: translate(180px, 140px); }
   100% { opacity: 0; transform: translate(180px, 140px); }
 }
 
+/* 20s cycle — visible only during the first ~3% (0.6s) */
 @keyframes meteor-2 {
   0%   { opacity: 0; transform: translate(0, 0); }
-  8%   { opacity: 0.5; }
+  0.8% { opacity: 0.4; }
+  3%   { opacity: 0; transform: translate(140px, 200px); }
   100% { opacity: 0; transform: translate(140px, 200px); }
+}
+
+/* 25s cycle — visible only during the first ~3% (0.7s) */
+@keyframes meteor-3 {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  0.8% { opacity: 0.5; }
+  2.8% { opacity: 0; transform: translate(200px, 120px); }
+  100% { opacity: 0; transform: translate(200px, 120px); }
 }
 
 .shooting-star {
   position: absolute;
-  width: 2px;
-  height: 2px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.7);
   pointer-events: none;
   opacity: 0;
 }
 
-/* No ::before or ::after — no tail alignment issues.
-   The visual trail comes purely from CSS motion blur via a very fast
-   animation. The dot is tiny and dim — background ambiance only. */
-
-/* Rare, fast, spread across sky */
 .shooting-star-1 {
   top: 8%;
   left: 12%;
-  animation: meteor-1 0.6s linear 6s infinite;
+  animation: meteor-1 15s linear 3s infinite;
 }
 
 .shooting-star-2 {
   top: 5%;
   left: 50%;
-  animation: meteor-2 0.5s linear 22s infinite;
+  animation: meteor-2 20s linear 10s infinite;
 }
 
 .shooting-star-3 {
   top: 14%;
   right: 25%;
-  animation: meteor-1 0.7s linear 38s infinite;
+  animation: meteor-3 25s linear 18s infinite;
 }
 
 /* Drifting clouds */
