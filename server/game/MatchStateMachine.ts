@@ -173,8 +173,9 @@ export class MatchStateMachine {
         const rightKing = this.callbacks.getKingState('right');
 
         if (leftKing.hp <= 0 && rightKing.hp <= 0) {
-            // Both dead — the one who fired wins? Or draw? Let's say current turn player wins.
-            this.endMatch(this.currentTurn, 'both_kings_destroyed');
+            // Both dead — attacker (who fired the shot) wins, since they caused the destruction
+            const attacker = this.currentTurn;
+            this.endMatch(attacker, 'both_kings_destroyed');
             return;
         }
 

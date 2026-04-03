@@ -451,6 +451,12 @@ export const useGameState = () => {
     const requestRematch = useCallback(() => {
         socketRef.current?.emit('request_rematch');
         setRematchState('requested');
+        // Timeout: if opponent doesn't respond in 15s, reset
+        const t = setTimeout(() => {
+            setRematchState(prev => prev === 'requested' ? 'none' : prev);
+        }, 15000);
+        // Cleanup on unmount
+        return () => clearTimeout(t);
     }, []);
 
     const getProfile = useCallback(() => {

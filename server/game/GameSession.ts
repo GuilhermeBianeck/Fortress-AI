@@ -340,6 +340,11 @@ export class GameSession {
 
             const plan = await generateFortress(apiKey, prompt, terrainCtx);
 
+            if (!plan.bodies || plan.bodies.length === 0) {
+                socket.emit('build_error', { message: 'AI generated no blocks. Try a different prompt.' });
+                return;
+            }
+
             clearInterval(heartbeat);
 
             socket.emit('build_status', { status: 'building', message: plan.thought_chain });

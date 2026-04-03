@@ -2024,7 +2024,11 @@ const GameCanvasInner = ({
         aim.useKeyboard = true;
     };
 
-    const cursorClass = (phase === 'build' && gameMode === 'build') ? 'cursor-crosshair' : 'cursor-default';
+    const isMyTurn = phase === 'combat' && turnPlayer === mySide;
+    const cursorClass = (phase === 'build' && gameMode === 'build') ? 'cursor-crosshair'
+        : (phase === 'combat' && !isMyTurn) ? 'cursor-not-allowed'
+        : isMyTurn ? 'cursor-crosshair'
+        : 'cursor-default';
 
     return (
         <div ref={containerRef} className="w-full h-full relative">

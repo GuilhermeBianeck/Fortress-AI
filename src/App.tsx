@@ -4,11 +4,12 @@ import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
 import { GodTools, MobileDoneButton } from './components/GodTools';
 import { sprites } from './sprites';
+import { toggleMute, isMuted } from './audio/SoundManager';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
 import { RankBadge } from './components/RankBadge';
-import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, WifiOff } from 'lucide-react';
+import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, WifiOff, Volume2, VolumeX } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
 import { track } from './analytics/tracker';
@@ -44,6 +45,7 @@ function App() {
   const [prompt, setPrompt] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [showRankPanel, setShowRankPanel] = useState(false);
+  const [muted, setMuted] = useState(isMuted());
 
   // Auto-start first game for new users (ref-based to survive Strict Mode double-invocation)
   const autoStartRef = useRef(false);
@@ -198,6 +200,15 @@ function App() {
               )}
             </button>
           )}
+          {/* Mute toggle */}
+          <button
+            onClick={() => setMuted(toggleMute())}
+            aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
+            className="min-w-[36px] min-h-[36px] px-1.5 py-1.5 text-xs rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center
+              text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]"
+          >
+            {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          </button>
           {/* API Key toggle — only shown when user has a custom key or during build phase */}
           {(apiKey || (inGame && phase === 'build')) && (
             <button

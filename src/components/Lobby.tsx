@@ -163,6 +163,7 @@ export const Lobby = ({
     const [codeCopied, setCodeCopied] = useState(false);
     const [showHowToPlay, setShowHowToPlay] = useState(false);
     const [battleMode, setBattleMode] = useState<'solo' | 'pvp'>('solo');
+    const [battlePending, setBattlePending] = useState(false);
 
     // Check-in state
     const [checkinStreak, setCheckinStreak] = useState(() => parseInt(localStorage.getItem('fortress_checkin_streak') || '0', 10));
@@ -615,7 +616,10 @@ export const Lobby = ({
 
                     {/* BATTLE Button */}
                     <button
+                        disabled={battlePending}
                         onClick={() => {
+                            if (battlePending) return;
+                            setBattlePending(true);
                             playBoom();
                             if (battleMode === 'solo') {
                                 track('room_created', { mode: 'single' });
