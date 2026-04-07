@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "dev": "ts-node index.ts",
     "start": "node dist/index.js",
     "build": "tsc"
@@ -26,5 +27,8 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.3"
   }
 }
