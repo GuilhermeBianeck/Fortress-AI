@@ -427,16 +427,24 @@ const GameCanvasInner = ({
         }
     }, [phase, mySide, currentCanvasWidth, kingsHp]);
 
-    // Auto-pan to active cannon when it's their turn
+    // Auto-pan to active cannon when it's their turn.
+    // Framing: keep the cannon near the back edge, with most of the viewport
+    // showing the battlefield in the firing direction so the player can aim.
     useEffect(() => {
         if (phase !== 'combat') return;
-        if (turnPlayer) {
-            const cannonX = turnPlayer === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
-            cameraRef.current.targetX = Math.max(0, Math.min(
-                WORLD_WIDTH - currentCanvasWidth,
-                cannonX - currentCanvasWidth / 2
-            ));
-        }
+        if (!turnPlayer) return;
+        const cannonX = turnPlayer === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
+        // Left cannon fires right — put it at ~15% of viewport (battlefield on the right).
+        // Right cannon fires left — put it at ~85% of viewport (battlefield on the left).
+        const cannonScreenFraction = turnPlayer === 'left' ? 0.15 : 0.85;
+        const target = Math.max(0, Math.min(
+            WORLD_WIDTH - currentCanvasWidth,
+            cannonX - currentCanvasWidth * cannonScreenFraction
+        ));
+        cameraRef.current.targetX = target;
+        // Snap so the cannon is framed the instant the turn starts,
+        // instead of slowly lerping from wherever reveal/previous-turn left us.
+        cameraRef.current.x = target;
     }, [phase, turnPlayer, currentCanvasWidth]);
 
     // Track projectile during combat for auto-pan
@@ -1270,29 +1278,51 @@ const GameCanvasInner = ({
                     const w = body.width || 50;
                     const h = body.height || 50;
 
-                    // Sprite-based block rendering with fallback
-                    const mat = body.material || body.label || 'wood';
-                    const hpRatio = (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0)
-                        ? body.blockHp / body.blockMaxHp : 1;
-                    const dmgSuffix = hpRatio > 0.66 ? '' : hpRatio > 0.33 ? '_damaged' : '_critical';
-                    const blockSprite = sprites.get(`block_${mat}${dmgSuffix}`);
+                    if (body.label === 'foundation') {
+                        // King's plinth: a clean chiseled stone block with a
+                        // light top edge, beveled side highlights, and subtle
+                        // vertical shading. Rendered directly (no stretched
+                        // sprite) so it doesn't flicker or alias as it moves.
+                        const halfW = w / 2;
+                        const halfH = h / 2;
 
-                    if (blockSprite) {
-                        // Pixelated scaling for crisp pixel art
-                        ctx.imageSmoothingEnabled = false;
-                        ctx.drawImage(blockSprite, -w / 2, -h / 2, w, h);
-                        ctx.imageSmoothingEnabled = true;
-                        // Subtle border for depth
-                        ctx.strokeStyle = strokeColor;
-                        ctx.lineWidth = 0.5;
-                        ctx.strokeRect(-w / 2, -h / 2, w, h);
+                        const grad = ctx.createLinearGradient(0, -halfH, 0, halfH);
+                        grad.addColorStop(0, '#9aa0a6');
+                        grad.addColorStop(0.5, '#70767e');
+                        grad.addColorStop(1, '#4a4f56');
+                        ctx.fillStyle = grad;
+                        ctx.fillRect(-halfW, -halfH, w, h);
+
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+                        ctx.fillRect(-halfW, -halfH, w, 4);
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+                        ctx.fillRect(-halfW, halfH - 3, w, 3);
+
+                        ctx.strokeStyle = 'rgba(20, 20, 30, 0.6)';
+                        ctx.lineWidth = 1.2;
+                        ctx.strokeRect(-halfW, -halfH, w, h);
                     } else {
-                        // Fallback: flat color rendering
-                        ctx.fillStyle = fillColor;
-                        ctx.fillRect(-w / 2, -h / 2, w, h);
-                        ctx.strokeStyle = strokeColor;
-                        ctx.lineWidth = 1.5;
-                        ctx.strokeRect(-w / 2, -h / 2, w, h);
+                        // Sprite-based block rendering with fallback
+                        const mat = body.material || body.label || 'wood';
+                        const hpRatio = (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0)
+                            ? body.blockHp / body.blockMaxHp : 1;
+                        const dmgSuffix = hpRatio > 0.66 ? '' : hpRatio > 0.33 ? '_damaged' : '_critical';
+                        const blockSprite = sprites.get(`block_${mat}${dmgSuffix}`);
+
+                        if (blockSprite) {
+                            ctx.imageSmoothingEnabled = false;
+                            ctx.drawImage(blockSprite, -w / 2, -h / 2, w, h);
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.strokeStyle = strokeColor;
+                            ctx.lineWidth = 0.5;
+                            ctx.strokeRect(-w / 2, -h / 2, w, h);
+                        } else {
+                            ctx.fillStyle = fillColor;
+                            ctx.fillRect(-w / 2, -h / 2, w, h);
+                            ctx.strokeStyle = strokeColor;
+                            ctx.lineWidth = 1.5;
+                            ctx.strokeRect(-w / 2, -h / 2, w, h);
+                        }
                     }
                 }
 

@@ -11,7 +11,7 @@ export const RIGHT_CANNON_X = 2380;
 
 // === Phase timers ===
 export const BUILD_PHASE_DURATION_MS = 90_000;
-export const COMBAT_TURN_DURATION_MS = 15_000;
+export const COMBAT_TURN_DURATION_MS = 25_000;
 export const REVEAL_DURATION_MS = 5_000;
 export const SETTLE_TIMEOUT_MS = 1_000;
 export const SETTLE_MAX_TIMEOUT_MS = 5_000;
@@ -100,10 +100,12 @@ export const BOT_FIRE_DELAY_MS = 1500;
 export const BOT_BUILD_DELAY_MS = 2000;
 
 // === Projectiles ===
-export const PROJECTILE_RADIUS = 8;
-export const PROJECTILE_DENSITY = 0.05;
-export const PROJECTILE_RESTITUTION = 0.3;
-export const PROJECTILE_FRICTION = 0.2;
+export const PROJECTILE_RADIUS = 9;
+export const PROJECTILE_DENSITY = 0.08;
+// Low restitution: projectile thuds instead of pinballing off blocks.
+// Pinball bounces are the biggest source of "unpredictable aim" complaints.
+export const PROJECTILE_RESTITUTION = 0.1;
+export const PROJECTILE_FRICTION = 0.3;
 export const PROJECTILE_LIFESPAN_MS = 5000;
 export const PROJECTILE_BLOCK_DAMAGE_MULT = 2.0;
 export const PROJECTILE_MIN_IMPACT = 3;

@@ -620,51 +620,41 @@ export class GameSession {
 
         Matter.World.add(this.world, body);
 
-        // --- Create Robust Concrete Foundation ---
-        // Scan terrain under the King's area to find the highest point (min Y)
-        // This ensures the foundation sits on top of the highest terrain peak
-        // and extends downwards, so nothing is underground or floating.
-
-        const foundationWidth = 360; // 4 beams wide
+        // --- Compact stone platform under the king ---
+        // A small, clean plinth: wide enough to give the king a stable seat,
+        // narrow enough not to dominate the view. The body is static so
+        // Matter.js never moves it — no need for a huge underground anchor.
+        const foundationWidth = 180;
+        const foundationHeight = 48;
         const halfWidth = foundationWidth / 2;
         const scanStart = Math.floor(spawnX - halfWidth);
         const scanEnd = Math.ceil(spawnX + halfWidth);
 
-        // Find highest terrain point (minimum Y value) in the foundation footprint
-        let highestY = Infinity; // Lower Y is higher up
-        const pts = this.terrain.points;
-
-        // Optimized scan: find points within range or interpolate
-        // Since points are sorted by X, we can find range efficiently or just iterate relevant ones
-        // Points resolution is 20px, so just iterating all is fast enough for initialization
-        for (const pt of pts) {
-            if (pt.x >= scanStart && pt.x <= scanEnd) {
-                if (pt.y < highestY) highestY = pt.y;
+        // Find the highest terrain point under the platform footprint so
+        // the platform rests on the peak rather than floating on an average.
+        let highestY = Infinity;
+        for (const pt of this.terrain.points) {
+            if (pt.x >= scanStart && pt.x <= scanEnd && pt.y < highestY) {
+                highestY = pt.y;
             }
         }
-
-        // If no points found (edge case), use spawnY
         if (highestY === Infinity) highestY = spawnY;
 
-        // Foundation Geometry
-        // Top protrudes above highest terrain so it's visible as a platform
-        // Bottom extends underground for anchoring
-        const foundationVisibleHeight = 20; // How much protrudes above terrain
-        const bottomY = CANVAS_HEIGHT + 200;
+        // Expose ~34px above terrain so the platform reads as a plinth,
+        // with the remainder below terrain so it visually grounds into the hill.
+        const foundationVisibleHeight = 34;
         const foundationTop = highestY - foundationVisibleHeight;
-        const foundationDisplayHeight = bottomY - foundationTop;
-        const foundationCenterY = (foundationTop + bottomY) / 2;
+        const foundationCenterY = foundationTop + foundationHeight / 2;
 
-        const foundation = Matter.Bodies.rectangle(spawnX, foundationCenterY, foundationWidth, foundationDisplayHeight, {
+        const foundation = Matter.Bodies.rectangle(spawnX, foundationCenterY, foundationWidth, foundationHeight, {
             isStatic: true,
             label: 'foundation',
-            friction: 2.0, // High friction
-            render: { fillStyle: '#7D7D7D' } // Stone color
+            friction: 2.0,
+            render: { fillStyle: '#7D7D7D' },
         });
 
-        // Tag it so it doesn't get destroyed easily (high HP)
-        this.stampBlockProps(foundation, 'stone', foundationWidth, foundationDisplayHeight);
-        (foundation as GameBody).blockHp = 10000; // Indestructible-ish
+        this.stampBlockProps(foundation, 'stone', foundationWidth, foundationHeight);
+        (foundation as GameBody).blockHp = 10000;
         (foundation as GameBody).blockMaxHp = 10000;
 
         Matter.World.add(this.world, foundation);
