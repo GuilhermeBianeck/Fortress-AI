@@ -58,7 +58,6 @@ const EmberParticles = () => {
     );
 };
 
-const TORCH_FRAMES = ['ambient_torch_0', 'ambient_torch_1', 'ambient_torch_2', 'ambient_torch_3'] as const;
 const FLAG_FRAMES = ['ambient_flag_0', 'ambient_flag_1', 'ambient_flag_2', 'ambient_flag_3'] as const;
 
 const prefersReducedMotion = () =>
@@ -454,13 +453,15 @@ export const Lobby = ({
             <div className="shooting-star shooting-star-2" />
             <div className="shooting-star shooting-star-3" />
 
-            <img
-                src="/sprites/landing_citadel.png"
-                alt=""
+            <div
+                className="landing-moon"
                 aria-hidden="true"
-                className="landing-art landing-citadel"
-                style={{ transform: `translate(calc(-50% + ${mousePos.x * -10}px), ${mousePos.y * -5}px)` }}
-                draggable={false}
+                style={{ transform: `translate(${mousePos.x * -4}px, ${mousePos.y * -2}px)` }}
+            />
+            <div
+                className="landing-horizon-silhouette"
+                aria-hidden="true"
+                style={{ transform: `translate(calc(-50% + ${mousePos.x * -6}px), ${mousePos.y * -3}px)` }}
             />
             <img
                 src="/sprites/landing_gate_arch.png"
@@ -515,8 +516,6 @@ export const Lobby = ({
                 draggable={false}
             />
 
-            <AnimatedSprite frames={TORCH_FRAMES} intervalMs={140} className="landing-ambient landing-torch-left" />
-            <AnimatedSprite frames={TORCH_FRAMES} intervalMs={155} className="landing-ambient landing-torch-right" />
             <AnimatedSprite frames={FLAG_FRAMES} intervalMs={320} className="landing-ambient landing-flag-left" />
             <AnimatedSprite frames={FLAG_FRAMES} intervalMs={300} className="landing-ambient landing-flag-right" />
             <img src="/sprites/ambient_smoke_2.png" alt="" aria-hidden="true" className="landing-ambient landing-smoke landing-smoke-left" draggable={false} />

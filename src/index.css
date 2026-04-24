@@ -751,53 +751,103 @@ body {
   filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.45));
 }
 
-.landing-citadel {
-  top: clamp(0.75rem, 5vh, 2.75rem);
-  left: 50%;
-  width: min(62vw, 760px);
-  opacity: 0.5;
+.landing-moon {
+  position: absolute;
+  top: clamp(3.25rem, 9vh, 5rem);
+  left: calc(50% - min(36vw, 410px));
+  width: clamp(64px, 7.5vw, 104px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255, 248, 213, 0.98), rgba(235, 220, 185, 0.86) 34%, rgba(165, 172, 188, 0.38) 68%, rgba(95, 107, 136, 0.1) 100%);
+  box-shadow:
+    0 0 34px rgba(217, 224, 242, 0.16),
+    0 0 88px rgba(255, 215, 0, 0.08);
+  opacity: 0.46;
   z-index: 1;
 }
 
-.landing-gate {
-  top: clamp(4.75rem, 11vh, 6.5rem);
+.landing-moon::after {
+  content: '';
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 48%, rgba(20, 24, 39, 0.18), transparent 20%),
+    radial-gradient(circle at 58% 28%, rgba(20, 24, 39, 0.12), transparent 18%),
+    radial-gradient(circle at 62% 70%, rgba(20, 24, 39, 0.14), transparent 15%);
+  opacity: 0.65;
+}
+
+.landing-horizon-silhouette {
+  position: absolute;
+  top: clamp(10.5rem, 27vh, 13.5rem);
   left: 50%;
-  width: min(68vw, 560px);
-  opacity: 0.42;
+  width: min(72vw, 760px);
+  height: 92px;
+  pointer-events: none;
+  opacity: 0.28;
+  z-index: 1;
+  transition: transform 0.12s ease-out;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgba(255, 215, 0, 0.12), transparent 62%),
+    linear-gradient(0deg, rgba(7, 8, 18, 0.88), rgba(10, 13, 27, 0.22) 62%, transparent);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+}
+
+.landing-horizon-silhouette::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  width: 34%;
+  height: 42px;
+  transform: translateX(-50%);
+  background:
+    linear-gradient(180deg, rgba(13, 17, 32, 0.74), rgba(7, 8, 18, 0.92));
+  clip-path: polygon(0 100%, 0 55%, 10% 55%, 10% 34%, 17% 34%, 17% 8%, 22% 34%, 30% 34%, 30% 58%, 42% 58%, 42% 28%, 49% 28%, 49% 0, 56% 28%, 63% 28%, 63% 60%, 74% 60%, 74% 38%, 82% 38%, 82% 15%, 88% 38%, 96% 38%, 96% 58%, 100% 58%, 100% 100%);
+}
+
+.landing-gate {
+  top: clamp(10.25rem, 27vh, 13rem);
+  left: 50%;
+  width: min(58vw, 530px);
+  opacity: 0.24;
   z-index: 2;
 }
 
 .landing-castle-left,
 .landing-castle-right {
-  bottom: clamp(1.2rem, 8vh, 4.8rem);
-  width: min(24vw, 280px);
-  min-width: 170px;
-  opacity: 0.8;
+  bottom: clamp(-0.35rem, 2vh, 1rem);
+  width: min(30vw, 340px);
+  min-width: 220px;
+  opacity: 0.68;
   z-index: 3;
 }
 
 .landing-castle-left {
-  left: max(1rem, calc((100vw - 1120px) / 2 + 1rem));
+  left: max(-2.8rem, calc((100vw - 1180px) / 2 - 1rem));
 }
 
 .landing-castle-right {
-  right: max(1rem, calc((100vw - 1120px) / 2 + 1rem));
+  right: max(-2.8rem, calc((100vw - 1180px) / 2 - 1rem));
 }
 
 .landing-wall {
   left: 50%;
-  bottom: -0.55rem;
-  width: min(70vw, 680px);
-  opacity: 0.74;
+  bottom: -0.9rem;
+  width: min(74vw, 760px);
+  opacity: 0.56;
   z-index: 3;
   transform: translateX(-50%);
 }
 
 .landing-platform {
   left: 50%;
-  bottom: clamp(1.4rem, 5vh, 3.25rem);
-  width: min(48vw, 640px);
-  opacity: 0.48;
+  bottom: clamp(0.4rem, 2.5vh, 1.4rem);
+  width: min(56vw, 640px);
+  opacity: 0.28;
   z-index: 3;
   transform: translateX(-50%);
 }
@@ -829,37 +879,22 @@ body {
   filter: drop-shadow(0 0 18px rgba(255, 157, 53, 0.3));
 }
 
-.landing-torch-left,
-.landing-torch-right {
-  top: clamp(13.5rem, 27vh, 16.5rem);
-  width: 54px;
-  opacity: 0.82;
-}
-
-.landing-torch-left {
-  left: calc(50% - min(32vw, 280px));
-}
-
-.landing-torch-right {
-  right: calc(50% - min(32vw, 280px));
-}
-
 .landing-flag-left,
 .landing-flag-right {
-  bottom: clamp(6.8rem, 17vh, 9.2rem);
+  bottom: clamp(4.4rem, 10vh, 6rem);
   width: 68px;
   height: auto;
   object-fit: contain;
-  opacity: 0.74;
+  opacity: 0.62;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
 }
 
 .landing-flag-left {
-  left: max(4rem, calc((100vw - 1000px) / 2 + 5rem));
+  left: max(1.4rem, calc((100vw - 1080px) / 2 + 2.8rem));
 }
 
 .landing-flag-right {
-  right: max(4rem, calc((100vw - 1000px) / 2 + 5rem));
+  right: max(1.4rem, calc((100vw - 1080px) / 2 + 2.8rem));
   transform: scaleX(-1);
 }
 
@@ -1074,28 +1109,30 @@ body {
 }
 
 @media (max-width: 640px) {
-  .landing-citadel {
-    top: 1rem;
-    width: 132vw;
-    opacity: 0.28;
+  .landing-moon {
+    top: 2.1rem;
+    left: 9%;
+    width: 70px;
+    opacity: 0.36;
   }
 
-  .landing-ridge {
-    display: none;
+  .landing-horizon-silhouette {
+    top: 11rem;
+    width: 118vw;
+    height: 74px;
+    opacity: 0.18;
   }
 
   .landing-gate {
-    top: 4.75rem;
-    width: 122vw;
-    opacity: 0.24;
+    display: none;
   }
 
   .landing-castle-left,
   .landing-castle-right {
-    bottom: 1.2rem;
-    width: 155px;
+    bottom: -1rem;
+    width: 175px;
     min-width: 0;
-    opacity: 0.42;
+    opacity: 0.28;
   }
 
   .landing-castle-left {
@@ -1107,13 +1144,12 @@ body {
   }
 
   .landing-wall {
-    width: 118vw;
-    opacity: 0.44;
+    width: 124vw;
+    opacity: 0.28;
   }
 
   .landing-platform {
-    width: 108vw;
-    opacity: 0.26;
+    display: none;
   }
 
   .landing-torch-left,
@@ -1298,8 +1334,7 @@ body {
     transform: none !important;
   }
 
-  .landing-citadel,
-  .landing-ridge,
+  .landing-horizon-silhouette,
   .landing-gate,
   .landing-wall,
   .landing-platform,
@@ -1307,6 +1342,7 @@ body {
     transform: translateX(-50%) !important;
   }
 
+  .landing-moon,
   .landing-castle-left,
   .landing-castle-right,
   .landing-fog-b,
