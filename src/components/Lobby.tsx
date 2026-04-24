@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Swords, Zap, Check, Shield, Crown, LogIn, ChevronRight, Target, Gift, Star, Calendar, Trophy, Copy, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Target, Gift, Star, Calendar, Trophy, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { RankBadge } from './RankBadge';
+import { SpriteIcon } from './SpriteIcon';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 import { track } from '../analytics/tracker';
 import { playClick, playSwitch, playBoom } from '../audio/SoundManager';
@@ -78,52 +79,6 @@ const MountainLayerAlt = ({ color, height, offset, className }: { color: string;
                 fill={color}
                 d="M0,288L60,261.3C120,235,240,181,360,165.3C480,149,600,171,720,186.7C840,203,960,213,1080,197.3C1200,181,1320,139,1380,117.3L1440,96L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"
             />
-        </svg>
-    </div>
-);
-
-/* ═══════════════════════════════════════
-   Castle Silhouette SVG
-   ═══════════════════════════════════════ */
-const CastleSilhouette = ({ side, className }: { side: 'left' | 'right'; className?: string }) => (
-    <div className={`absolute bottom-[12%] ${side === 'left' ? 'left-[5%]' : 'right-[5%]'} ${className || ''}`} style={{ width: '120px', height: '140px' }}>
-        <svg viewBox="0 0 120 140" fill="none" className={`w-full h-full ${side === 'right' ? 'scale-x-[-1]' : ''}`}>
-            {/* Main tower */}
-            <rect x="35" y="30" width="50" height="110" fill="#0d1117" />
-            {/* Left turret */}
-            <rect x="15" y="50" width="25" height="90" fill="#0d1117" />
-            <rect x="10" y="45" width="35" height="8" fill="#0d1117" />
-            {/* Right turret */}
-            <rect x="80" y="40" width="25" height="100" fill="#0d1117" />
-            <rect x="75" y="35" width="35" height="8" fill="#0d1117" />
-            {/* Battlements */}
-            <rect x="10" y="42" width="8" height="10" fill="#0d1117" />
-            <rect x="22" y="42" width="8" height="10" fill="#0d1117" />
-            <rect x="34" y="42" width="8" height="10" fill="#0d1117" />
-            <rect x="75" y="32" width="8" height="10" fill="#0d1117" />
-            <rect x="87" y="32" width="8" height="10" fill="#0d1117" />
-            <rect x="99" y="32" width="8" height="10" fill="#0d1117" />
-            {/* Center top */}
-            <rect x="45" y="10" width="30" height="25" fill="#0d1117" />
-            <rect x="40" y="5" width="8" height="30" fill="#0d1117" />
-            <rect x="72" y="5" width="8" height="30" fill="#0d1117" />
-            {/* Flag pole + animated flag */}
-            <rect x="57" y="0" width="2" height="15" fill="#0d1117" />
-            <polygon points="59,0 59,8 68,4" fill="#1a0a0a" className="animate-flag" />
-            {/* Gate */}
-            <rect x="48" y="105" width="24" height="35" rx="12" fill="#060810" />
-            {/* Windows — animated candlelight flicker */}
-            <rect x="52" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.5" />
-            <rect x="62" y="60" width="6" height="8" fill="#1a1a2e" opacity="0.5" />
-            <rect x="52" y="80" width="6" height="8" fill="#ffd700" className="animate-candle" />
-            <rect x="62" y="80" width="6" height="8" fill="#ffd700" className="animate-candle" style={{ animationDelay: '0.7s' }} />
-            <rect x="22" y="70" width="5" height="6" fill="#ffd700" className="animate-candle" style={{ animationDelay: '1.2s' }} />
-            <rect x="88" y="55" width="5" height="6" fill="#ffd700" className="animate-candle" style={{ animationDelay: '0.3s' }} />
-            {/* Torch flames on turret tops */}
-            <ellipse cx="14" cy="40" rx="3" ry="5" fill="#ff6a00" className="animate-flame" opacity="0.6" />
-            <ellipse cx="14" cy="39" rx="2" ry="3" fill="#ffaa00" className="animate-flame-delay" opacity="0.5" />
-            <ellipse cx="103" cy="30" rx="3" ry="5" fill="#ff6a00" className="animate-flame" opacity="0.6" />
-            <ellipse cx="103" cy="29" rx="2" ry="3" fill="#ffaa00" className="animate-flame-delay" opacity="0.5" />
         </svg>
     </div>
 );
@@ -320,11 +275,11 @@ export const Lobby = ({
                 <div className="w-full max-w-lg text-center relative z-10">
                     {/* Title */}
                     <div className="flex items-center justify-center gap-3 mb-6">
-                        <Swords size={28} className="text-[var(--gold)]" />
+                        <SpriteIcon name="ui_battle_cannons" size={32} />
                         <h2 className="text-2xl sm:text-3xl font-bold text-[var(--gold)] font-heading text-glow-gold">
                             {isSinglePlayer ? 'Training Grounds' : 'War Room'}
                         </h2>
-                        <Swords size={28} className="text-[var(--gold)]" />
+                        <SpriteIcon name="ui_battle_cannons" size={32} className="scale-x-[-1]" />
                     </div>
 
                     {/* Room Code for PvP */}
@@ -350,7 +305,7 @@ export const Lobby = ({
                                 onClick={() => handleShare(roomState.roomId)}
                                 className="btn-blue min-h-[40px] px-4 py-2 rounded-lg text-sm mb-4 flex items-center justify-center gap-2"
                             >
-                                <ChevronRight size={14} />
+                                <SpriteIcon name="ui_room_key" size={18} />
                                 <span>Share Invite Link</span>
                             </button>
                             <p className="text-xs text-[var(--text-secondary)] mb-6">
@@ -366,7 +321,7 @@ export const Lobby = ({
                             <div className="flex-1 flex flex-col items-center gap-2">
                                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl"
                                     style={{ background: 'linear-gradient(135deg, rgba(46, 204, 113, 0.2), rgba(46, 204, 113, 0.05))', border: '2px solid rgba(46, 204, 113, 0.4)' }}>
-                                    <Shield size={32} className="text-[var(--emerald)]" />
+                                    <SpriteIcon name="avatar_king" size={54} />
                                 </div>
                                 <span className="text-sm sm:text-base font-bold text-[var(--text-primary)] font-display truncate max-w-[120px]">
                                     {playerName || 'Knight'}
@@ -391,7 +346,7 @@ export const Lobby = ({
                                 <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl ${!roomState.opponentConnected ? 'animate-pulse' : ''}`}
                                     style={{ background: roomState.opponentConnected ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(231, 76, 60, 0.05))' : 'linear-gradient(135deg, rgba(100, 100, 100, 0.2), rgba(100, 100, 100, 0.05))', border: `2px solid ${roomState.opponentConnected ? 'rgba(231, 76, 60, 0.4)' : 'rgba(100, 100, 100, 0.3)'}` }}>
                                     {roomState.opponentConnected
-                                        ? <Swords size={32} className="text-[var(--crimson)]" />
+                                        ? <SpriteIcon name={isSinglePlayer ? 'avatar_engineer' : 'avatar_opponent'} size={54} />
                                         : <div className="w-6 h-6 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
                                     }
                                 </div>
@@ -430,7 +385,7 @@ export const Lobby = ({
                                 </span>
                             ) : (
                                 <span className="flex items-center justify-center gap-2 font-bold">
-                                    <Swords size={20} /> READY FOR BATTLE
+                                    <SpriteIcon name="ui_ready_shield" size={24} /> READY FOR BATTLE
                                 </span>
                             )}
                         </button>
@@ -512,8 +467,22 @@ export const Lobby = ({
             />
 
             {/* Castle silhouettes */}
-            <CastleSilhouette side="left" className="opacity-60" />
-            <CastleSilhouette side="right" className="opacity-60" />
+            <img
+                src="/sprites/menu_castle_left.png"
+                alt=""
+                aria-hidden="true"
+                className="absolute bottom-[10%] left-[5%] w-32 sm:w-40 opacity-70"
+                style={{ transform: `translate(${mousePos.x * -8}px, ${mousePos.y * -4}px)` }}
+                draggable={false}
+            />
+            <img
+                src="/sprites/menu_castle_right.png"
+                alt=""
+                aria-hidden="true"
+                className="absolute bottom-[10%] right-[5%] w-32 sm:w-40 opacity-70"
+                style={{ transform: `translate(${mousePos.x * 8}px, ${mousePos.y * -4}px)` }}
+                draggable={false}
+            />
 
             {/* Layer 3: Near hills */}
             <MountainLayerAlt
@@ -541,7 +510,7 @@ export const Lobby = ({
                     {/* Crown — drops from above with bounce */}
                     <div className="relative mb-3 animate-crown-drop">
                         <div className="absolute inset-0 blur-xl bg-[var(--gold)] opacity-20 rounded-full scale-150" />
-                        <Crown size={48} className="text-[var(--gold)] relative" strokeWidth={1.5} />
+                        <SpriteIcon name="ui_crown_emblem" size={64} className="relative" alt="Fortress AI crown" />
                     </div>
 
                     {/* Title — staggered letter reveal with shimmer */}
@@ -596,7 +565,7 @@ export const Lobby = ({
                                     : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
                                 }`}
                         >
-                            <Zap size={16} aria-hidden="true" />
+                            <SpriteIcon name="ui_solo" size={20} />
                             Solo
                         </button>
                         <button
@@ -609,7 +578,7 @@ export const Lobby = ({
                                     : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
                                 }`}
                         >
-                            <Swords size={16} aria-hidden="true" />
+                            <SpriteIcon name="ui_pvp" size={20} />
                             PvP
                         </button>
                     </div>
@@ -637,7 +606,7 @@ export const Lobby = ({
                             hover:from-emerald-400 hover:to-emerald-600
                             active:scale-[0.98] transition-all duration-200"
                     >
-                        <Swords size={18} aria-hidden="true" />
+                        <SpriteIcon name="ui_battle_cannons" size={24} />
                         <span>BATTLE</span>
                         <span className="text-xs opacity-70 font-normal ml-1">
                             {battleMode === 'solo' ? '— vs Bot' : '— Find Opponent'}
@@ -664,7 +633,7 @@ export const Lobby = ({
                                 flex items-center gap-1.5
                                 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
                         >
-                            <LogIn size={14} aria-hidden="true" />
+                            <SpriteIcon name="ui_room_key" size={18} />
                             Join
                         </button>
                     </form>
@@ -678,7 +647,7 @@ export const Lobby = ({
                             className="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors touch-manipulation"
                         >
                             <span className="flex items-center gap-2 font-display font-bold tracking-wider">
-                                <HelpCircle size={16} className="text-[var(--gold-dim)]" aria-hidden="true" />
+                                <SpriteIcon name="ui_howto_scroll" size={18} />
                                 HOW TO PLAY
                             </span>
                             {showHowToPlay ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}

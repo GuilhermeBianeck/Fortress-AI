@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Hammer, Eye, Check, Swords } from 'lucide-react';
+import { Eye, Check } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode, MatchPhase } from '../types';
 import { MATERIAL_COLORS } from '../types';
 import { track } from '../analytics/tracker';
+import { SpriteIcon } from './SpriteIcon';
 
 interface GodToolsProps {
     selectedMaterial: MaterialType;
@@ -16,12 +17,12 @@ interface GodToolsProps {
     blockCount?: number;
 }
 
-const MATERIALS: { key: MaterialType; label: string; icon: string }[] = [
-    { key: 'wood', label: 'Wood', icon: '🪵' },
-    { key: 'stone', label: 'Stone', icon: '🪨' },
-    { key: 'ice', label: 'Ice', icon: '🧊' },
-    { key: 'rubber', label: 'Rubber', icon: '⚫' },
-    { key: 'steel', label: 'Steel', icon: '⚙️' },
+const MATERIALS: { key: MaterialType; label: string }[] = [
+    { key: 'wood', label: 'Wood' },
+    { key: 'stone', label: 'Stone' },
+    { key: 'ice', label: 'Ice' },
+    { key: 'rubber', label: 'Rubber' },
+    { key: 'steel', label: 'Steel' },
 ];
 
 const MATERIAL_TIPS: Record<MaterialType, string> = {
@@ -38,14 +39,11 @@ const SHAPES: { key: ShapeType; label: string }[] = [
     { key: 'beam', label: 'Beam' },
 ];
 
-/* Small SVG shape previews */
-const ShapeIcon = ({ shape, color }: { shape: ShapeType; color: string }) => (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        {shape === 'rectangle' && <rect x="3" y="3" width="12" height="12" rx="1" fill={color} opacity="0.9" />}
-        {shape === 'pillar' && <rect x="5" y="1" width="8" height="16" rx="1" fill={color} opacity="0.9" />}
-        {shape === 'beam' && <rect x="1" y="6" width="16" height="6" rx="1" fill={color} opacity="0.9" />}
-    </svg>
-);
+const getShapeSpriteName = (shape: ShapeType, material: MaterialType) => {
+    if (shape === 'rectangle') return `block_${material}`;
+    if (shape === 'pillar') return `shape_pillar_${material}`;
+    return `shape_beam_${material}`;
+};
 
 export const GodTools = ({
     selectedMaterial,
@@ -82,8 +80,6 @@ export const GodTools = ({
         onReady();
     };
 
-    const activeColor = MATERIAL_COLORS[selectedMaterial] || '#ffd700';
-
     return (
         <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-3 w-full">
             {/* Mode Toggle - Mobile Only */}
@@ -100,7 +96,7 @@ export const GodTools = ({
                         }
                     `}
                 >
-                    <Hammer size={14} aria-hidden="true" />
+                    <SpriteIcon name="ui_ready_shield" size={16} />
                     BUILD
                 </button>
             </div>
@@ -134,7 +130,7 @@ export const GodTools = ({
                                         border: '1.5px solid transparent',
                                     }}
                                 >
-                                    <span className="text-sm" aria-hidden="true">{mat.icon}</span>
+                                    <SpriteIcon name={`block_${mat.key}`} size={22} />
                                     <span className="sr-only">{mat.label}</span>
                                     <span
                                         aria-hidden="true"
@@ -172,7 +168,11 @@ export const GodTools = ({
                                         border: '1.5px solid transparent',
                                     }}
                                 >
-                                    <ShapeIcon shape={shape.key} color={isActive ? activeColor : '#665c54'} />
+                                    <SpriteIcon
+                                        name={getShapeSpriteName(shape.key, selectedMaterial)}
+                                        size={shape.key === 'beam' ? 28 : 22}
+                                        className={isActive ? '' : 'opacity-70'}
+                                    />
                                     <span className="hidden sm:inline" aria-hidden="true">{shape.label}</span>
                                 </button>
                             );
@@ -208,7 +208,7 @@ export const GodTools = ({
                         : 'btn-emerald cursor-pointer animate-pulse-subtle'
                     }`}
             >
-                {isReady ? <Check size={14} /> : <Swords size={14} />}
+                {isReady ? <Check size={14} /> : <SpriteIcon name="ui_ready_shield" size={16} />}
                 {isReady ? 'READY!' : 'DONE'}
             </button>
         </div>
@@ -250,7 +250,7 @@ export const MobileDoneButton = ({ phase, onReady }: { phase: MatchPhase; onRead
                     : 'btn-emerald cursor-pointer animate-pulse-subtle'
                 }`}
         >
-            {isReady ? <Check size={14} aria-hidden="true" /> : <Swords size={14} aria-hidden="true" />}
+            {isReady ? <Check size={14} aria-hidden="true" /> : <SpriteIcon name="ui_ready_shield" size={16} />}
             {isReady ? 'READY!' : 'DONE'}
         </button>
     );

@@ -109,16 +109,22 @@
       "path": "/sprites/king_hit.png"
     },
     {
-      "name": "cannon_left",
-      "width": 32,
-      "height": 16,
-      "path": "/sprites/cannon_left.png"
+      "name": "crown",
+      "width": 12,
+      "height": 12,
+      "path": "/sprites/crown.png"
     },
     {
       "name": "cannon_right",
       "width": 32,
       "height": 16,
       "path": "/sprites/cannon_right.png"
+    },
+    {
+      "name": "cannon_left",
+      "width": 32,
+      "height": 16,
+      "path": "/sprites/cannon_left.png"
     },
     {
       "name": "projectile",
@@ -140,14 +146,14 @@
     },
     {
       "name": "terrain_earth",
-      "width": 32,
-      "height": 32,
+      "width": 256,
+      "height": 256,
       "path": "/sprites/terrain_earth.png"
     },
     {
       "name": "terrain_deep",
-      "width": 32,
-      "height": 32,
+      "width": 256,
+      "height": 256,
       "path": "/sprites/terrain_deep.png"
     },
     {
@@ -185,12 +191,6 @@
       "width": 16,
       "height": 16,
       "path": "/sprites/rock.png"
-    },
-    {
-      "name": "crown",
-      "width": 12,
-      "height": 12,
-      "path": "/sprites/crown.png"
     },
     {
       "name": "explosion_0",
@@ -233,6 +233,234 @@
       "width": 16,
       "height": 16,
       "path": "/sprites/spark_2.png"
+    },
+    {
+      "name": "ui_logo_crest",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/ui_logo_crest.png"
+    },
+    {
+      "name": "ui_crown_emblem",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/ui_crown_emblem.png"
+    },
+    {
+      "name": "ui_battle_cannons",
+      "width": 48,
+      "height": 48,
+      "path": "/sprites/ui_battle_cannons.png"
+    },
+    {
+      "name": "ui_room_key",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_room_key.png"
+    },
+    {
+      "name": "ui_ai_orb",
+      "width": 48,
+      "height": 48,
+      "path": "/sprites/ui_ai_orb.png"
+    },
+    {
+      "name": "ui_banner",
+      "width": 48,
+      "height": 48,
+      "path": "/sprites/ui_banner.png"
+    },
+    {
+      "name": "ui_howto_scroll",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_howto_scroll.png"
+    },
+    {
+      "name": "ui_chat_bubble",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_chat_bubble.png"
+    },
+    {
+      "name": "ui_trophy",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_trophy.png"
+    },
+    {
+      "name": "ui_rematch",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_rematch.png"
+    },
+    {
+      "name": "ui_timer_hourglass",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_timer_hourglass.png"
+    },
+    {
+      "name": "avatar_knight",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/avatar_knight.png"
+    },
+    {
+      "name": "avatar_wizard",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/avatar_wizard.png"
+    },
+    {
+      "name": "avatar_engineer",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/avatar_engineer.png"
+    },
+    {
+      "name": "menu_castle_left",
+      "width": 160,
+      "height": 120,
+      "path": "/sprites/menu_castle_left.png"
+    },
+    {
+      "name": "menu_castle_center",
+      "width": 180,
+      "height": 140,
+      "path": "/sprites/menu_castle_center.png"
+    },
+    {
+      "name": "menu_castle_right",
+      "width": 160,
+      "height": 120,
+      "path": "/sprites/menu_castle_right.png"
+    },
+    {
+      "name": "menu_castle_wall",
+      "width": 180,
+      "height": 90,
+      "path": "/sprites/menu_castle_wall.png"
+    },
+    {
+      "name": "ui_ready_shield",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_ready_shield.png"
+    },
+    {
+      "name": "ui_api_key",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_api_key.png"
+    },
+    {
+      "name": "ui_mute",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_mute.png"
+    },
+    {
+      "name": "ui_warning",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_warning.png"
+    },
+    {
+      "name": "ui_solo",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_solo.png"
+    },
+    {
+      "name": "ui_pvp",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ui_pvp.png"
+    },
+    {
+      "name": "avatar_king",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/avatar_king.png"
+    },
+    {
+      "name": "avatar_opponent",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/avatar_opponent.png"
+    },
+    {
+      "name": "shape_pillar_wood",
+      "width": 24,
+      "height": 48,
+      "path": "/sprites/shape_pillar_wood.png"
+    },
+    {
+      "name": "shape_pillar_stone",
+      "width": 24,
+      "height": 48,
+      "path": "/sprites/shape_pillar_stone.png"
+    },
+    {
+      "name": "shape_pillar_ice",
+      "width": 24,
+      "height": 48,
+      "path": "/sprites/shape_pillar_ice.png"
+    },
+    {
+      "name": "shape_pillar_rubber",
+      "width": 24,
+      "height": 48,
+      "path": "/sprites/shape_pillar_rubber.png"
+    },
+    {
+      "name": "shape_pillar_steel",
+      "width": 24,
+      "height": 48,
+      "path": "/sprites/shape_pillar_steel.png"
+    },
+    {
+      "name": "shape_pillar_preview",
+      "width": 24,
+      "height": 48,
+      "path": "/sprites/shape_pillar_preview.png"
+    },
+    {
+      "name": "shape_beam_wood",
+      "width": 64,
+      "height": 24,
+      "path": "/sprites/shape_beam_wood.png"
+    },
+    {
+      "name": "shape_beam_stone",
+      "width": 64,
+      "height": 24,
+      "path": "/sprites/shape_beam_stone.png"
+    },
+    {
+      "name": "shape_beam_ice",
+      "width": 64,
+      "height": 24,
+      "path": "/sprites/shape_beam_ice.png"
+    },
+    {
+      "name": "shape_beam_rubber",
+      "width": 64,
+      "height": 24,
+      "path": "/sprites/shape_beam_rubber.png"
+    },
+    {
+      "name": "shape_beam_steel",
+      "width": 64,
+      "height": 24,
+      "path": "/sprites/shape_beam_steel.png"
+    },
+    {
+      "name": "shape_beam_preview",
+      "width": 64,
+      "height": 24,
+      "path": "/sprites/shape_beam_preview.png"
     }
   ]
 }

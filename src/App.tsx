@@ -9,7 +9,8 @@ import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
 import { RankBadge } from './components/RankBadge';
-import { Terminal, Send, Key, Loader2, CheckCircle2, AlertCircle, MessageCircle, WifiOff, Volume2, VolumeX } from 'lucide-react';
+import { Terminal, Send, Loader2, CheckCircle2, AlertCircle, WifiOff } from 'lucide-react';
+import { SpriteIcon } from './components/SpriteIcon';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
 import { track } from './analytics/tracker';
@@ -155,7 +156,7 @@ function App() {
       <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`} style={{ background: 'rgba(10, 10, 18, 0.9)', boxShadow: '0 1px 0 rgba(255,215,0,0.08), 0 2px 16px rgba(0,0,0,0.4)' }}>
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg shrink-0" style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,215,0,0.06))', border: '1px solid rgba(255,215,0,0.2)' }}>
-            <img src="/favicon.svg" alt="Fortress AI" width={20} height={20} className="block" />
+            <SpriteIcon name="ui_logo_crest" size={24} alt="Fortress AI" />
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-wide text-[var(--gold)] font-heading leading-none">FORTRESS AI</h1>
@@ -193,7 +194,7 @@ function App() {
                   : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
                 }`}
             >
-              <MessageCircle size={16} aria-hidden="true" />
+              <SpriteIcon name="ui_chat_bubble" size={18} />
               <span className="hidden sm:inline text-xs">Chat</span>
               {chatMessages.length > 0 && (
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--ember)]" aria-hidden="true"></span>
@@ -207,7 +208,7 @@ function App() {
             className="min-w-[36px] min-h-[36px] px-1.5 py-1.5 text-xs rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center
               text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]"
           >
-            {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            <SpriteIcon name="ui_mute" size={18} />
           </button>
           {/* API Key toggle — only shown when user has a custom key or during build phase */}
           {(apiKey || (inGame && phase === 'build')) && (
@@ -222,7 +223,7 @@ function App() {
                 }
                          hover:bg-[var(--bg-elevated)]`}
             >
-              <Key size={14} aria-hidden="true" />
+              <SpriteIcon name="ui_api_key" size={18} />
               <span className="hidden sm:inline">{apiKey ? 'Key Set' : 'API Key'}</span>
             </button>
           )}
@@ -378,7 +379,7 @@ function App() {
                             : 'bg-[rgba(10,10,18,0.6)] border-[var(--border-subtle)] active:bg-[var(--bg-elevated)]'
                           }`}
                       >
-                        <MessageCircle size={18} className="text-[var(--gold)]" />
+                        <SpriteIcon name="ui_chat_bubble" size={22} />
                         {chatMessages.length > 0 && (
                           <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--ember)]"></span>
                         )}
