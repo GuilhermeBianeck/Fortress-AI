@@ -6,6 +6,11 @@
  *   P2.png - king, crown, cannon, projectile
  *   P3.png - terrain, lava, wind, rock
  *   P4.png - explosions and sparks
+ *   P14.png - royal landing background layers
+ *   P15.png - royal logo, crest, and ornaments
+ *   P16.png - royal button and panel UI kit
+ *   P17.png - ambient royal menu animation sprites
+ *   P18.png - gameplay loop preview icons
  *
  * The script slices the large sheets, trims transparent padding inside each
  * crop, resizes to the exact dimensions used by the renderer, and rewrites
@@ -138,6 +143,65 @@ const specs: SpriteSpec[] = [
     { source: 'P13.png', name: 'shape_beam_rubber', crop: { x: 525, y: 840, w: 280, h: 90 }, width: 64, height: 24, trim: true },
     { source: 'P13.png', name: 'shape_beam_steel', crop: { x: 820, y: 690, w: 155, h: 90 }, width: 64, height: 24, trim: true },
     { source: 'P13.png', name: 'shape_beam_preview', crop: { x: 820, y: 840, w: 155, h: 90 }, width: 64, height: 24, trim: true },
+
+    { source: 'P14.png', name: 'landing_citadel', crop: { x: 35, y: 74, w: 535, h: 222 }, width: 760, height: 320, trim: true },
+    { source: 'P14.png', name: 'landing_mountain_ridge', crop: { x: 45, y: 172, w: 510, h: 95 }, width: 760, height: 160, trim: true },
+    { source: 'P14.png', name: 'landing_gate_arch', crop: { x: 616, y: 122, w: 372, h: 280 }, width: 560, height: 420, trim: true },
+    { source: 'P14.png', name: 'landing_platform_edge', crop: { x: 626, y: 484, w: 360, h: 74 }, width: 640, height: 120, trim: true },
+    { source: 'P14.png', name: 'landing_castle_left', crop: { x: 40, y: 360, w: 285, h: 185 }, width: 320, height: 210, trim: true },
+    { source: 'P14.png', name: 'landing_castle_right', crop: { x: 360, y: 360, w: 250, h: 185 }, width: 320, height: 210, trim: true },
+    { source: 'P14.png', name: 'landing_fog_bank', crop: { x: 475, y: 620, w: 510, h: 120 }, width: 820, height: 150, trim: true },
+    { source: 'P14.png', name: 'landing_wall_segment', crop: { x: 520, y: 780, w: 450, h: 92 }, width: 680, height: 140, trim: true },
+
+    { source: 'P15.png', name: 'logo_crest', crop: { x: 48, y: 82, w: 200, h: 190 }, width: 96, height: 96, trim: true },
+    { source: 'P15.png', name: 'logo_crown', crop: { x: 285, y: 106, w: 230, h: 150 }, width: 112, height: 88, trim: true },
+    { source: 'P15.png', name: 'logo_seal', crop: { x: 562, y: 104, w: 175, h: 170 }, width: 96, height: 96, trim: true },
+    { source: 'P15.png', name: 'logo_cannon_crown', crop: { x: 770, y: 100, w: 180, h: 175 }, width: 96, height: 96, trim: true },
+    { source: 'P6.png', name: 'logo_ai_crystal', crop: { x: 720, y: 365, w: 220, h: 220 }, width: 96, height: 96, trim: true },
+    { source: 'P15.png', name: 'logo_divider', crop: { x: 78, y: 392, w: 865, h: 40 }, width: 520, height: 32, trim: true },
+    { source: 'P15.png', name: 'logo_flourish_left', crop: { x: 72, y: 488, w: 185, h: 72 }, width: 160, height: 64, trim: true },
+    { source: 'P15.png', name: 'logo_flourish_right', crop: { x: 772, y: 488, w: 185, h: 72 }, width: 160, height: 64, trim: true },
+    { source: 'P15.png', name: 'logo_wordmark', crop: { x: 78, y: 784, w: 410, h: 110 }, width: 420, height: 120, trim: true },
+    { source: 'P15.png', name: 'logo_compact', crop: { x: 792, y: 784, w: 165, h: 110 }, width: 180, height: 120, trim: true },
+
+    { source: 'P16.png', name: 'button_primary', crop: { x: 45, y: 112, w: 450, h: 88 }, width: 620, height: 104, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_primary_hover', crop: { x: 45, y: 112, w: 450, h: 88 }, width: 620, height: 104, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_secondary', crop: { x: 527, y: 112, w: 187, h: 88 }, width: 360, height: 96, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_disabled', crop: { x: 759, y: 112, w: 223, h: 88 }, width: 360, height: 96, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_segmented', crop: { x: 51, y: 294, w: 440, h: 82 }, width: 560, height: 104, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_segment_selected', crop: { x: 281, y: 298, w: 204, h: 78 }, width: 280, height: 88, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_input', crop: { x: 528, y: 291, w: 449, h: 85 }, width: 620, height: 104, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_room_input', crop: { x: 533, y: 457, w: 443, h: 114 }, width: 620, height: 112, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_accordion', crop: { x: 45, y: 457, w: 450, h: 113 }, width: 620, height: 128, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_tooltip', crop: { x: 519, y: 663, w: 271, h: 122 }, width: 320, height: 120, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_icon', crop: { x: 828, y: 665, w: 126, h: 115 }, width: 96, height: 96, trim: true, fit: 'fill' },
+    { source: 'P16.png', name: 'button_icon_active', crop: { x: 828, y: 665, w: 126, h: 115 }, width: 96, height: 96, trim: true, fit: 'fill' },
+
+    { source: 'P17.png', name: 'ambient_torch_0', crop: { x: 64, y: 86, w: 130, h: 150 }, width: 80, height: 96, trim: true },
+    { source: 'P17.png', name: 'ambient_torch_1', crop: { x: 238, y: 86, w: 130, h: 150 }, width: 80, height: 96, trim: true },
+    { source: 'P17.png', name: 'ambient_torch_2', crop: { x: 404, y: 78, w: 140, h: 160 }, width: 80, height: 96, trim: true },
+    { source: 'P17.png', name: 'ambient_torch_3', crop: { x: 570, y: 86, w: 135, h: 150 }, width: 80, height: 96, trim: true },
+    { source: 'P17.png', name: 'ambient_flag_0', crop: { x: 315, y: 292, w: 190, h: 150 }, width: 112, height: 82, trim: true },
+    { source: 'P17.png', name: 'ambient_flag_1', crop: { x: 520, y: 292, w: 195, h: 150 }, width: 112, height: 82, trim: true },
+    { source: 'P17.png', name: 'ambient_flag_2', crop: { x: 315, y: 292, w: 190, h: 150 }, width: 112, height: 82, trim: true },
+    { source: 'P17.png', name: 'ambient_flag_3', crop: { x: 520, y: 292, w: 195, h: 150 }, width: 112, height: 82, trim: true },
+    { source: 'P17.png', name: 'ambient_smoke_0', crop: { x: 52, y: 490, w: 175, h: 112 }, width: 170, height: 96, trim: true },
+    { source: 'P17.png', name: 'ambient_smoke_1', crop: { x: 258, y: 488, w: 180, h: 116 }, width: 180, height: 104, trim: true },
+    { source: 'P17.png', name: 'ambient_smoke_2', crop: { x: 456, y: 505, w: 305, h: 96 }, width: 280, height: 96, trim: true },
+    { source: 'P17.png', name: 'ambient_smoke_3', crop: { x: 792, y: 498, w: 180, h: 102 }, width: 180, height: 96, trim: true },
+    { source: 'P17.png', name: 'ambient_ember', crop: { x: 152, y: 862, w: 50, h: 50 }, width: 32, height: 32, trim: true },
+    { source: 'P17.png', name: 'ambient_ember_cluster', crop: { x: 330, y: 848, w: 100, h: 75 }, width: 48, height: 48, trim: true },
+    { source: 'P17.png', name: 'ambient_glint', crop: { x: 552, y: 842, w: 120, h: 82 }, width: 64, height: 64, trim: true },
+    { source: 'P17.png', name: 'ambient_button_shine', crop: { x: 758, y: 842, w: 205, h: 82 }, width: 220, height: 56, trim: true },
+
+    { source: 'P18.png', name: 'preview_prompt', crop: { x: 58, y: 106, w: 190, h: 180 }, width: 72, height: 72, trim: true },
+    { source: 'P18.png', name: 'preview_blueprint', crop: { x: 292, y: 104, w: 215, h: 182 }, width: 72, height: 72, trim: true },
+    { source: 'P18.png', name: 'preview_fortress', crop: { x: 554, y: 118, w: 190, h: 165 }, width: 72, height: 72, trim: true },
+    { source: 'P18.png', name: 'preview_fire', crop: { x: 792, y: 122, w: 180, h: 165 }, width: 72, height: 72, trim: true },
+    { source: 'P18.png', name: 'preview_king_shield', crop: { x: 58, y: 400, w: 190, h: 180 }, width: 72, height: 72, trim: true },
+    { source: 'P18.png', name: 'preview_debris', crop: { x: 548, y: 410, w: 190, h: 155 }, width: 72, height: 72, trim: true },
+    { source: 'P18.png', name: 'preview_victory', crop: { x: 548, y: 730, w: 195, h: 165 }, width: 72, height: 72, trim: true },
+    { source: 'P18.png', name: 'preview_rematch', crop: { x: 780, y: 720, w: 190, h: 180 }, width: 72, height: 72, trim: true },
 ];
 
 function requireInputs() {

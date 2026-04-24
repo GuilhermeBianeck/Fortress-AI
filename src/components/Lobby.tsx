@@ -58,30 +58,43 @@ const EmberParticles = () => {
     );
 };
 
-/* ═══════════════════════════════════════
-   Mountain Silhouette SVG (CSS art)
-   ═══════════════════════════════════════ */
-const MountainLayer = ({ color, height, offset, className }: { color: string; height: string; offset: string; className?: string }) => (
-    <div className={`absolute bottom-0 left-0 right-0 ${className || ''}`} style={{ height }}>
-        <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="w-full h-full" style={{ transform: `translateY(${offset})` }}>
-            <path
-                fill={color}
-                d="M0,224L48,213.3C96,203,192,181,288,186.7C384,192,480,224,576,229.3C672,235,768,213,864,186.7C960,160,1056,128,1152,133.3C1248,139,1344,181,1392,202.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-            />
-        </svg>
-    </div>
-);
+const TORCH_FRAMES = ['ambient_torch_0', 'ambient_torch_1', 'ambient_torch_2', 'ambient_torch_3'] as const;
+const FLAG_FRAMES = ['ambient_flag_0', 'ambient_flag_1', 'ambient_flag_2', 'ambient_flag_3'] as const;
 
-const MountainLayerAlt = ({ color, height, offset, className }: { color: string; height: string; offset: string; className?: string }) => (
-    <div className={`absolute bottom-0 left-0 right-0 ${className || ''}`} style={{ height }}>
-        <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="w-full h-full" style={{ transform: `translateY(${offset})` }}>
-            <path
-                fill={color}
-                d="M0,288L60,261.3C120,235,240,181,360,165.3C480,149,600,171,720,186.7C840,203,960,213,1080,197.3C1200,181,1320,139,1380,117.3L1440,96L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"
-            />
-        </svg>
-    </div>
-);
+const prefersReducedMotion = () =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const AnimatedSprite = ({
+    frames,
+    intervalMs = 160,
+    className = '',
+    alt = '',
+}: {
+    frames: readonly string[];
+    intervalMs?: number;
+    className?: string;
+    alt?: string;
+}) => {
+    const [frameIndex, setFrameIndex] = useState(0);
+
+    useEffect(() => {
+        if (frames.length <= 1 || prefersReducedMotion()) return;
+        const timer = window.setInterval(() => {
+            setFrameIndex(index => (index + 1) % frames.length);
+        }, intervalMs);
+        return () => window.clearInterval(timer);
+    }, [frames, intervalMs]);
+
+    return (
+        <img
+            src={`/sprites/${frames[frameIndex]}.png`}
+            alt={alt}
+            aria-hidden={alt === '' ? true : undefined}
+            className={className}
+            draggable={false}
+        />
+    );
+};
 
 /* ═══════════════════════════════════════
    Main Lobby Component
@@ -416,130 +429,152 @@ export const Lobby = ({
         );
     }
 
-    // ─── Main Lobby — Parallax Landing Page ───
+    // ─── Main Lobby — Royal Landing Page ───
     return (
         <div
             ref={containerRef}
             onMouseMove={handleMouseMove}
-            className="parallax-container flex-1 w-full flex flex-col items-center"
-            style={{ background: 'linear-gradient(180deg, #070710 0%, #0a0a16 20%, #0f0e17 40%, #1a1a2e 70%, #16213e 100%)' }}
+            className="parallax-container royal-landing flex-1 w-full flex flex-col items-center"
         >
-            {/* ═══ PARALLAX LAYERS ═══ */}
-
-            {/* Layer 0: Stars */}
+            {/* ═══ ROYAL ART LAYERS ═══ */}
             <div
                 className="stars-layer parallax-layer"
                 style={{ transform: `translate(${mousePos.x * -5}px, ${mousePos.y * -5}px)` }}
             />
 
-            {/* Horizon glow — pulsing */}
             <div
-                className="absolute bottom-0 left-0 right-0 h-[40%] pointer-events-none animate-horizon-pulse"
+                className="absolute inset-x-0 top-0 h-[50%] pointer-events-none animate-horizon-pulse"
                 style={{
-                    background: 'radial-gradient(ellipse 80% 40% at 50% 100%, rgba(230, 126, 34, 0.12) 0%, transparent 70%)',
+                    background: 'radial-gradient(ellipse 45% 32% at 50% 10%, rgba(255, 215, 0, 0.12) 0%, transparent 70%)',
                     transform: `translate(${mousePos.x * -3}px, ${mousePos.y * -2}px)`,
                 }}
             />
 
-            {/* Shooting stars */}
             <div className="shooting-star shooting-star-1" />
             <div className="shooting-star shooting-star-2" />
             <div className="shooting-star shooting-star-3" />
 
-            {/* Drifting clouds */}
-            <div className="lobby-cloud" style={{ top: '12%', width: '180px', height: '40px', background: 'radial-gradient(ellipse, rgba(200,200,220,0.08), transparent)', animation: 'cloud-drift 45s linear infinite' }} />
-            <div className="lobby-cloud" style={{ top: '22%', width: '240px', height: '50px', background: 'radial-gradient(ellipse, rgba(200,200,220,0.05), transparent)', animation: 'cloud-drift 60s linear 15s infinite' }} />
-            <div className="lobby-cloud" style={{ top: '8%', width: '140px', height: '30px', background: 'radial-gradient(ellipse, rgba(200,200,220,0.06), transparent)', animation: 'cloud-drift 35s linear 8s infinite' }} />
-
-            {/* Layer 1: Far mountains */}
-            <MountainLayerAlt
-                color="#0d0d1a"
-                height="55%"
-                offset="10px"
-                className="opacity-80"
-            />
-
-            {/* Layer 2: Mid mountains */}
-            <MountainLayer
-                color="#0b0b15"
-                height="45%"
-                offset="20px"
-            />
-
-            {/* Castle silhouettes */}
             <img
-                src="/sprites/menu_castle_left.png"
+                src="/sprites/landing_citadel.png"
                 alt=""
                 aria-hidden="true"
-                className="absolute bottom-[10%] left-[5%] w-32 sm:w-40 opacity-70"
-                style={{ transform: `translate(${mousePos.x * -8}px, ${mousePos.y * -4}px)` }}
+                className="landing-art landing-citadel"
+                style={{ transform: `translate(calc(-50% + ${mousePos.x * -10}px), ${mousePos.y * -5}px)` }}
                 draggable={false}
             />
             <img
-                src="/sprites/menu_castle_right.png"
+                src="/sprites/landing_gate_arch.png"
                 alt=""
                 aria-hidden="true"
-                className="absolute bottom-[10%] right-[5%] w-32 sm:w-40 opacity-70"
-                style={{ transform: `translate(${mousePos.x * 8}px, ${mousePos.y * -4}px)` }}
+                className="landing-art landing-gate"
+                style={{ transform: `translate(calc(-50% + ${mousePos.x * 5}px), ${mousePos.y * 3}px)` }}
+                draggable={false}
+            />
+            <img
+                src="/sprites/landing_castle_left.png"
+                alt=""
+                aria-hidden="true"
+                className="landing-art landing-castle-left"
+                style={{ transform: `translate(${mousePos.x * -12}px, ${mousePos.y * -4}px)` }}
+                draggable={false}
+            />
+            <img
+                src="/sprites/landing_castle_right.png"
+                alt=""
+                aria-hidden="true"
+                className="landing-art landing-castle-right"
+                style={{ transform: `translate(${mousePos.x * 12}px, ${mousePos.y * -4}px)` }}
+                draggable={false}
+            />
+            <img
+                src="/sprites/landing_wall_segment.png"
+                alt=""
+                aria-hidden="true"
+                className="landing-art landing-wall"
+                draggable={false}
+            />
+            <img
+                src="/sprites/landing_platform_edge.png"
+                alt=""
+                aria-hidden="true"
+                className="landing-art landing-platform"
+                draggable={false}
+            />
+            <img
+                src="/sprites/landing_fog_bank.png"
+                alt=""
+                aria-hidden="true"
+                className="landing-art landing-fog landing-fog-a"
+                draggable={false}
+            />
+            <img
+                src="/sprites/landing_fog_bank.png"
+                alt=""
+                aria-hidden="true"
+                className="landing-art landing-fog landing-fog-b"
                 draggable={false}
             />
 
-            {/* Layer 3: Near hills */}
-            <MountainLayerAlt
-                color="#090912"
-                height="30%"
-                offset="0px"
-            />
+            <AnimatedSprite frames={TORCH_FRAMES} intervalMs={140} className="landing-ambient landing-torch-left" />
+            <AnimatedSprite frames={TORCH_FRAMES} intervalMs={155} className="landing-ambient landing-torch-right" />
+            <AnimatedSprite frames={FLAG_FRAMES} intervalMs={320} className="landing-ambient landing-flag-left" />
+            <AnimatedSprite frames={FLAG_FRAMES} intervalMs={300} className="landing-ambient landing-flag-right" />
+            <img src="/sprites/ambient_smoke_2.png" alt="" aria-hidden="true" className="landing-ambient landing-smoke landing-smoke-left" draggable={false} />
+            <img src="/sprites/ambient_smoke_3.png" alt="" aria-hidden="true" className="landing-ambient landing-smoke landing-smoke-right" draggable={false} />
 
-            {/* Fog overlay — drifting */}
             <div
-                className="absolute bottom-0 left-0 right-0 h-[25%] pointer-events-none z-[2] animate-fog-drift"
+                className="absolute bottom-0 left-0 right-0 h-[30%] pointer-events-none z-[4] animate-fog-drift"
                 style={{
-                    background: 'linear-gradient(0deg, rgba(10, 10, 18, 0.95) 0%, rgba(10, 10, 18, 0.5) 40%, transparent 100%)',
+                    background: 'linear-gradient(0deg, rgba(7, 7, 16, 0.96) 0%, rgba(7, 7, 16, 0.48) 42%, transparent 100%)',
                 }}
             />
 
-            {/* Ember particles */}
             <EmberParticles />
 
             {/* ═══ CONTENT ═══ */}
-            <div className="relative z-10 flex flex-col items-center flex-1 w-full max-w-lg px-6 py-8 sm:py-12">
+            <div className="relative z-10 flex flex-col items-center flex-1 w-full max-w-lg px-5 py-6 sm:py-9">
 
                 {/* Logo & Branding — animated entrance */}
-                <div className="flex flex-col items-center mb-8 sm:mb-10">
-                    {/* Crown — drops from above with bounce */}
-                    <div className="relative mb-3 animate-crown-drop">
+                <div className="royal-title-lockup flex flex-col items-center mb-5 sm:mb-7">
+                    <div className="relative mb-2 animate-crown-drop">
                         <div className="absolute inset-0 blur-xl bg-[var(--gold)] opacity-20 rounded-full scale-150" />
-                        <SpriteIcon name="ui_crown_emblem" size={64} className="relative" alt="Fortress AI crown" />
+                        <SpriteIcon name="logo_crown" size={76} className="relative" alt="" />
                     </div>
 
-                    {/* Title — staggered letter reveal with shimmer */}
-                    <h1
-                        className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wide font-heading text-glow-gold title-shimmer-text"
-                        aria-label="FORTRESS AI"
-                    >
-                        {'FORTRESS AI'.split('').map((char, i) => (
-                            <span
-                                key={i}
-                                className="animate-letter-rise inline-block"
-                                style={{ animationDelay: `${0.2 + i * 0.05}s` }}
-                            >
-                                {char === ' ' ? '\u00A0' : char}
-                            </span>
-                        ))}
-                    </h1>
-
-                    <div className="ornament-divider w-48 my-3 animate-subtitle-fade">
-                        <span className="text-[var(--gold-dim)] text-xs font-display tracking-[0.3em]">✦</span>
+                    <div className="flex items-center justify-center gap-1.5 sm:gap-2 w-full">
+                        <SpriteIcon name="logo_flourish_left" size={76} className="hidden sm:inline-block opacity-85" />
+                        <h1
+                            className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wide font-heading text-glow-gold title-shimmer-text whitespace-nowrap"
+                            aria-label="FORTRESS AI"
+                        >
+                            {'FORTRESS AI'.split('').map((char, i) => (
+                                <span
+                                    key={i}
+                                    className="animate-letter-rise inline-block"
+                                    style={{ animationDelay: `${0.2 + i * 0.05}s` }}
+                                >
+                                    {char === ' ' ? '\u00A0' : char}
+                                </span>
+                            ))}
+                        </h1>
+                        <SpriteIcon name="logo_flourish_right" size={76} className="hidden sm:inline-block opacity-85" />
                     </div>
 
-                    <p className="text-sm sm:text-base text-[var(--text-secondary)] font-display tracking-wider animate-subtitle-fade">
-                        CASTLE WAR — BUILD & CONQUER
+                    <img
+                        src="/sprites/logo_divider.png"
+                        alt=""
+                        aria-hidden="true"
+                        className="royal-title-divider my-2 animate-subtitle-fade"
+                        draggable={false}
+                    />
+
+                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-display tracking-wider animate-subtitle-fade">
+                        CASTLE WAR · BUILD & CONQUER
                     </p>
                 </div>
 
                 {/* Action Panel */}
-                <div className="w-full flex flex-col gap-3">
+                <div className="royal-menu-panel w-full flex flex-col gap-3">
                     {/* Player Name */}
                     <label htmlFor="player-name-input" className="sr-only">Player name</label>
                     <input
@@ -550,11 +585,11 @@ export const Lobby = ({
                         placeholder="Enter thy name..."
                         maxLength={20}
                         autoComplete="nickname"
-                        className="input-medieval w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-bold tracking-wide touch-manipulation"
+                        className="input-medieval royal-input-frame w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-bold tracking-wide touch-manipulation"
                     />
 
                     {/* Mode Selector — segmented control */}
-                    <div className="flex w-full rounded-xl overflow-hidden border border-[var(--border-subtle)]" role="radiogroup" aria-label="Game mode">
+                    <div className="royal-segmented flex w-full rounded-xl overflow-hidden border border-[var(--border-subtle)]" role="radiogroup" aria-label="Game mode">
                         <button
                             role="radio"
                             aria-checked={battleMode === 'solo'}
@@ -598,7 +633,7 @@ export const Lobby = ({
                                 onJoinQueue(playerName);
                             }
                         }}
-                        className="w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-bold touch-manipulation
+                        className="royal-primary-button group w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-bold touch-manipulation
                             flex items-center justify-center gap-2.5
                             bg-gradient-to-b from-emerald-500 to-emerald-700 text-white
                             border border-emerald-400/30
@@ -606,12 +641,27 @@ export const Lobby = ({
                             hover:from-emerald-400 hover:to-emerald-600
                             active:scale-[0.98] transition-all duration-200"
                     >
+                        <img src="/sprites/ambient_button_shine.png" alt="" aria-hidden="true" className="royal-button-shine" draggable={false} />
                         <SpriteIcon name="ui_battle_cannons" size={24} />
                         <span>BATTLE</span>
                         <span className="text-xs opacity-70 font-normal ml-1">
-                            {battleMode === 'solo' ? '— vs Bot' : '— Find Opponent'}
+                            {battleMode === 'solo' ? '· vs Bot' : '· Find Opponent'}
                         </span>
                     </button>
+
+                    <div className="landing-preview-strip" aria-label="Gameplay loop">
+                        {[
+                            { icon: 'preview_prompt', label: 'Prompt' },
+                            { icon: 'preview_blueprint', label: 'Fortress' },
+                            { icon: 'preview_fire', label: 'Cannon' },
+                        ].map((step, index, items) => (
+                            <div className="landing-preview-item" key={step.icon}>
+                                <SpriteIcon name={step.icon} size={36} />
+                                <span>{step.label}</span>
+                                {index < items.length - 1 && <span className="landing-preview-arrow" aria-hidden="true">&gt;</span>}
+                            </div>
+                        ))}
+                    </div>
 
                     {/* Join by Room Code — always visible */}
                     <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
@@ -624,12 +674,12 @@ export const Lobby = ({
                             placeholder="ROOM CODE"
                             maxLength={6}
                             autoComplete="off"
-                            className="input-medieval min-w-0 flex-1 rounded-xl px-3 py-3 text-center text-sm font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
+                            className="input-medieval royal-input-frame min-w-0 flex-1 rounded-xl px-3 py-3 text-center text-sm font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
                         />
                         <button
                             type="submit"
                             disabled={joinCode.trim().length < 4}
-                            className="btn-medieval shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-sm touch-manipulation
+                            className="btn-medieval royal-secondary-button shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-sm touch-manipulation
                                 flex items-center gap-1.5
                                 disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
                         >
@@ -639,7 +689,7 @@ export const Lobby = ({
                     </form>
 
                     {/* How to Play */}
-                    <div className="card-dark rounded-xl overflow-hidden">
+                    <div className="card-dark royal-accordion-panel rounded-xl overflow-hidden">
                         <button
                             onClick={() => setShowHowToPlay(!showHowToPlay)}
                             aria-expanded={showHowToPlay}

@@ -461,6 +461,330 @@
       "width": 64,
       "height": 24,
       "path": "/sprites/shape_beam_preview.png"
+    },
+    {
+      "name": "landing_citadel",
+      "width": 760,
+      "height": 320,
+      "path": "/sprites/landing_citadel.png"
+    },
+    {
+      "name": "landing_mountain_ridge",
+      "width": 760,
+      "height": 160,
+      "path": "/sprites/landing_mountain_ridge.png"
+    },
+    {
+      "name": "landing_gate_arch",
+      "width": 560,
+      "height": 420,
+      "path": "/sprites/landing_gate_arch.png"
+    },
+    {
+      "name": "landing_platform_edge",
+      "width": 640,
+      "height": 120,
+      "path": "/sprites/landing_platform_edge.png"
+    },
+    {
+      "name": "landing_castle_left",
+      "width": 320,
+      "height": 210,
+      "path": "/sprites/landing_castle_left.png"
+    },
+    {
+      "name": "landing_castle_right",
+      "width": 320,
+      "height": 210,
+      "path": "/sprites/landing_castle_right.png"
+    },
+    {
+      "name": "landing_fog_bank",
+      "width": 820,
+      "height": 150,
+      "path": "/sprites/landing_fog_bank.png"
+    },
+    {
+      "name": "landing_wall_segment",
+      "width": 680,
+      "height": 140,
+      "path": "/sprites/landing_wall_segment.png"
+    },
+    {
+      "name": "logo_crest",
+      "width": 96,
+      "height": 96,
+      "path": "/sprites/logo_crest.png"
+    },
+    {
+      "name": "logo_crown",
+      "width": 112,
+      "height": 88,
+      "path": "/sprites/logo_crown.png"
+    },
+    {
+      "name": "logo_seal",
+      "width": 96,
+      "height": 96,
+      "path": "/sprites/logo_seal.png"
+    },
+    {
+      "name": "logo_cannon_crown",
+      "width": 96,
+      "height": 96,
+      "path": "/sprites/logo_cannon_crown.png"
+    },
+    {
+      "name": "logo_ai_crystal",
+      "width": 96,
+      "height": 96,
+      "path": "/sprites/logo_ai_crystal.png"
+    },
+    {
+      "name": "logo_divider",
+      "width": 520,
+      "height": 32,
+      "path": "/sprites/logo_divider.png"
+    },
+    {
+      "name": "logo_flourish_left",
+      "width": 160,
+      "height": 64,
+      "path": "/sprites/logo_flourish_left.png"
+    },
+    {
+      "name": "logo_flourish_right",
+      "width": 160,
+      "height": 64,
+      "path": "/sprites/logo_flourish_right.png"
+    },
+    {
+      "name": "logo_wordmark",
+      "width": 420,
+      "height": 120,
+      "path": "/sprites/logo_wordmark.png"
+    },
+    {
+      "name": "logo_compact",
+      "width": 180,
+      "height": 120,
+      "path": "/sprites/logo_compact.png"
+    },
+    {
+      "name": "button_primary",
+      "width": 620,
+      "height": 104,
+      "path": "/sprites/button_primary.png"
+    },
+    {
+      "name": "button_primary_hover",
+      "width": 620,
+      "height": 104,
+      "path": "/sprites/button_primary_hover.png"
+    },
+    {
+      "name": "button_secondary",
+      "width": 360,
+      "height": 96,
+      "path": "/sprites/button_secondary.png"
+    },
+    {
+      "name": "button_disabled",
+      "width": 360,
+      "height": 96,
+      "path": "/sprites/button_disabled.png"
+    },
+    {
+      "name": "button_segmented",
+      "width": 560,
+      "height": 104,
+      "path": "/sprites/button_segmented.png"
+    },
+    {
+      "name": "button_segment_selected",
+      "width": 280,
+      "height": 88,
+      "path": "/sprites/button_segment_selected.png"
+    },
+    {
+      "name": "button_input",
+      "width": 620,
+      "height": 104,
+      "path": "/sprites/button_input.png"
+    },
+    {
+      "name": "button_room_input",
+      "width": 620,
+      "height": 112,
+      "path": "/sprites/button_room_input.png"
+    },
+    {
+      "name": "button_accordion",
+      "width": 620,
+      "height": 128,
+      "path": "/sprites/button_accordion.png"
+    },
+    {
+      "name": "button_tooltip",
+      "width": 320,
+      "height": 120,
+      "path": "/sprites/button_tooltip.png"
+    },
+    {
+      "name": "button_icon",
+      "width": 96,
+      "height": 96,
+      "path": "/sprites/button_icon.png"
+    },
+    {
+      "name": "button_icon_active",
+      "width": 96,
+      "height": 96,
+      "path": "/sprites/button_icon_active.png"
+    },
+    {
+      "name": "ambient_torch_0",
+      "width": 80,
+      "height": 96,
+      "path": "/sprites/ambient_torch_0.png"
+    },
+    {
+      "name": "ambient_torch_1",
+      "width": 80,
+      "height": 96,
+      "path": "/sprites/ambient_torch_1.png"
+    },
+    {
+      "name": "ambient_torch_2",
+      "width": 80,
+      "height": 96,
+      "path": "/sprites/ambient_torch_2.png"
+    },
+    {
+      "name": "ambient_torch_3",
+      "width": 80,
+      "height": 96,
+      "path": "/sprites/ambient_torch_3.png"
+    },
+    {
+      "name": "ambient_flag_0",
+      "width": 112,
+      "height": 82,
+      "path": "/sprites/ambient_flag_0.png"
+    },
+    {
+      "name": "ambient_flag_1",
+      "width": 112,
+      "height": 82,
+      "path": "/sprites/ambient_flag_1.png"
+    },
+    {
+      "name": "ambient_flag_2",
+      "width": 112,
+      "height": 82,
+      "path": "/sprites/ambient_flag_2.png"
+    },
+    {
+      "name": "ambient_flag_3",
+      "width": 112,
+      "height": 82,
+      "path": "/sprites/ambient_flag_3.png"
+    },
+    {
+      "name": "ambient_smoke_0",
+      "width": 170,
+      "height": 96,
+      "path": "/sprites/ambient_smoke_0.png"
+    },
+    {
+      "name": "ambient_smoke_1",
+      "width": 180,
+      "height": 104,
+      "path": "/sprites/ambient_smoke_1.png"
+    },
+    {
+      "name": "ambient_smoke_2",
+      "width": 280,
+      "height": 96,
+      "path": "/sprites/ambient_smoke_2.png"
+    },
+    {
+      "name": "ambient_smoke_3",
+      "width": 180,
+      "height": 96,
+      "path": "/sprites/ambient_smoke_3.png"
+    },
+    {
+      "name": "ambient_ember",
+      "width": 32,
+      "height": 32,
+      "path": "/sprites/ambient_ember.png"
+    },
+    {
+      "name": "ambient_ember_cluster",
+      "width": 48,
+      "height": 48,
+      "path": "/sprites/ambient_ember_cluster.png"
+    },
+    {
+      "name": "ambient_glint",
+      "width": 64,
+      "height": 64,
+      "path": "/sprites/ambient_glint.png"
+    },
+    {
+      "name": "ambient_button_shine",
+      "width": 220,
+      "height": 56,
+      "path": "/sprites/ambient_button_shine.png"
+    },
+    {
+      "name": "preview_prompt",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_prompt.png"
+    },
+    {
+      "name": "preview_blueprint",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_blueprint.png"
+    },
+    {
+      "name": "preview_fortress",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_fortress.png"
+    },
+    {
+      "name": "preview_fire",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_fire.png"
+    },
+    {
+      "name": "preview_king_shield",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_king_shield.png"
+    },
+    {
+      "name": "preview_debris",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_debris.png"
+    },
+    {
+      "name": "preview_victory",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_victory.png"
+    },
+    {
+      "name": "preview_rematch",
+      "width": 72,
+      "height": 72,
+      "path": "/sprites/preview_rematch.png"
     }
   ]
 }
