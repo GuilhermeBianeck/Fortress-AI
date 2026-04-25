@@ -739,7 +739,7 @@ export const Lobby = ({
                                     <div className="grid grid-cols-1 gap-1 text-[10px]">
                                         <span><span aria-hidden="true">🖱️</span> <b>Click</b> to place blocks during build phase</span>
                                         <span><span aria-hidden="true">🎯</span> <b>Drag</b> on the cannon to aim, release to fire</span>
-                                        <span><span aria-hidden="true">⌨️</span> <b>A/D</b> to pan camera · <b>↑↓</b> adjust power · <b>Space</b> to fire</span>
+                                        <span><span aria-hidden="true">⌨️</span> <b>A/D</b> to pan camera · <b>↑↓</b> to adjust power · <b>Space</b> to fire</span>
                                         <span><span aria-hidden="true">🤖</span> <b>Set an API key</b> and type a prompt to let AI build your fortress</span>
                                     </div>
                                 </div>
