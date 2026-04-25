@@ -720,7 +720,7 @@ export const Lobby = ({
                                 <div className="flex gap-3 items-start">
                                     <span className="text-lg leading-none mt-0.5" aria-hidden="true">💥</span>
                                     <div>
-                                        <p className="font-bold text-[var(--crimson)] mb-0.5">3. Combat Phase (15s/turn)</p>
+                                        <p className="font-bold text-[var(--crimson)] mb-0.5">3. Combat Phase (25s/turn)</p>
                                         <p>Take turns firing cannonballs! Drag to aim and release to fire. Destroy the enemy King to win the round. First to win 2 rounds wins the match.</p>
                                     </div>
                                 </div>
