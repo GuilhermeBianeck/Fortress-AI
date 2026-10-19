@@ -1,10 +1,18 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
-import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHpState } from '../types';
-import { WORLD_WIDTH, CANVAS_WIDTH, CANVAS_HEIGHT, LEFT_CANNON_X, RIGHT_CANNON_X } from '../types';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Crosshair, Hand, LocateFixed, MoveLeft, MoveRight, Flame, ZoomIn, ZoomOut } from 'lucide-react';
+import type { GameState, TerrainData, GameMode, Vector, Side, MatchPhase, KingHpState, ShapeType } from '../types';
+import { WORLD_WIDTH } from '../types';
 import { ParticleSystem } from '../effects/particles';
 import { debugStats, debugVisible, toggleDebug } from '../debug/debugStats';
 import { track } from '../analytics/tracker';
-import { sprites, AnimatedSprite, ANIMATIONS } from '../sprites';
+import { playFire, playImpact, playExplosion } from '../audio/SoundManager';
+import { cartoon } from '../sprites/cartoon';
+import { drawBattle, type BattleEffect, type BattleHazard } from '../game/BattleRenderer';
+import { cannonPosition, predictTrajectory } from '../game/ballistics';
+import { kingFeedbackPosition } from '../game/battleFeedback';
+import { canPlace, PLACEMENT_DIMENSIONS } from '../game/placement';
+import { clampCamera, createViewport, minimapRect, screenToWorld } from '../game/viewport';
+import './GameCanvas.css';
 
 interface GameCanvasProps {
     gameState: GameState | null;
@@ -13,6 +21,7 @@ interface GameCanvasProps {
     kingsHp: { left: KingHpState; right: KingHpState };
     mySide: Side;
     gameMode: GameMode;
+    selectedShape?: ShapeType;
     phase: MatchPhase;
     turnPlayer: Side | null;
     onFire: (angle: number, power: number) => void;
@@ -20,2101 +29,366 @@ interface GameCanvasProps {
     setProjectileImpactCallback: (cb: ((data: { position: Vector }) => void) | null) => void;
     setKingDamageCallback: (cb: ((data: { side: Side; damage: number }) => void) | null) => void;
     playerNames?: { left: string; right: string };
-    hazards?: HazardData[];
+    hazards?: BattleHazard[];
     roundScore?: { left: number; right: number };
     currentRound?: number;
 }
 
-export interface HazardData {
-    type: string;
-    id: string;
-    position: { x: number; y: number };
-    width: number;
-    height: number;
-    windDirection?: number;
-    windStrength?: number;
+export type HazardData = BattleHazard;
+interface Gesture {
+    kind: 'aim' | 'place' | 'pan' | 'minimap';
+    start: Vector;
+    camera: number;
+    cancelled: boolean;
 }
+const MIN_ANGLE = 10 * Math.PI / 180;
+const MAX_ANGLE = 170 * Math.PI / 180;
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-// Server snapshot rate: 20Hz = 50ms between snapshots (must match SNAPSHOT_RATE in server/physics/loop.ts)
-const SERVER_SNAPSHOT_MS = 50;
-
-// Pre-computed star alpha strings to avoid template literal allocation per star per frame
-// Stars use alpha = twinkle * 0.6 where twinkle ∈ [0.3, 1.0] → alpha ∈ [0.18, 0.60]
-// Quantized into 16 buckets (range=0.42) for minimal visual difference
-const STAR_ALPHA_MIN = 0.18;
-const STAR_ALPHA_RANGE = 0.42;
-const ALPHA_BUCKETS = 16;
-const STAR_ALPHA_STRINGS: string[] = (() => {
-    const arr: string[] = [];
-    for (let i = 0; i < ALPHA_BUCKETS; i++) {
-        const alpha = (STAR_ALPHA_MIN + (i / (ALPHA_BUCKETS - 1)) * STAR_ALPHA_RANGE).toFixed(2);
-        arr.push(`rgba(200,210,255,${alpha})`);
-    }
-    return arr;
-})();
-
-// Pre-computed wind particle alpha strings (16 buckets)
-// Wind alpha ∈ [~0.01, ~0.20] from: 0.08 + 0.12 * sin(...)
-const WIND_ALPHA_MIN = 0.01;
-const WIND_ALPHA_RANGE = 0.19;
-const WIND_ALPHA_STRINGS: string[] = (() => {
-    const arr: string[] = [];
-    for (let i = 0; i < ALPHA_BUCKETS; i++) {
-        const alpha = (WIND_ALPHA_MIN + (i / (ALPHA_BUCKETS - 1)) * WIND_ALPHA_RANGE).toFixed(3);
-        arr.push(`rgba(180,215,255,${alpha})`);
-    }
-    return arr;
-})();
-
-// Pre-computed wind arrow alpha strings (16 buckets, alpha * 0.7 of wind alpha)
-const WIND_ARROW_ALPHA_MIN = 0.007;
-const WIND_ARROW_ALPHA_RANGE = 0.133;
-const WIND_ARROW_ALPHA_STRINGS: string[] = (() => {
-    const arr: string[] = [];
-    for (let i = 0; i < ALPHA_BUCKETS; i++) {
-        const alpha = (WIND_ARROW_ALPHA_MIN + (i / (ALPHA_BUCKETS - 1)) * WIND_ARROW_ALPHA_RANGE).toFixed(3);
-        arr.push(`rgba(180,215,255,${alpha})`);
-    }
-    return arr;
-})();
-
-// Material color map (dark medieval theme)
-const MATERIAL_COLORS: Record<string, string> = {
-    wood: '#8B6B42',
-    stone: '#5A5A6A',
-    ice: '#7EC8D0',
-    rubber: '#D45090',
-    steel: '#4A5560',
-    king: '#FFD700',
-    Terrain: '#2a4a2f',
-};
-
-const MATERIAL_STROKE: Record<string, string> = {
-    wood: '#6B4D14',
-    stone: '#3a3a4a',
-    ice: '#5AA8B0',
-    rubber: '#A03868',
-    steel: '#1e2226',
-    king: '#B8860B',
-};
-
-function getHpColor(ratio: number): string {
-    if (ratio > 0.6) return '#22c55e';
-    if (ratio > 0.3) return '#eab308';
-    return '#ef4444';
-}
-
-function interpolateTerrainY(points: { x: number; y: number }[], x: number): number {
-    for (let i = 0; i < points.length - 1; i++) {
-        if (points[i].x <= x && points[i + 1].x >= x) {
-            const t = (x - points[i].x) / (points[i + 1].x - points[i].x);
-            return points[i].y + t * (points[i + 1].y - points[i].y);
-        }
-    }
-    return points[points.length - 1]?.y ?? 500;
-}
-
-// === Physics Constants (Must match server) ===
-const PHYSICS_GRAVITY = 2.0;
-const PHYSICS_GRAVITY_SCALE = 0.001;
-const PHYSICS_MAX_SPEED = 1000;
-const PHYSICS_POWER_MULTIPLIER = 1.0;
-const PHYSICS_AIR_FRICTION = 0.005;
-
-interface DamageNumber { side: Side; damage: number; x: number; y: number; age: number; }
-
-const GameCanvasInner = ({
-    gameState, terrain, onSpawn, kingsHp, mySide,
-    gameMode, phase, turnPlayer, onFire,
-    setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback,
-    playerNames, hazards, roundScore, currentRound,
-}: GameCanvasProps) => {
+function GameCanvasInner(props: GameCanvasProps) {
+    const latest = useRef(props);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const stageRef = useRef<HTMLDivElement>(null);
+    const camera = useRef({ x: 0, target: 0, manualUntil: 0 });
+    const [size, setSize] = useState({ width: 800, height: 560 });
+    const [overview, setOverview] = useState(false);
+    const view = useRef(createViewport(800, 560));
+    const [aim, setAimState] = useState({ angle: Math.PI / 4, power: 35 });
+    const aimRef = useRef(aim);
+    const [inspect, setInspect] = useState(false);
+    const inspectRef = useRef(false);
+    const [shotPending, setShotPending] = useState(false);
+    const pendingRef = useRef(false);
+    const previous = useRef(new Map<number, { x: number; y: number; angle: number }>());
+    const snapshotAt = useRef(0);
+    const trajectory = useRef<Vector[]>([]);
+    const particles = useRef(new ParticleSystem());
+    const effects = useRef<BattleEffect[]>([]);
+    const shot = useRef<{ side: Side; at: number } | undefined>(undefined);
+    const seenProjectiles = useRef(new Set<number>());
+    const followedProjectile = useRef<number | null>(null);
+    const lastSound = useRef(0);
+    const pointers = useRef(new Map<number, Vector>());
+    const gesture = useRef<Gesture | null>(null);
+    const ghost = useRef<Vector | undefined>(undefined);
+    const reducedMotion = useRef(false);
+    const keys = useRef(new Set<string>());
 
-    // Refs for minimap drag state
-    const isDraggingMinimapRef = useRef(false);
-
-    const gameStateRef = useRef(gameState);
-    const terrainRef = useRef(terrain);
-    const kingsHpRef = useRef(kingsHp);
-    const mySideRef = useRef(mySide);
-    const gameModeRef = useRef(gameMode);
-    const phaseRef = useRef(phase);
-    const turnPlayerRef = useRef(turnPlayer);
-    const onSpawnRef = useRef(onSpawn);
-    const onFireRef = useRef(onFire);
-    const playerNamesRef = useRef(playerNames);
-    const hazardsRef = useRef(hazards);
-    const roundScoreRef = useRef(roundScore);
-    const currentRoundRef = useRef(currentRound);
-
-    // Camera state
-    const cameraRef = useRef({ x: 0, targetX: 0 });
-
-    // Dynamic Canvas Size
-    const [canvasSize, setCanvasSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
-    const containerRef = useRef<HTMLDivElement>(null);
-
+    useEffect(() => { void cartoon.load(); }, []);
     useEffect(() => {
-        const updateSize = () => {
-            // Mobile breakpoint matches CSS (640px)
-            if (window.innerWidth < 640 && containerRef.current) {
-                // Use exact container size on mobile to prevent stretching
-                const { clientWidth, clientHeight } = containerRef.current;
-                if (clientWidth > 0 && clientHeight > 0) {
-                    setCanvasSize({ width: clientWidth, height: clientHeight });
-                }
-            } else {
-                // Fixed 4:3 on desktop
-                setCanvasSize({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
-            }
+        const media = matchMedia('(prefers-reduced-motion: reduce)');
+        const update = () => { reducedMotion.current = media.matches; };
+        update(); media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
+    useEffect(() => {
+        const stage = stageRef.current;
+        if (!stage) return;
+        const update = () => {
+            const { width, height } = stage.getBoundingClientRect();
+            if (width > 0 && height > 0) setSize({ width: Math.round(width), height: Math.round(height) });
         };
-
-        const observer = new ResizeObserver(updateSize);
-        if (containerRef.current) {
-            observer.observe(containerRef.current);
-        }
-
-        // Also listen to window resize for the breakpoint switch
-        window.addEventListener('resize', updateSize);
-        updateSize(); // Initial setup
-
-        return () => {
-            observer.disconnect();
-            window.removeEventListener('resize', updateSize);
-        };
+        const observer = new ResizeObserver(update);
+        observer.observe(stage); update();
+        return () => observer.disconnect();
     }, []);
 
-    // Helper for current dimensions (for effects/logic outside render loop)
-    const { width: currentCanvasWidth, height: currentCanvasHeight } = canvasSize;
+    const updateAim = useCallback((angle: number, power: number) => {
+        const next = { angle: clamp(angle, MIN_ANGLE, MAX_ANGLE), power: clamp(power, 5, 100) };
+        aimRef.current = next; setAimState(next);
+    }, []);
+    const focus = useCallback((x: number, manual = false) => {
+        camera.current.manualUntil = manual ? performance.now() + 12000 : 0;
+        camera.current.target = clampCamera(x - view.current.worldWidth / 2, view.current);
+    }, []);
+    const recenter = useCallback(() => {
+        const p = latest.current;
+        focus(p.phase === 'combat' ? cannonPosition(p.mySide, p.terrain?.points ?? []).x : p.kingsHp[p.mySide].x ?? 300);
+    }, [focus]);
 
-    // Aim state
-    const aimRef = useRef<{ active: boolean; angle: number; power: number; useKeyboard: boolean }>({
-        active: false, angle: Math.PI / 4, power: 15, useKeyboard: false,
-    });
-
-    // Touch guard — prevent synthesized mouse events after touch
-    const lastTouchRef = useRef(0);
-    // Touch aiming: store initial touch screen position for drag-relative power
-    const touchStartRef = useRef<{ sx: number; sy: number } | null>(null);
-    // Two-finger pan: store initial midpoint and camera position
-    const panTouchRef = useRef<{ startX: number; camStartX: number } | null>(null);
-
-    // Screen shake
-    const shakeRef = useRef({ amplitude: 0, remaining: 0, max: 0 });
-
-    // Floating damage numbers
-    const damageNumbersRef = useRef<DamageNumber[]>([]);
-
-    // Trajectory preview cache — avoids 240 physics iterations when aim is unchanged
-    const trajectoryCache = useRef<{ angle: number; power: number; cannonX: number; cannonY: number; path: {x: number; y: number}[] } | null>(null);
-
-    // Particles
-    const particlesRef = useRef(new ParticleSystem());
-
-    // Cloud state
-    interface Cloud {
-        x: number;
-        y: number;
-        speed: number;
-        scale: number;
-        depth: number; // 0=far, 1=near
-        puffs: { dx: number; dy: number; rx: number; ry: number }[];
-        fillStyle: string; // Pre-computed, never changes (depth is constant)
-        offscreen?: HTMLCanvasElement; // Pre-rendered puffs (lazily created)
-        offX: number; // Offset from cloud center to offscreen canvas origin
-        offY: number;
-    }
-    const cloudsRef = useRef<Cloud[] | null>(null);
-
-    // Projectile trails: bodyId -> last N positions
-    const trailsRef = useRef<Map<number, Vector[]>>(new Map());
-
-    // Gradient cache: recreated only when canvas logical dimensions change
-    const gradientCacheRef = useRef<{
-        skyBg: CanvasGradient | null;
-        horizonGlow: CanvasGradient | null;
-        terrainFill: CanvasGradient | null;
-        canvasW: number;
-        canvasH: number;
-    }>({ skyBg: null, horizonGlow: null, terrainFill: null, canvasW: 0, canvasH: 0 });
-
-    // Previous kings HP for shake detection
-    const prevKingsHpRef = useRef(kingsHp);
-
-    // Animation frame ID
-    const rafRef = useRef<number>(0);
-
-    // Cached 2D context — avoids getContext('2d') call every frame
-    const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-
-    // Keys pressed for camera
-    const keysRef = useRef<Set<string>>(new Set());
-
-    // Flag to ensure initial camera setup only happens once
-    const hasPannedForPhaseRef = useRef<string | null>(null);
-
-    // Interpolation state: store previous snapshot for smooth movement
-    const prevBodiesRef = useRef<Map<number, { x: number; y: number; angle: number }>>(new Map());
-    const snapshotTimeRef = useRef<number>(0);
-
-    // Cached king glow gradient (avoid createRadialGradient per frame)
-    const kingGlowRef = useRef<{ radius: number; gradient: CanvasGradient } | null>(null);
-
-    // Camera flash on king hit (white overlay that fades)
-    const flashRef = useRef(0);
-
-    // Active one-shot sprite animations (explosions, sparks)
-    const activeAnimsRef = useRef<{ anim: AnimatedSprite; x: number; y: number; size: number }[]>([]);
-
-    // Terrain tile pattern (cached)
-    const terrainPatternRef = useRef<CanvasPattern | null>(null);
-
-    // Sync refs
     useEffect(() => {
-        // On each new server snapshot, capture previous positions for interpolation
-        if (gameState) {
-            const prevMap = prevBodiesRef.current;
-            const gsRef = gameStateRef.current;
-            if (gsRef) {
-                prevMap.clear();
-                for (const body of gsRef.bodies) {
-                    prevMap.set(body.id, { x: body.position.x, y: body.position.y, angle: body.angle });
-                }
-            }
-            snapshotTimeRef.current = performance.now();
-        }
-        gameStateRef.current = gameState;
-    }, [gameState]);
-    useEffect(() => { terrainRef.current = terrain; }, [terrain]);
-    useEffect(() => { kingsHpRef.current = kingsHp; }, [kingsHp]);
-    useEffect(() => { mySideRef.current = mySide; }, [mySide]);
-    useEffect(() => { gameModeRef.current = gameMode; }, [gameMode]);
-    useEffect(() => { phaseRef.current = phase; }, [phase]);
-    useEffect(() => { turnPlayerRef.current = turnPlayer; }, [turnPlayer]);
-    useEffect(() => { onSpawnRef.current = onSpawn; }, [onSpawn]);
-    useEffect(() => { onFireRef.current = onFire; }, [onFire]);
-    useEffect(() => { playerNamesRef.current = playerNames; }, [playerNames]);
-    useEffect(() => { hazardsRef.current = hazards; }, [hazards]);
-    useEffect(() => { roundScoreRef.current = roundScore; }, [roundScore]);
-    useEffect(() => { currentRoundRef.current = currentRound; }, [currentRound]);
-
-    // Detect King HP decrease -> shake
+        view.current = createViewport(size.width, size.height, overview);
+        camera.current.x = clampCamera(camera.current.x, view.current);
+        camera.current.target = clampCamera(camera.current.target, view.current);
+    }, [size, overview]);
     useEffect(() => {
-        const myKingHp = kingsHp[mySide].hp;
-        const prevMyKingHp = prevKingsHpRef.current[mySide].hp;
-        if (myKingHp < prevMyKingHp) {
-            triggerShake(6, 18);
+        pendingRef.current = false; setShotPending(false);
+        followedProjectile.current = null;
+    }, [props.phase, props.turnPlayer]);
+    useEffect(() => {
+        const oldState = latest.current.gameState;
+        if (oldState !== props.gameState) {
+            previous.current = new Map((oldState?.bodies ?? []).map(b => [b.id, { ...b.position, angle: b.angle }]));
+            snapshotAt.current = performance.now();
         }
-        prevKingsHpRef.current = kingsHp;
-        // triggerShake is stable (useCallback with no deps) — safe to omit from deps
+        latest.current = props;
+        for (const body of props.gameState?.bodies ?? []) {
+            if (body.label !== 'projectile' || seenProjectiles.current.has(body.id)) continue;
+            seenProjectiles.current.add(body.id);
+            followedProjectile.current = body.id;
+            const side: Side = props.turnPlayer ?? (body.position.x < WORLD_WIDTH / 2 ? 'left' : 'right');
+            shot.current = { side, at: performance.now() };
+            const pos = cannonPosition(side, props.terrain?.points ?? []);
+            if (!reducedMotion.current) particles.current.emitImpact(pos.x, pos.y);
+            playFire();
+        }
+    }, [props]);
+    useEffect(() => {
+        gesture.current = null; ghost.current = undefined; pointers.current.clear();
+        camera.current.manualUntil = 0;
+        if (props.phase === 'build') {
+            effects.current = []; seenProjectiles.current.clear();
+            focus(props.kingsHp[props.mySide].x ?? (props.mySide === 'left' ? 300 : 2100));
+            camera.current.x = camera.current.target;
+        } else if (props.phase === 'combat') {
+            focus(cannonPosition(props.turnPlayer ?? props.mySide, props.terrain?.points ?? []).x);
+            camera.current.x = camera.current.target;
+        }
+        // Reframe on phase/turn/viewport changes, not every moving king snapshot.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [kingsHp, mySide]);
-
-    const triggerShake = useCallback((amplitude: number, duration: number) => {
-        const s = shakeRef.current;
-        if (amplitude > s.amplitude || s.remaining <= 0) {
-            s.amplitude = amplitude;
-            s.remaining = duration;
-            s.max = duration;
-        }
-    }, []);
-
-    // Register socket callbacks
+    }, [props.phase, props.turnPlayer, props.mySide, size.width, size.height, overview]);
     useEffect(() => {
-        setBlockDestroyedCallback((data) => {
-            const particles = particlesRef.current;
-            // Material-specific debris
-            particles.emitMaterial(data.position.x, data.position.y, data.material, data.velocity);
-            // Lingering smoke
-            particles.emitSmoke(data.position.x, data.position.y);
-            // Explosion sprite animation
-            const expl = new AnimatedSprite({ ...ANIMATIONS.explosion });
-            activeAnimsRef.current.push({ anim: expl, x: data.position.x, y: data.position.y, size: 40 });
-            triggerShake(3, 10);
-        });
-        setProjectileImpactCallback((data) => {
-            const particles = particlesRef.current;
-            // Bright impact flash sparks
-            particles.emitImpact(data.position.x, data.position.y);
-            // Spark sprite animation
-            const spark = new AnimatedSprite({ ...ANIMATIONS.spark });
-            activeAnimsRef.current.push({ anim: spark, x: data.position.x, y: data.position.y, size: 24 });
-            triggerShake(1, 4);
-        });
-        setKingDamageCallback((data) => {
-            const kingHp = kingsHpRef.current[data.side];
-            const x = kingHp.x ?? (data.side === 'left' ? 300 : WORLD_WIDTH - 300);
-            const y = (kingHp.y ?? 400) - 30;
-            damageNumbersRef.current.push({
-                side: data.side,
-                damage: Math.round(data.damage),
-                x: x + (Math.random() - 0.5) * 20,
-                y,
-                age: 0,
-            });
-            // White camera flash on king hit
-            flashRef.current = 6;
-        });
-        return () => {
-            setBlockDestroyedCallback(null);
-            setProjectileImpactCallback(null);
-            setKingDamageCallback(null);
-        };
-    }, [setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback, triggerShake]);
-
-    // Update projectile trails from gameState
-    useEffect(() => {
-        if (!gameState) return;
-        const trails = trailsRef.current;
-        const activeIds = new Set<number>();
-
-        for (const body of gameState.bodies) {
-            if (body.label !== 'projectile') continue;
-            activeIds.add(body.id);
-            let trail = trails.get(body.id);
-            if (!trail) {
-                trail = [];
-                trails.set(body.id, trail);
-            }
-            trail.push({ x: body.position.x, y: body.position.y });
-            if (trail.length > 5) trail.shift();
-        }
-
-        // Cleanup stale trails
-        for (const id of trails.keys()) {
-            if (!activeIds.has(id)) trails.delete(id);
-        }
-    }, [gameState]);
-
-    // Auto-pan camera based on phase
-    useEffect(() => {
-        const cam = cameraRef.current;
-
-        if (phase === 'build') {
-            const kingX = kingsHp[mySide]?.x;
-            if (kingX) {
-                // Re-pan if phase changed OR canvas width changed (mobile resize)
-                const panKey = `${phase}_${currentCanvasWidth}`;
-                if (hasPannedForPhaseRef.current === panKey) return;
-                const maxCamX = WORLD_WIDTH - currentCanvasWidth;
-                const target = Math.max(0, Math.min(maxCamX, kingX - currentCanvasWidth / 2));
-                cam.targetX = target;
-                cam.x = target; // Snap immediately so King is centered from the first frame
-                hasPannedForPhaseRef.current = panKey;
-            }
-        } else if (phase === 'reveal') {
-            if (hasPannedForPhaseRef.current?.startsWith('reveal')) return;
-            const myKingX = kingsHp[mySide]?.x;
-            const enemyKingX = kingsHp[mySide === 'left' ? 'right' : 'left']?.x;
-
-            if (myKingX && enemyKingX) {
-                const maxCamX = WORLD_WIDTH - currentCanvasWidth;
-                cam.targetX = Math.max(0, Math.min(maxCamX, myKingX - currentCanvasWidth / 2));
-                const panTimer = setTimeout(() => {
-                    cam.targetX = Math.max(0, Math.min(maxCamX, enemyKingX - currentCanvasWidth / 2));
-                }, 2500);
-                hasPannedForPhaseRef.current = 'reveal';
-                return () => clearTimeout(panTimer);
-            }
-        } else {
-            hasPannedForPhaseRef.current = phase;
-        }
-
-        // Release cloud data for GC between matches — they'll be lazily re-created
-        if (phase === 'result' || phase === 'build') {
-            cloudsRef.current = null;
-        }
-    }, [phase, mySide, currentCanvasWidth, kingsHp]);
-
-    // Auto-pan to active cannon when it's their turn.
-    // Framing: keep the cannon near the back edge, with most of the viewport
-    // showing the battlefield in the firing direction so the player can aim.
-    useEffect(() => {
-        if (phase !== 'combat') return;
-        if (!turnPlayer) return;
-        const cannonX = turnPlayer === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
-        // Left cannon fires right — put it at ~15% of viewport (battlefield on the right).
-        // Right cannon fires left — put it at ~85% of viewport (battlefield on the left).
-        const cannonScreenFraction = turnPlayer === 'left' ? 0.15 : 0.85;
-        const target = Math.max(0, Math.min(
-            WORLD_WIDTH - currentCanvasWidth,
-            cannonX - currentCanvasWidth * cannonScreenFraction
-        ));
-        cameraRef.current.targetX = target;
-        // Snap so the cannon is framed the instant the turn starts,
-        // instead of slowly lerping from wherever reveal/previous-turn left us.
-        cameraRef.current.x = target;
-    }, [phase, turnPlayer, currentCanvasWidth]);
-
-    // Track projectile during combat for auto-pan
-    useEffect(() => {
-        if (phase !== 'combat' || !gameState) return;
-        const projectile = gameState.bodies.find(b => b.label === 'projectile');
-        if (projectile) {
-            cameraRef.current.targetX = Math.max(0, Math.min(
-                WORLD_WIDTH - currentCanvasWidth,
-                projectile.position.x - currentCanvasWidth / 2
-            ));
-        }
-    }, [phase, gameState, currentCanvasWidth]);
-
-    // 60fps render loop
-    useEffect(() => {
-        const render = (timestamp: number) => {
-            renderFrame(timestamp);
-            rafRef.current = requestAnimationFrame(render);
-        };
-        rafRef.current = requestAnimationFrame(render);
-        return () => {
-            cancelAnimationFrame(rafRef.current);
-        }
+        if (props.phase !== 'reveal') return;
+        focus(props.kingsHp[props.mySide].x ?? 300);
+        const timer = setTimeout(() => focus(latest.current.kingsHp[props.mySide === 'left' ? 'right' : 'left'].x ?? 2100), 2200);
+        return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const renderFrame = (rafTimestamp: number) => {
-        if (debugVisible) debugStats.updateFrame(rafTimestamp);
-
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        // Cache the 2D context — only fetch once
-        let ctx = ctxRef.current;
-        if (!ctx || ctx.canvas !== canvas) {
-            ctx = canvas.getContext('2d');
-            ctxRef.current = ctx;
-        }
-        if (!ctx) return;
-
-        const dpr = window.devicePixelRatio || 1;
-        // Reset and scale for High DPI
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-        // Logical dimensions (same as canvasSize state)
-        const width = canvas.width / dpr;
-        const height = canvas.height / dpr;
-
-        const gs = gameStateRef.current;
-        const terr = terrainRef.current;
-        const cam = cameraRef.current;
-
-        // Compute interpolation factor: 0 = at previous snapshot, 1 = at current snapshot
-        const prevBodies = prevBodiesRef.current;
-        const elapsed = performance.now() - snapshotTimeRef.current;
-        const interpT = Math.min(elapsed / SERVER_SNAPSHOT_MS, 1);
-
-        const kings = kingsHpRef.current;
-        const side = mySideRef.current;
-        const currentPhase = phaseRef.current;
-        const currentTurn = turnPlayerRef.current;
-        const aim = aimRef.current;
-        const shake = shakeRef.current;
-        const particles = particlesRef.current;
-        // const cam = cameraRef.current; // Already declared above
-
-
-
-        // Update camera with smooth lerp
-        const keys = keysRef.current;
-        if (keys.has('a') || keys.has('A')) cam.targetX -= 8;
-        if (keys.has('d') || keys.has('D')) cam.targetX += 8;
-        cam.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, cam.targetX));
-        const lerpFactor = currentPhase === 'reveal' ? 0.015 : 0.1;
-        cam.x += (cam.targetX - cam.x) * lerpFactor;
-
-        // Update particles
-        particles.update();
-
-        ctx.save();
-
-        // Apply screen shake
-        if (shake.remaining > 0) {
-            const progress = shake.remaining / shake.max;
-            const amp = shake.amplitude * progress;
-            const sx = (Math.random() - 0.5) * 2 * amp;
-            const sy = (Math.random() - 0.5) * 2 * amp;
-            ctx.translate(sx, sy);
-            shake.remaining--;
-        }
-
-        // Camera flash on king hit (white overlay that fades)
-        if (flashRef.current > 0) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${(flashRef.current / 6 * 0.15).toFixed(3)})`;
-            ctx.fillRect(-10, -10, width + 20, height + 20);
-            flashRef.current--;
-        }
-
-        // Single timestamp for the entire frame — use rAF timestamp (monotonic, no allocation)
-        const nowMs = rafTimestamp;
-
-        // Rebuild gradients only when canvas logical size changes
-        const gradCache = gradientCacheRef.current;
-        if (gradCache.canvasW !== width || gradCache.canvasH !== height) {
-            gradCache.skyBg = ctx.createLinearGradient(0, 0, 0, height);
-            gradCache.skyBg.addColorStop(0, '#0a0a14');
-            gradCache.skyBg.addColorStop(0.2, '#0d0d1a');
-            gradCache.skyBg.addColorStop(0.45, '#141428');
-            gradCache.skyBg.addColorStop(0.7, '#1a1a3e');
-            gradCache.skyBg.addColorStop(0.88, '#2a1a1a');
-            gradCache.skyBg.addColorStop(1, '#1a1008');
-
-            gradCache.horizonGlow = ctx.createRadialGradient(width / 2, height * 0.85, 0, width / 2, height * 0.85, width * 0.6);
-            gradCache.horizonGlow.addColorStop(0, 'rgba(180, 100, 30, 0.08)');
-            gradCache.horizonGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-            gradCache.terrainFill = ctx.createLinearGradient(0, 400, 0, height);
-            gradCache.terrainFill.addColorStop(0, '#2a3a20');
-            gradCache.terrainFill.addColorStop(0.15, '#1e2a18');
-            gradCache.terrainFill.addColorStop(0.4, '#1e1510');
-            gradCache.terrainFill.addColorStop(1, '#0e0a08');
-
-            gradCache.canvasW = width;
-            gradCache.canvasH = height;
-        }
-
-        // Dark twilight sky gradient (cached)
-        ctx.fillStyle = gradCache.skyBg!;
-        ctx.fillRect(-10, -10, width + 20, height + 20);
-
-        // Twinkling stars (upper sky only)
-        const starSeed = 42;
-        const starTime = nowMs / 1000;
-        for (let i = 0; i < 60; i++) {
-            const sx = ((i * 137.508 + starSeed * 73) % (width + 200)) - 100;
-            const sy = ((i * 97.3 + starSeed * 31) % (height * 0.55));
-            const twinkle = 0.3 + 0.7 * Math.abs(Math.sin(starTime * (0.5 + (i % 5) * 0.3) + i * 1.7));
-            const size = 0.5 + (i % 3) * 0.5;
-            // Use pre-computed alpha string: map alpha to bucket index
-            const alphaIdx = Math.min(ALPHA_BUCKETS - 1, (twinkle * 0.6 - STAR_ALPHA_MIN) / STAR_ALPHA_RANGE * (ALPHA_BUCKETS - 1) + 0.5 | 0);
-            ctx.fillStyle = STAR_ALPHA_STRINGS[alphaIdx];
-            // fillRect instead of beginPath+arc+fill: stars at 0.5-1.5px are too small for shape to matter
-            ctx.fillRect(sx - size, sy - size, size * 2, size * 2);
-        }
-
-        // Subtle horizon glow (cached)
-        ctx.fillStyle = gradCache.horizonGlow!;
-        ctx.fillRect(0, 0, width, height);
-
-        // Initialize dark storm clouds
-        if (!cloudsRef.current) {
-            const generateCloud = (layer: 'far' | 'mid' | 'near') => {
-                const depth = layer === 'far' ? 0.2 : layer === 'mid' ? 0.5 : 0.8;
-                const baseScale = layer === 'far' ? 0.7 : layer === 'mid' ? 1.1 : 1.6;
-                const speed = layer === 'far' ? 0.08 : layer === 'mid' ? 0.15 : 0.25;
-                const cloudAlpha = 0.25 + depth * 0.15;
-
-                return {
-                    x: Math.random() * (WORLD_WIDTH * 1.5),
-                    y: (Math.random() * 120) + (layer === 'far' ? 10 : layer === 'mid' ? 40 : 70),
-                    speed: speed + Math.random() * 0.08,
-                    scale: baseScale * (0.8 + Math.random() * 0.4),
-                    depth,
-                    puffs: Array.from({ length: 4 + Math.floor(Math.random() * 4) }, () => ({
-                        dx: (Math.random() - 0.5) * 80,
-                        dy: (Math.random() * 20),
-                        rx: 30 + Math.random() * 20,
-                        ry: 15 + Math.random() * 15
-                    })),
-                    fillStyle: `rgba(35,30,50,${cloudAlpha.toFixed(2)})`,
-                    offX: 0,
-                    offY: 0,
-                };
-            };
-
-            const clouds: Cloud[] = [];
-            for (let i = 0; i < 10; i++) clouds.push(generateCloud('far'));
-            for (let i = 0; i < 7; i++) clouds.push(generateCloud('mid'));
-            for (let i = 0; i < 5; i++) clouds.push(generateCloud('near'));
-
-            cloudsRef.current = clouds;
-        }
-
-        // Draw Background Parallax (Mountains/Hills)
-        const drawLayer = (color: string, layerHeight: number, parallaxFactor: number, seedOffset: number, verticalOffset: number, frequency: number) => {
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            const startX = -100;
-            const endX = width + 100;
-            const camX = cam.x * parallaxFactor;
-            // Use terrain seed if available, otherwise 0
-            const baseSeed = terr?.seed ?? 0;
-            const amplitude = 120; // Fixed amplitude for background layers
-
-            ctx.moveTo(startX, height);
-            for (let x = startX; x <= endX; x += 20) {
-                // Perlin-ish noise using sine waves with custom seed offset
-                const worldX = x + camX;
-                const layerSeed = baseSeed + seedOffset;
-                const noise = Math.sin(worldX * frequency + layerSeed) * amplitude
-                    + Math.sin(worldX * frequency * 2.5 + layerSeed * 1.5) * (amplitude * 0.5)
-                    + Math.sin(worldX * frequency * 5 + layerSeed * 2.2) * (amplitude * 0.25);
-                // Height = base height from bottom
-                // VerticalOffset = additional shift (likely downwards if positive, or just an offset)
-                // User call: drawLayer('#A0BEDC', 250, 0.05, 123, 100, 0.002);
-
-                const y = height - layerHeight + noise + verticalOffset;
-
-                ctx.lineTo(x, y);
-            }
-            ctx.lineTo(endX, height);
-            ctx.fill();
-        };
-
-        // Layer 1: Far Mountains — dark misty silhouettes
-        drawLayer('#1a1e2e', 250, 0.05, 123, 100, 0.002);
-
-        // Layer 2: Mid Hills — dark forest silhouettes
-        drawLayer('#141e18', 150, 0.15, 456, 60, 0.005);
-
-        // Layer 3: Near Hills — darkest foreground
-        drawLayer('#0e1610', 80, 0.3, 789, 40, 0.008);
-
-
-        // Draw clouds — pre-render each cloud's puffs to an offscreen canvas on first use
-        const clouds = cloudsRef.current;
-        const totalWidth = WORLD_WIDTH + 800;
-
-        for (const cloud of clouds) {
-            cloud.x -= cloud.speed;
-            if (cloud.x < -400) cloud.x += totalWidth;
-
-            const drawX = cloud.x - (cam.x * cloud.depth);
-            if (drawX < -300 || drawX > width + 300) continue;
-
-            // Lazily render cloud puffs to an offscreen canvas (once per cloud)
-            if (!cloud.offscreen) {
-                // Compute bounding box of all puffs
-                let minPx = Infinity, minPy = Infinity, maxPx = -Infinity, maxPy = -Infinity;
-                for (const puff of cloud.puffs) {
-                    const px = puff.dx * cloud.scale;
-                    const py = puff.dy * cloud.scale;
-                    const rx = puff.rx * cloud.scale;
-                    const ry = puff.ry * cloud.scale;
-                    if (px - rx < minPx) minPx = px - rx;
-                    if (py - ry < minPy) minPy = py - ry;
-                    if (px + rx > maxPx) maxPx = px + rx;
-                    if (py + ry > maxPy) maxPy = py + ry;
-                }
-                const pad = 2;
-                const ow = Math.ceil(maxPx - minPx) + pad * 2;
-                const oh = Math.ceil(maxPy - minPy) + pad * 2;
-                const oc = document.createElement('canvas');
-                oc.width = ow;
-                oc.height = oh;
-                const octx = oc.getContext('2d')!;
-                octx.fillStyle = cloud.fillStyle;
-                for (const puff of cloud.puffs) {
-                    const px = puff.dx * cloud.scale - minPx + pad;
-                    const py = puff.dy * cloud.scale - minPy + pad;
-                    octx.beginPath();
-                    octx.ellipse(px, py, puff.rx * cloud.scale, puff.ry * cloud.scale, 0, 0, Math.PI * 2);
-                    octx.fill();
-                }
-                cloud.offscreen = oc;
-                cloud.offX = minPx - pad;
-                cloud.offY = minPy - pad;
-            }
-
-            // Blit the pre-rendered cloud (single drawImage instead of N ellipses)
-            ctx.drawImage(cloud.offscreen, drawX + cloud.offX, cloud.y + cloud.offY);
-        }
-
-        // === Apply camera offset for world drawing ===
-        ctx.save();
-        ctx.translate(-cam.x, 0);
-
-        // Draw terrain
-        if (terr && terr.points.length > 0) {
-            ctx.beginPath();
-            ctx.moveTo(0, canvas.height);
-            for (const pt of terr.points) {
-                ctx.lineTo(pt.x, pt.y);
-            }
-            ctx.lineTo(WORLD_WIDTH, canvas.height);
-            ctx.closePath();
-
-            // Earth terrain fill — use tiled texture if sprites loaded, else fallback to gradient
-            if (!terrainPatternRef.current && sprites.isReady()) {
-                const earthTile = sprites.get('terrain_earth');
-                if (earthTile) {
-                    terrainPatternRef.current = ctx.createPattern(earthTile, 'repeat');
-                }
-            }
-            if (terrainPatternRef.current) {
-                ctx.fillStyle = terrainPatternRef.current;
-            } else {
-                ctx.fillStyle = gradCache.terrainFill!;
-            }
-            ctx.fill();
-
-            // Grass edge sprites along terrain surface
-            const grassTile = sprites.get('terrain_grass');
-            if (grassTile) {
-                ctx.imageSmoothingEnabled = false;
-                for (let i = 0; i < terr.points.length - 1; i++) {
-                    const p = terr.points[i];
-                    ctx.drawImage(grassTile, p.x, p.y - 6, 32, 8);
-                }
-                ctx.imageSmoothingEnabled = true;
-            } else {
-                // Fallback: gold-tinted edge line
-                ctx.beginPath();
-                ctx.moveTo(terr.points[0].x, terr.points[0].y);
-                for (let i = 1; i < terr.points.length; i++) {
-                    ctx.lineTo(terr.points[i].x, terr.points[i].y);
-                }
-                ctx.strokeStyle = 'rgba(180, 150, 80, 0.25)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-
-            // Build zone overlays (more visible during build phase)
-            const isBuildPhase = currentPhase === 'build';
-            for (const zone of terr.buildZones) {
-                // Determine if this zone belongs to the current player
-                const isMyZone = isBuildPhase && (
-                    (side === 'left' && zone.x < WORLD_WIDTH / 2) ||
-                    (side === 'right' && zone.x >= WORLD_WIDTH / 2)
-                );
-                const zoneAlpha = isBuildPhase ? (isMyZone ? 0.1 : 0.04) : 0.03;
-                const borderAlpha = isBuildPhase ? (isMyZone ? 0.4 : 0.15) : 0.1;
-                // My zone: green tint; enemy zone: red tint; non-build: gold
-                const zoneColor = isBuildPhase
-                    ? (isMyZone ? '39, 174, 96' : '192, 57, 43')
-                    : '255, 215, 0';
-                ctx.fillStyle = `rgba(${zoneColor}, ${zoneAlpha})`;
-                ctx.fillRect(zone.x, zone.y - 200, zone.width, 200);
-                ctx.strokeStyle = `rgba(${zoneColor}, ${borderAlpha})`;
-                ctx.lineWidth = isBuildPhase ? 1.5 : 1;
-                ctx.setLineDash([4, 4]);
-                ctx.beginPath();
-                ctx.moveTo(zone.x, zone.y - 2);
-                ctx.lineTo(zone.x + zone.width, zone.y - 2);
-                ctx.stroke();
-                // Vertical build zone borders during build phase
-                if (isBuildPhase) {
-                    ctx.beginPath();
-                    ctx.moveTo(zone.x, zone.y - 200);
-                    ctx.lineTo(zone.x, zone.y - 2);
-                    ctx.moveTo(zone.x + zone.width, zone.y - 200);
-                    ctx.lineTo(zone.x + zone.width, zone.y - 2);
-                    ctx.stroke();
-                }
-                ctx.setLineDash([]);
-                // Zone label during build phase
-                if (isBuildPhase) {
-                    const labelAlpha = isMyZone ? 0.55 : 0.25;
-                    const label = isMyZone ? 'YOUR ZONE' : 'ENEMY ZONE';
-                    ctx.font = `bold ${isMyZone ? 13 : 11}px monospace`;
-                    ctx.fillStyle = `rgba(${zoneColor}, ${labelAlpha})`;
-                    ctx.textAlign = 'center';
-                    ctx.fillText(label, zone.x + zone.width / 2, zone.y - 182);
-                }
-            }
-
-            // Center divider — subtle gold dashed line
-            ctx.strokeStyle = 'rgba(255, 215, 0, 0.12)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([8, 8]);
-            ctx.beginPath();
-            ctx.moveTo(WORLD_WIDTH / 2, 0);
-            ctx.lineTo(WORLD_WIDTH / 2, canvas.height);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        // Draw hazard zones
-        const hzds = hazardsRef.current;
-        if (hzds) {
-            const animPhase = nowMs / 1000;
-            const visibleLeft = cam.x - 100;
-            const visibleRight = cam.x + width + 100;
-
-            for (const h of hzds) {
-                // Skip zones entirely off-screen
-                if (h.position.x + h.width < visibleLeft || h.position.x > visibleRight) continue;
-
-                if (h.type === 'wind_zone') {
-                    // Subtle blue tint
-                    ctx.fillStyle = 'rgba(100, 150, 255, 0.03)';
-                    ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
-
-                    // Organic wind particles — curved streaks with wobble
-                    const dir = h.windDirection ?? 1;
-                    const particleCount = 30; // Reduced from 50 for performance
-                    const wrapWidth = visibleRight - visibleLeft + 200;
-
-                    for (let i = 0; i < particleCount; i++) {
-                        const seed = i * 137.508;
-                        // Horizontal position wraps across the visible area
-                        const rawX = visibleLeft + ((seed + animPhase * (50 + (i % 4) * 15) * dir) % wrapWidth + wrapWidth) % wrapWidth;
-                        // Vertical position distributed across height with some jitter
-                        const baseY = h.position.y + ((seed * 73.7) % h.height);
-                        // Wobble for organic movement
-                        const wobble = Math.sin(animPhase * (1.5 + (i % 3) * 0.5) + seed * 0.1) * 6;
-                        const wobble2 = Math.cos(animPhase * 0.8 + seed * 0.07) * 3;
-                        // Varying streak length
-                        const len = 12 + (i % 7) * 6;
-                        // Pulsing opacity
-                        const alpha = 0.08 + 0.12 * Math.sin(animPhase * (2 + (i % 5) * 0.3) + seed * 0.15);
-
-                        const x = rawX;
-                        const y = baseY + wobble;
-
-                        // Draw curved streak — use pre-computed alpha string
-                        ctx.beginPath();
-                        ctx.moveTo(x, y);
-                        ctx.quadraticCurveTo(
-                            x + dir * len * 0.4, y + wobble2 - 2,
-                            x + dir * len, y + wobble2
-                        );
-                        // Map alpha to pre-computed bucket index
-                        const alphaIdx = Math.min(ALPHA_BUCKETS - 1, Math.max(0, (alpha - WIND_ALPHA_MIN) / WIND_ALPHA_RANGE * (ALPHA_BUCKETS - 1) + 0.5 | 0));
-                        ctx.strokeStyle = WIND_ALPHA_STRINGS[alphaIdx];
-                        ctx.lineWidth = 0.8 + (i % 3) * 0.4;
-                        ctx.stroke();
-
-                        // Small arrowhead on some streaks
-                        if (i % 4 === 0) {
-                            const tipX = x + dir * len;
-                            const tipY = y + wobble2;
-                            ctx.beginPath();
-                            ctx.moveTo(tipX, tipY);
-                            ctx.lineTo(tipX - dir * 4, tipY - 2);
-                            ctx.moveTo(tipX, tipY);
-                            ctx.lineTo(tipX - dir * 4, tipY + 2);
-                            // Map arrow alpha (0.7 * wind alpha) to pre-computed bucket index
-                            const arrowIdx = Math.min(ALPHA_BUCKETS - 1, Math.max(0, (alpha * 0.7 - WIND_ARROW_ALPHA_MIN) / WIND_ARROW_ALPHA_RANGE * (ALPHA_BUCKETS - 1) + 0.5 | 0));
-                            ctx.strokeStyle = WIND_ARROW_ALPHA_STRINGS[arrowIdx];
-                            ctx.lineWidth = 0.6;
-                            ctx.stroke();
-                        }
-                    }
-                } else if (h.type === 'lava_pool') {
-                    // Animated lava sprite (4 frames at 200ms each)
-                    const lavaFrame = Math.floor((nowMs / 200) % 4);
-                    const lavaSprite = sprites.get(`lava_${lavaFrame}`);
-                    if (lavaSprite) {
-                        ctx.imageSmoothingEnabled = false;
-                        for (let lx = h.position.x; lx < h.position.x + h.width; lx += 32) {
-                            const tw = Math.min(32, h.position.x + h.width - lx);
-                            ctx.drawImage(lavaSprite, 0, 0, Math.round(tw * (lavaSprite.width / 32)), lavaSprite.height, lx, h.position.y, tw, h.height);
-                        }
-                        ctx.imageSmoothingEnabled = true;
-                        // Glow overlay
-                        const glow = 0.1 + 0.05 * Math.sin(animPhase * 3);
-                        ctx.fillStyle = `rgba(255, 100, 30, ${glow})`;
-                        ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
-                    } else {
-                        // Fallback
-                        const glow = 0.4 + 0.1 * Math.sin(animPhase * 3);
-                        ctx.fillStyle = `rgba(255, 80, 20, ${glow})`;
-                        ctx.fillRect(h.position.x, h.position.y, h.width, h.height);
-                        ctx.fillStyle = `rgba(255, 200, 50, ${glow * 0.5})`;
-                        ctx.fillRect(h.position.x + 2, h.position.y + 2, h.width - 4, h.height - 4);
-                    }
-                } else if (h.type === 'falling_rocks') {
-                    // Dashed danger column outline
-                    ctx.strokeStyle = 'rgba(255, 200, 50, 0.3)';
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([4, 6]);
-                    ctx.strokeRect(h.position.x, h.position.y, h.width, h.height);
-                    ctx.setLineDash([]);
-
-                    // Danger label
-                    ctx.font = 'bold 9px monospace';
-                    ctx.fillStyle = 'rgba(255, 200, 50, 0.5)';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('DANGER', h.position.x + h.width / 2, h.position.y + 15);
-
-                    // Animated falling rock boulders within the zone
-                    const rockSprite = sprites.get('rock');
-                    if (rockSprite) {
-                        ctx.imageSmoothingEnabled = false;
-                        for (let ri = 0; ri < 3; ri++) {
-                            const rx = h.position.x + ((ri * 97 + Math.floor(animPhase * 20)) % Math.max(1, h.width - 16));
-                            const ry = h.position.y + ((ri * 137 + Math.floor(animPhase * 40)) % Math.max(1, h.height - 16));
-                            const rockAlpha = 0.4 + 0.3 * Math.sin(animPhase * 2 + ri * 2.1);
-                            ctx.globalAlpha = rockAlpha;
-                            ctx.drawImage(rockSprite, rx, ry, 16, 16);
-                        }
-                        ctx.globalAlpha = 1;
-                        ctx.imageSmoothingEnabled = true;
-                    }
-                }
-            }
-        }
-
-        // Draw BOTH cannons
-        if (terr && terr.points.length > 0) {
-            const drawCannon = (cannonX: number, facingRight: boolean, isActive: boolean) => {
-                const cannonY = interpolateTerrainY(terr.points, cannonX) - 20;
-                const currentAngle = isActive ? aim.angle : Math.PI / 4;
-
-                // Pulsing glow ring on active cannon — shows player where to drag
-                if (isActive && currentPhase === 'combat' && !aim.active && !aim.useKeyboard) {
-                    const pulse = 0.5 + 0.5 * Math.sin(nowMs / 350);
-                    ctx.beginPath();
-                    ctx.arc(cannonX, cannonY, 16 + pulse * 5, 0, Math.PI * 2);
-                    ctx.strokeStyle = `rgba(255, 215, 0, ${(0.25 + pulse * 0.45).toFixed(2)})`;
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    // Inner subtle glow fill
-                    ctx.beginPath();
-                    ctx.arc(cannonX, cannonY, 14, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(255, 215, 0, ${(0.05 + pulse * 0.07).toFixed(2)})`;
-                    ctx.fill();
-                }
-
-                // Cannon — sprite or fallback
-                const barrelAngle = facingRight ? -currentAngle : -(Math.PI - currentAngle);
-                const cannonSprite = sprites.get(facingRight ? 'cannon_right' : 'cannon_left');
-                if (cannonSprite) {
-                    ctx.save();
-                    ctx.translate(cannonX, cannonY);
-                    ctx.rotate(barrelAngle);
-                    ctx.imageSmoothingEnabled = false;
-                    ctx.drawImage(cannonSprite, -4, -8, 32, 16);
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.restore();
-                } else {
-                    // Fallback: programmatic barrel + base
-                    ctx.save();
-                    ctx.translate(cannonX, cannonY);
-                    ctx.rotate(barrelAngle);
-                    ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
-                    ctx.fillRect(0, -4, 24, 8);
-                    ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(0, -4, 24, 8);
-                    if (isActive) {
-                        ctx.beginPath();
-                        ctx.arc(22, 0, 1.5, 0, Math.PI * 2);
-                        ctx.fillStyle = '#FFD700';
-                        ctx.fill();
-                    }
-                    ctx.restore();
-                    ctx.beginPath();
-                    ctx.arc(cannonX, cannonY, 7, 0, Math.PI * 2);
-                    ctx.fillStyle = isActive ? '#3a3a4a' : '#2a2a3a';
-                    ctx.fill();
-                    ctx.strokeStyle = isActive ? '#aa9055' : '#4a4a5a';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.arc(cannonX, cannonY, 2, 0, Math.PI * 2);
-                    ctx.fillStyle = isActive ? '#FFD700' : '#6a6a7a';
-                    ctx.fill();
-                }
-
-                // Trajectory preview (only for active cannon during fire mode)
-                if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
-                    // Trajectory cache thresholds
-                    const TRAJ_ANGLE_THRESHOLD = 0.005; // ~0.3 degrees
-                    const TRAJ_POWER_THRESHOLD = 0.3;
-
-                    const cache = trajectoryCache.current;
-                    let trajPath: {x: number; y: number}[];
-
-                    // Reuse cached path if aim hasn't changed meaningfully
-                    if (cache &&
-                        Math.abs(cache.angle - aim.angle) < TRAJ_ANGLE_THRESHOLD &&
-                        Math.abs(cache.power - aim.power) < TRAJ_POWER_THRESHOLD &&
-                        Math.abs(cache.cannonX - cannonX) < 1 &&
-                        Math.abs(cache.cannonY - cannonY) < 1) {
-                        trajPath = cache.path;
-                    } else {
-                        // Compute new trajectory (match Matter.js physics exactly)
-                        // Matter.js applies gravity as: vy += gravity.y * gravity.scale (per Engine.update call)
-                        // NOT multiplied by dt — it's a velocity increment, not acceleration
-                        const gravityAccel = PHYSICS_GRAVITY * PHYSICS_GRAVITY_SCALE;
-                        const airDamp = 1 - PHYSICS_AIR_FRICTION;
-
-                        const dirMult = facingRight ? 1 : -1;
-                        let px = cannonX + dirMult * Math.cos(currentAngle) * 24;
-                        let py = cannonY - Math.sin(currentAngle) * 24;
-
-                        let vx = dirMult * (aim.power * PHYSICS_POWER_MULTIPLIER) * Math.cos(currentAngle);
-                        let vy = -(aim.power * PHYSICS_POWER_MULTIPLIER) * Math.sin(currentAngle);
-
-                        let speed = Math.sqrt(vx * vx + vy * vy);
-                        if (speed > PHYSICS_MAX_SPEED) {
-                            const s = PHYSICS_MAX_SPEED / speed;
-                            vx *= s;
-                            vy *= s;
-                        }
-
-                        trajPath = [{ x: px, y: py }];
-                        const frames = 120;
-
-                        // Wind hazard data for trajectory simulation
-                        const windHazard = hazardsRef.current?.find(h => h.type === 'wind_zone');
-
-                        for (let f = 0; f < frames; f++) {
-                            for (let sub = 0; sub < 2; sub++) {
-                                vy += gravityAccel;
-                                vx *= airDamp;
-                                vy *= airDamp;
-
-                                // Apply wind force between sub-steps (matching server's onTick between Engine.update calls)
-                                if (sub === 0 && windHazard) {
-                                    const wx = windHazard.position.x;
-                                    const wy = windHazard.position.y;
-                                    const ww = windHazard.width;
-                                    const wh = windHazard.height;
-                                    if (px >= wx && px <= wx + ww && py >= wy && py <= wy + wh) {
-                                        const windDir = windHazard.windDirection ?? 1;
-                                        const windStr = windHazard.windStrength ?? 0.0003;
-                                        vx += windDir * windStr * 0.4 * 4;
-                                    }
-                                }
-
-                                px += vx;
-                                py += vy;
-
-                                speed = Math.sqrt(vx * vx + vy * vy);
-                                if (speed > PHYSICS_MAX_SPEED) {
-                                    const cap = PHYSICS_MAX_SPEED / speed;
-                                    vx *= cap;
-                                    vy *= cap;
-                                }
-                            }
-
-                            trajPath.push({ x: px, y: py });
-                            if (py > canvas.height + 50 || px < -50 || px > WORLD_WIDTH + 50) break;
-                        }
-
-                        trajectoryCache.current = { angle: aim.angle, power: aim.power, cannonX, cannonY, path: trajPath };
-                    }
-
-                    // Draw the trajectory path
-                    ctx.beginPath();
-                    if (trajPath.length > 0) {
-                        ctx.moveTo(trajPath[0].x, trajPath[0].y);
-                        for (let i = 1; i < trajPath.length; i++) {
-                            ctx.lineTo(trajPath[i].x, trajPath[i].y);
-                        }
-                    }
-
-                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([6, 6]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-
-                // Aim readout (always show when aiming)
-                if (isActive && (aim.active || aim.useKeyboard) && currentPhase === 'combat') {
-                    ctx.font = 'bold 10px monospace';
-                    ctx.fillStyle = '#FFD700';
-                    ctx.textAlign = 'left';
-                    const labelX = facingRight ? cannonX + 14 : cannonX - 90;
-                    ctx.fillText(`${(currentAngle * 180 / Math.PI).toFixed(0)}° P:${aim.power.toFixed(0)}`, labelX, cannonY - 18);
-
-                    // Power bar
-                    const barX = facingRight ? cannonX + 14 : cannonX - 90;
-                    const barY = cannonY - 8;
-                    const barW = 60;
-                    const barH = 5;
-                    const powerRatio = (aim.power - 5) / 95;
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                    ctx.fillRect(barX, barY, barW, barH);
-                    const r = Math.round(255 * powerRatio);
-                    const g = Math.round(255 * (1 - powerRatio));
-                    ctx.fillStyle = `rgb(${r}, ${g}, 80)`;
-                    ctx.fillRect(barX, barY, barW * powerRatio, barH);
-                    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                    ctx.lineWidth = 0.5;
-                    ctx.strokeRect(barX, barY, barW, barH);
-                }
-            };
-
-            // Left cannon (fires right)
-            const leftActive = currentPhase === 'combat' && currentTurn === 'left' && side === 'left';
-            drawCannon(LEFT_CANNON_X, true, leftActive);
-
-            // Right cannon (fires left)
-            const rightActive = currentPhase === 'combat' && currentTurn === 'right' && side === 'right';
-            drawCannon(RIGHT_CANNON_X, false, rightActive);
-        }
-
-        // Draw projectile trails
-        const trails = trailsRef.current;
-        for (const [, positions] of trails) {
-            for (let i = 0; i < positions.length - 1; i++) {
-                const alpha = (i + 1) / positions.length * 0.5;
-                ctx.beginPath();
-                ctx.arc(positions[i].x, positions[i].y, 3, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 180, 80, ${alpha})`;
-                ctx.fill();
-            }
-        }
-
-        // Draw dynamic bodies
-        if (gs) {
-            // Viewport bounds for culling (with margin for rotation/size)
-            const cullMargin = 80;
-            const vpLeft = cam.x - cullMargin;
-            const vpRight = cam.x + width + cullMargin;
-            const vpTop = -cullMargin;
-            const vpBottom = height + cullMargin;
-            let _dbgDrawn = 0, _dbgCulled = 0;
-
-            for (const body of gs.bodies) {
-                if (body.label === 'Terrain' || body.label === 'Boundary') continue;
-
-                // Fast viewport culling — skip bodies entirely off-screen
-                const bx = body.position.x;
-                const by = body.position.y;
-                if (bx < vpLeft || bx > vpRight || by < vpTop || by > vpBottom) { _dbgCulled++; continue; }
-
-                // Interpolate position and angle for smooth movement between server snapshots
-                let drawX = body.position.x;
-                let drawY = body.position.y;
-                let drawAngle = body.angle;
-
-                const prev = prevBodies.get(body.id);
-                if (prev && interpT < 1) {
-                    drawX = prev.x + (body.position.x - prev.x) * interpT;
-                    drawY = prev.y + (body.position.y - prev.y) * interpT;
-                    // Interpolate angle with shortest-path wrapping
-                    let dAngle = body.angle - prev.angle;
-                    if (dAngle > Math.PI) dAngle -= Math.PI * 2;
-                    if (dAngle < -Math.PI) dAngle += Math.PI * 2;
-                    drawAngle = prev.angle + dAngle * interpT;
-                }
-
-                ctx.save();
-                ctx.translate(drawX, drawY);
-                ctx.rotate(drawAngle);
-
-                const fillColor = body.color || MATERIAL_COLORS[body.material] || MATERIAL_COLORS[body.label] || '#e11d48';
-                const strokeColor = MATERIAL_STROKE[body.material] || MATERIAL_STROKE[body.label] || 'rgba(255,255,255,0.3)';
-
-                if (body.circleRadius > 0) {
-                    if (body.label === 'king') {
-                        // Draw golden glow behind king (cached radial gradient)
-                        const glowRadius = body.circleRadius + 10;
-                        let glowCache = kingGlowRef.current;
-                        if (!glowCache || glowCache.radius !== glowRadius) {
-                            const glow = ctx.createRadialGradient(0, 0, body.circleRadius * 0.5, 0, 0, glowRadius);
-                            glow.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
-                            glow.addColorStop(1, 'rgba(255, 215, 0, 0)');
-                            glowCache = { radius: glowRadius, gradient: glow };
-                            kingGlowRef.current = glowCache;
-                        }
-                        ctx.fillStyle = glowCache.gradient;
-                        ctx.beginPath();
-                        ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-
-                    // Draw circle body — use sprite if available
-                    if (body.label === 'king') {
-                        // Animated king: breathing (2 frames at 500ms) + hit flash
-                        const isKingHit = flashRef.current > 3; // First 3 frames of flash = king was just hit
-                        const kingFrame = isKingHit ? 'king_hit' : `king_idle_${Math.floor(nowMs / 500) % 2}`;
-                        const kingSprite = sprites.get(kingFrame);
-                        if (kingSprite) {
-                            ctx.imageSmoothingEnabled = false;
-                            const sz = body.circleRadius * 2.5;
-                            ctx.drawImage(kingSprite, -sz / 2, -sz / 2, sz, sz);
-                            ctx.imageSmoothingEnabled = true;
-                        } else {
-                            ctx.beginPath();
-                            ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
-                            ctx.fillStyle = fillColor;
-                            ctx.fill();
-                            ctx.strokeStyle = strokeColor;
-                            ctx.lineWidth = 1.5;
-                            ctx.stroke();
-                            // Crown sprite or Unicode fallback
-                            const crownImg = sprites.get('crown');
-                            if (crownImg) {
-                                ctx.imageSmoothingEnabled = false;
-                                ctx.drawImage(crownImg, -6, -body.circleRadius - 14, 12, 12);
-                                ctx.imageSmoothingEnabled = true;
-                            } else {
-                                ctx.font = 'bold 14px sans-serif';
-                                ctx.textAlign = 'center';
-                                ctx.fillStyle = '#FFD700';
-                                ctx.fillText('\u265B', 0, -body.circleRadius - 4);
-                            }
-                        }
-                    } else if (body.label === 'projectile') {
-                        const projSprite = sprites.get('projectile');
-                        if (projSprite) {
-                            ctx.imageSmoothingEnabled = false;
-                            const sz = body.circleRadius * 2.5;
-                            ctx.drawImage(projSprite, -sz / 2, -sz / 2, sz, sz);
-                            ctx.imageSmoothingEnabled = true;
-                        } else {
-                            ctx.beginPath();
-                            ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
-                            ctx.fillStyle = fillColor;
-                            ctx.fill();
-                            ctx.strokeStyle = strokeColor;
-                            ctx.lineWidth = 1.5;
-                            ctx.stroke();
-                        }
-                    } else {
-                        ctx.beginPath();
-                        ctx.arc(0, 0, body.circleRadius, 0, Math.PI * 2);
-                        ctx.fillStyle = fillColor;
-                        ctx.fill();
-                        ctx.strokeStyle = strokeColor;
-                        ctx.lineWidth = 1.5;
-                        ctx.stroke();
-                    }
-
-                    // Projectile glow
-                    if (body.label === 'projectile') {
-                        ctx.beginPath();
-                        ctx.arc(0, 0, body.circleRadius + 4, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(255, 180, 50, 0.25)';
-                        ctx.fill();
-                    }
-                } else if (!body.isStatic || body.label === 'foundation') {
-                    const w = body.width || 50;
-                    const h = body.height || 50;
-
-                    if (body.label === 'foundation') {
-                        // King's plinth: a clean chiseled stone block with a
-                        // light top edge, beveled side highlights, and subtle
-                        // vertical shading. Rendered directly (no stretched
-                        // sprite) so it doesn't flicker or alias as it moves.
-                        const halfW = w / 2;
-                        const halfH = h / 2;
-
-                        const grad = ctx.createLinearGradient(0, -halfH, 0, halfH);
-                        grad.addColorStop(0, '#9aa0a6');
-                        grad.addColorStop(0.5, '#70767e');
-                        grad.addColorStop(1, '#4a4f56');
-                        ctx.fillStyle = grad;
-                        ctx.fillRect(-halfW, -halfH, w, h);
-
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
-                        ctx.fillRect(-halfW, -halfH, w, 4);
-                        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-                        ctx.fillRect(-halfW, halfH - 3, w, 3);
-
-                        ctx.strokeStyle = 'rgba(20, 20, 30, 0.6)';
-                        ctx.lineWidth = 1.2;
-                        ctx.strokeRect(-halfW, -halfH, w, h);
-                    } else {
-                        // Sprite-based block rendering with fallback
-                        const mat = body.material || body.label || 'wood';
-                        const hpRatio = (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0)
-                            ? body.blockHp / body.blockMaxHp : 1;
-                        const dmgSuffix = hpRatio > 0.66 ? '' : hpRatio > 0.33 ? '_damaged' : '_critical';
-                        const blockSprite = sprites.get(`block_${mat}${dmgSuffix}`);
-
-                        if (blockSprite) {
-                            ctx.imageSmoothingEnabled = false;
-                            ctx.drawImage(blockSprite, -w / 2, -h / 2, w, h);
-                            ctx.imageSmoothingEnabled = true;
-                            ctx.strokeStyle = strokeColor;
-                            ctx.lineWidth = 0.5;
-                            ctx.strokeRect(-w / 2, -h / 2, w, h);
-                        } else {
-                            ctx.fillStyle = fillColor;
-                            ctx.fillRect(-w / 2, -h / 2, w, h);
-                            ctx.strokeStyle = strokeColor;
-                            ctx.lineWidth = 1.5;
-                            ctx.strokeRect(-w / 2, -h / 2, w, h);
-                        }
-                    }
-                }
-
-                ctx.restore();
-
-                // Floating HP bar above King
-                if (body.label === 'king') {
-                    // Determine which king this is based on position
-                    const kingSide: Side = drawX < WORLD_WIDTH / 2 ? 'left' : 'right';
-                    const kHp = kings[kingSide].hp;
-                    const kMaxHp = kings[kingSide].maxHp;
-                    if (kMaxHp > 0) {
-                        const barWidth = 30;
-                        const barHeight = 4;
-                        const barX = drawX - barWidth / 2;
-                        const barY = drawY - (body.circleRadius || 12) - 10;
-                        const hpRatio = Math.max(0, kHp / kMaxHp);
-
-                        ctx.fillStyle = 'rgba(10, 10, 18, 0.7)';
-                        ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                        ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
-                        ctx.lineWidth = 0.5;
-                        ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                        ctx.fillStyle = '#1a1a2e';
-                        ctx.fillRect(barX, barY, barWidth, barHeight);
-                        ctx.fillStyle = getHpColor(hpRatio);
-                        ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
-                    }
-                }
-
-                // Block HP bar (only show if damaged)
-                if (body.blockHp != null && body.blockMaxHp != null && body.blockMaxHp > 0 && body.blockHp < body.blockMaxHp) {
-                    const barWidth = Math.min(body.width || 30, 30);
-                    const barHeight = 3;
-                    const barX = drawX - barWidth / 2;
-                    const barY = drawY - (body.height || 30) / 2 - 6;
-                    const hpRatio = Math.max(0, body.blockHp / body.blockMaxHp);
-
-                    ctx.fillStyle = 'rgba(10, 10, 18, 0.6)';
-                    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-                    ctx.fillStyle = '#1a1a2e';
-                    ctx.fillRect(barX, barY, barWidth, barHeight);
-                    ctx.fillStyle = getHpColor(hpRatio);
-                    ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
-                }
-                _dbgDrawn++;
-            }
-
-            // Update debug stats (zero cost when overlay hidden)
-            if (debugVisible) {
-                debugStats.bodiesDrawn = _dbgDrawn;
-                debugStats.bodiesCulled = _dbgCulled;
-                debugStats.totalBodies = gs.bodies.length;
-                debugStats.particlesActive = particles.count;
-                debugStats.phase = currentPhase;
-            }
-        }
-
-        // Draw particles (in world space)
-        particles.draw(ctx, cam.x, width);
-
-        // Draw active sprite animations (explosions, sparks) — swap-and-pop removal
-        const anims = activeAnimsRef.current;
-        let ai = 0;
-        while (ai < anims.length) {
-            const a = anims[ai];
-            a.anim.update(16.67);
-            ctx.imageSmoothingEnabled = false;
-            a.anim.draw(ctx, a.x - a.size / 2, a.y - a.size / 2, a.size, a.size);
-            ctx.imageSmoothingEnabled = true;
-            if (a.anim.finished) {
-                anims[ai] = anims[anims.length - 1];
-                anims.pop();
-            } else {
-                ai++;
-            }
-        }
-
-        // Draw floating damage numbers (in world space) — swap-and-pop removal
-        const dmgNums = damageNumbersRef.current;
-        let dmgIdx = 0;
-        while (dmgIdx < dmgNums.length) {
-            const dn = dmgNums[dmgIdx];
-            dn.age++;
-            if (dn.age > 60) {
-                // Swap-and-pop: O(1) removal
-                dmgNums[dmgIdx] = dmgNums[dmgNums.length - 1];
-                dmgNums.pop();
-                continue;
-            }
-            const progress = dn.age / 60;
-            const alpha = 1 - progress;
-            const yOffset = -progress * 40;
-            const scale = 1 + progress * 0.3;
-            ctx.save();
-            ctx.translate(dn.x, dn.y + yOffset);
-            ctx.scale(scale, scale);
-            ctx.font = 'bold 14px monospace';
-            ctx.textAlign = 'center';
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = 'rgb(239, 68, 68)';
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.lineWidth = 3;
-            const text = `-${dn.damage}`;
-            ctx.strokeText(text, 0, 0);
-            ctx.fillText(text, 0, 0);
-            ctx.restore();
-            dmgIdx++;
-        }
-
-        // === End world drawing ===
-        ctx.restore();
-
-        // HUD (fixed to screen, not affected by camera)
-        const isMobile = width < 640;
-        const topPadding = isMobile ? 48 : 12;
-
-        // Left King HP bar (top-left)
-        const names = playerNamesRef.current;
-        const leftLabel = names?.left || (side === 'left' ? 'YOU' : 'ENEMY');
-        const rightLabel = names?.right || (side === 'right' ? 'YOU' : 'ENEMY');
-        drawKingHud(ctx, 12, topPadding, kings.left, leftLabel);
-
-        // Right King HP bar (top-right)
-        drawKingHud(ctx, width - 132, topPadding, kings.right, rightLabel);
-
-        // Mode indicator and round score are shown by PhaseOverlay (HTML overlay)
-        // so we don't draw them on canvas to avoid overlap
-
-        // === Minimap ===
-        drawMinimap(ctx, canvas, terr, gs, cam, hazardsRef.current);
-
-        // === Debug Overlay ===
-        if (debugVisible) {
-            drawDebugOverlay(ctx, width, height);
-        }
-
-        ctx.restore();
-    };
-
-    function drawMinimap(
-        ctx: CanvasRenderingContext2D,
-        canvas: HTMLCanvasElement,
-        terr: TerrainData | null,
-        gs: GameState | null,
-        cam: { x: number; targetX: number },
-        hzds?: HazardData[],
-    ) {
-        const dpr = window.devicePixelRatio || 1;
-        const width = canvas.width / dpr;
-        const height = canvas.height / dpr;
-
-        // Minimap background (Moved up to clear tools)
-        const mmW = 200;
-        const mmH = 75;
-        const mmX = width - mmW - 10;
-        const mmY = height - mmH - 65; // Raised 65px (was 80)
-        const scaleX = mmW / WORLD_WIDTH;
-        const scaleY = mmH / height;
-
-        // Dark minimap background with rounded corners
-        ctx.beginPath();
-        const mmR = 6;
-        ctx.moveTo(mmX + mmR, mmY);
-        ctx.lineTo(mmX + mmW - mmR, mmY);
-        ctx.arcTo(mmX + mmW, mmY, mmX + mmW, mmY + mmR, mmR);
-        ctx.lineTo(mmX + mmW, mmY + mmH - mmR);
-        ctx.arcTo(mmX + mmW, mmY + mmH, mmX + mmW - mmR, mmY + mmH, mmR);
-        ctx.lineTo(mmX + mmR, mmY + mmH);
-        ctx.arcTo(mmX, mmY + mmH, mmX, mmY + mmH - mmR, mmR);
-        ctx.lineTo(mmX, mmY + mmR);
-        ctx.arcTo(mmX, mmY, mmX + mmR, mmY, mmR);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.35)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Terrain silhouette
-        if (terr && terr.points.length > 0) {
-            ctx.beginPath();
-            ctx.moveTo(mmX, mmY + mmH);
-            for (const pt of terr.points) {
-                ctx.lineTo(mmX + pt.x * scaleX, mmY + pt.y * scaleY);
-            }
-            ctx.lineTo(mmX + mmW, mmY + mmH);
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(42, 74, 47, 0.6)';
-            ctx.fill();
-        }
-
-        // Hazard zones
-        if (hzds) {
-            for (const h of hzds) {
-                const hx = mmX + h.position.x * scaleX;
-                const hy = mmY + h.position.y * scaleY;
-                const hw = h.width * scaleX;
-                const hh = h.height * scaleY;
-                if (h.type === 'wind_zone') {
-                    ctx.fillStyle = 'rgba(100, 150, 255, 0.3)';
-                } else if (h.type === 'lava_pool') {
-                    ctx.fillStyle = 'rgba(255, 100, 50, 0.4)';
-                } else {
-                    ctx.fillStyle = 'rgba(255, 200, 50, 0.3)';
-                }
-                ctx.fillRect(hx, hy, hw, hh);
-            }
-        }
-
-        // Bodies: kings and projectiles only (skip the full body iteration)
-        if (gs) {
-            for (const body of gs.bodies) {
-                if (body.label !== 'king' && body.label !== 'projectile') continue;
-                const bx = mmX + body.position.x * scaleX;
-                const by = mmY + body.position.y * scaleY;
-                if (body.label === 'king') {
-                    ctx.beginPath();
-                    ctx.arc(bx, by, 3, 0, Math.PI * 2);
-                    ctx.fillStyle = body.position.x < WORLD_WIDTH / 2 ? '#22c55e' : '#ef4444';
-                    ctx.fill();
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(bx, by, 2, 0, Math.PI * 2);
-                    ctx.fillStyle = '#fbbf24';
-                    ctx.fill();
-                }
-            }
-        }
-
-        // Viewport rectangle
-        const vpX = mmX + cam.x * scaleX;
-        const vpW = width * scaleX;
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(vpX, mmY, vpW, mmH);
-    }
-
-    function drawKingHud(ctx: CanvasRenderingContext2D, hudX: number, hudY: number, king: KingHpState, label: string) {
-        const hudWidth = 120;
-        const barHeight = 12;
-        const hpRatio = king.maxHp > 0 ? Math.max(0, king.hp / king.maxHp) : 0;
-        const cornerR = 6;
-        const totalH = barHeight + 22;
-
-        // Rounded translucent HUD panel
-        ctx.beginPath();
-        ctx.moveTo(hudX + cornerR, hudY);
-        ctx.lineTo(hudX + hudWidth + 4 - cornerR, hudY);
-        ctx.arcTo(hudX + hudWidth + 4, hudY, hudX + hudWidth + 4, hudY + cornerR, cornerR);
-        ctx.lineTo(hudX + hudWidth + 4, hudY + totalH - cornerR);
-        ctx.arcTo(hudX + hudWidth + 4, hudY + totalH, hudX + hudWidth + 4 - cornerR, hudY + totalH, cornerR);
-        ctx.lineTo(hudX + cornerR, hudY + totalH);
-        ctx.arcTo(hudX, hudY + totalH, hudX, hudY + totalH - cornerR, cornerR);
-        ctx.lineTo(hudX, hudY + cornerR);
-        ctx.arcTo(hudX, hudY, hudX + cornerR, hudY, cornerR);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Player name label
-        ctx.font = 'bold 10px monospace';
-        ctx.fillStyle = '#FFD700';
-        ctx.textAlign = 'left';
-        const crownHud = sprites.get('crown');
-        if (crownHud) {
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(crownHud, hudX + 2, hudY + 3, 10, 10);
-            ctx.imageSmoothingEnabled = true;
-            ctx.fillText(` ${label}`, hudX + 14, hudY + 13);
-        } else {
-            ctx.fillText(`\u265B ${label}`, hudX + 4, hudY + 13);
-        }
-
-        // HP bar with gradient fill
-        const barY = hudY + 18;
-        const barX = hudX + 4;
-        const barW = hudWidth - 4;
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(barX, barY, barW, barHeight);
-
-        if (hpRatio > 0) {
-            // Use flat color instead of gradient — avoids createLinearGradient() every frame
-            if (hpRatio > 0.5) {
-                ctx.fillStyle = '#2ecc71';
-            } else if (hpRatio > 0.25) {
-                ctx.fillStyle = '#f39c12';
-            } else {
-                ctx.fillStyle = '#e74c3c';
-            }
-            ctx.fillRect(barX, barY, barW * hpRatio, barHeight);
-        }
-
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(barX, barY, barW, barHeight);
-
-        // HP text
-        ctx.font = 'bold 8px monospace';
-        ctx.fillStyle = '#e0d0b0';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${Math.ceil(king.hp)} / ${king.maxHp}`, barX + barW / 2, barY + 9);
-    }
-
-    function drawDebugOverlay(ctx: CanvasRenderingContext2D, _canvasW: number, canvasH: number) {
-        const s = debugStats;
-        const x = 10;
-        const w = 230;
-        const lineH = 14;
-        const lines = [
-            `FPS: ${s.fps.toFixed(1)}  (${s.fpsMin.toFixed(0)}-${s.fpsMax.toFixed(0)})`,
-            `Frame: ${s.frameTimeMs.toFixed(1)}ms`,
-            `Bodies: ${s.totalBodies}  drawn:${s.bodiesDrawn} culled:${s.bodiesCulled}`,
-            `Net: ${s.snapshotsPerSec}/s  lat:${s.lastSnapshotLatencyMs}ms`,
-            `  ~${(s.bytesPerSec / 1024).toFixed(1)} KB/s`,
-            `Particles: ${s.particlesActive}`,
-            `Phase: ${s.phase}`,
-            `Heap: ${s.jsHeapMB > 0 ? `${s.jsHeapMB.toFixed(1)}/${s.jsHeapLimitMB.toFixed(0)} MB` : 'N/A'}`,
-        ];
-        const h = lines.length * lineH + 28;
-        const y = canvasH - h - 10;
-
-        // Background panel
-        ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
-        const r = 6;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + w, y, x + w, y + r, r);
-        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-        ctx.arcTo(x, y + h, x, y + h - r, r);
-        ctx.arcTo(x, y, x + r, y, r);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Title
-        ctx.font = 'bold 10px monospace';
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
-        ctx.textAlign = 'left';
-        ctx.fillText('DEBUG (` to hide)', x + 8, y + 14);
-
-        // Frame time color bar
-        const barX = x + 8;
-        const barY2 = y + 20;
-        const barW = 100;
-        const barH = 4;
-        const ftRatio = Math.min(1, s.frameTimeMs / 50);
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
-        ctx.fillRect(barX, barY2, barW, barH);
-        ctx.fillStyle = s.frameTimeMs < 16.67 ? '#22c55e' : s.frameTimeMs < 33.33 ? '#eab308' : '#ef4444';
-        ctx.fillRect(barX, barY2, barW * ftRatio, barH);
-
-        // Stats lines
-        ctx.font = '10px monospace';
-        ctx.fillStyle = 'rgba(200, 210, 220, 0.9)';
-        for (let i = 0; i < lines.length; i++) {
-            ctx.fillText(lines[i], x + 8, y + 34 + i * lineH);
-        }
-    }
-
-    // Mouse coordinate helper — converts screen coords to world coords
-    const getWorldCoords = (e: React.MouseEvent): { x: number; y: number } => {
-        const canvas = canvasRef.current!;
-        const rect = canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        const scaleX = (canvas.width / dpr) / rect.width;
-        const scaleY = (canvas.height / dpr) / rect.height;
-        return {
-            x: (e.clientX - rect.left) * scaleX + cameraRef.current.x,
-            y: (e.clientY - rect.top) * scaleY,
-        };
-    };
-
-    // Cannon position helper
-    const getMyCannonPos = (): { x: number; y: number } => {
-        const terr = terrainRef.current;
-        const side = mySideRef.current;
-        const cannonX = side === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
-        if (!terr || terr.points.length === 0) return { x: cannonX, y: 480 };
-        return { x: cannonX, y: interpolateTerrainY(terr.points, cannonX) - 20 };
-    };
-
-    // Muzzle flash + smoke when cannon fires
-    const emitMuzzleFlash = () => {
-        const cannon = getMyCannonPos();
-        const aim = aimRef.current;
-        const facingRight = mySideRef.current === 'left';
-        const muzzleX = cannon.x + (facingRight ? 1 : -1) * Math.cos(aim.angle) * 28;
-        const muzzleY = cannon.y - Math.sin(aim.angle) * 28;
-        particlesRef.current.emitImpact(muzzleX, muzzleY);
-        particlesRef.current.emitSmoke(muzzleX, muzzleY);
-        const flash = new AnimatedSprite({ ...ANIMATIONS.spark });
-        activeAnimsRef.current.push({ anim: flash, x: muzzleX, y: muzzleY, size: 20 });
-    };
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        // Skip synthesized mouse events from touch
-        if (Date.now() - lastTouchRef.current < 500) return;
-        const canvas = canvasRef.current!;
-        const rect = canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        const scaleX = (canvas.width / dpr) / rect.width;
-        const scaleY = (canvas.height / dpr) / rect.height;
-        // Logical (scaled) screen coords for minimap/HUD detection
-        const screenX = (e.clientX - rect.left) * scaleX;
-        const screenY = (e.clientY - rect.top) * scaleY;
-
-        // Minimap click detection
-        const width = canvas.width / dpr;
-        const height = canvas.height / dpr;
-
-        const mmW = 200;
-        const mmH = 75;
-        const mmX = width - mmW - 10;
-        const mmY = height - mmH - 65;
-
-        if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
-            isDraggingMinimapRef.current = true;
-            const clickRatioX = (screenX - mmX) / mmW;
-            const worldX = clickRatioX * WORLD_WIDTH;
-            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
-            return;
-        }
-
-        const currentPhase = phaseRef.current;
-        const side = mySideRef.current;
-
-        if (currentPhase === 'build' && gameModeRef.current === 'build') {
-            const { x, y } = getWorldCoords(e);
-            onSpawnRef.current(x, y);
-            return;
-        }
-
-        // Fire mode: start aiming (only during own combat turn)
-        if (currentPhase === 'combat' && turnPlayerRef.current === side) {
-            const aim = aimRef.current;
-            aim.active = true;
-            aim.useKeyboard = false;
-            const { x: mx, y: my } = getWorldCoords(e);
-            const cannon = getMyCannonPos();
-            aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
-            aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
-            const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-            // Non-linear power mapping for better sensitivity
-            const normalizedDist = Math.max(0, Math.min(1, dist / 800));
-            aim.power = Math.max(5, Math.min(100, 5 + Math.pow(normalizedDist, 1.2) * 95));
-        }
-    };
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (Date.now() - lastTouchRef.current < 500) return;
-
-        // Minimap drag handling
-        if (isDraggingMinimapRef.current && canvasRef.current) {
-            const canvas = canvasRef.current;
-            const rect = canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            const scaleX = (canvas.width / dpr) / rect.width;
-            const screenX = (e.clientX - rect.left) * scaleX;
-
-            const width = canvas.width / dpr;
-            const mmW = 200;
-            const mmX = width - mmW - 10;
-
-            // Allow dragging slightly outside bounds for forgiving UX
-            const clickRatioX = Math.max(0, Math.min(1, (screenX - mmX) / mmW));
-            const worldX = clickRatioX * WORLD_WIDTH;
-            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
-            return;
-        }
-
-        if (!aimRef.current.active) return;
-        const { x: mx, y: my } = getWorldCoords(e);
-        const cannon = getMyCannonPos();
-        const aim = aimRef.current;
-        aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
-        aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
-        const dist = Math.sqrt((mx - cannon.x) ** 2 + (my - cannon.y) ** 2);
-        // Non-linear power mapping for better sensitivity
-        const normalizedDist = Math.max(0, Math.min(1, dist / 800));
-        aim.power = Math.max(5, Math.min(100, 5 + Math.pow(normalizedDist, 1.2) * 95));
-    };
-
-    const handleMouseUp = () => {
-        if (isDraggingMinimapRef.current) {
-            isDraggingMinimapRef.current = false;
-        }
-
-        const aim = aimRef.current;
-        if (!aim.active) return;
-        aim.active = false;
-        track('projectile_fired', {
-            angle: Math.round(aim.angle * 180 / Math.PI),
-            power: Math.round(aim.power),
-        });
-        emitMuzzleFlash();
-        onFireRef.current(aim.angle, aim.power);
-    };
-
-    // --- Touch handlers for mobile ---
-    const getTouchWorldCoords = (touch: React.Touch) => {
-        const canvas = canvasRef.current!;
-        const rect = canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        const scaleX = (canvas.width / dpr) / rect.width;
-        const scaleY = (canvas.height / dpr) / rect.height;
-        const screenX = (touch.clientX - rect.left) * scaleX;
-        const screenY = (touch.clientY - rect.top) * scaleY;
-        const cam = cameraRef.current;
-        return { x: screenX + cam.x, y: screenY, screenX, screenY };
-    };
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        lastTouchRef.current = Date.now();
-
-        // Two-finger: start camera pan
-        if (e.touches.length === 2) {
-            // Cancel any single-finger action in progress
-            aimRef.current.active = false;
-            touchStartRef.current = null;
-            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            panTouchRef.current = { startX: midX, camStartX: cameraRef.current.targetX };
-            e.preventDefault();
-            return;
-        }
-
-        if (e.touches.length !== 1) return;
-        const touch = e.touches[0];
-        const { x, y, screenX, screenY } = getTouchWorldCoords(touch);
-
-        // Minimap tap detection
-        const canvas = canvasRef.current!;
-        const dpr = window.devicePixelRatio || 1;
-        const width = canvas.width / dpr;
-        const height = canvas.height / dpr;
-
-        const mmW = 200;
-        const mmH = 75;
-        const mmX = width - mmW - 10;
-        const mmY = height - mmH - 65;
-        if (screenX >= mmX && screenX <= mmX + mmW && screenY >= mmY && screenY <= mmY + mmH) {
-            isDraggingMinimapRef.current = true;
-            const clickRatioX = (screenX - mmX) / mmW;
-            const worldX = clickRatioX * WORLD_WIDTH;
-            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
-            return;
-        }
-
-        const currentPhase = phaseRef.current;
-        const side = mySideRef.current;
-
-        if (currentPhase === 'build' && gameModeRef.current === 'build') {
-            e.preventDefault();
-            onSpawnRef.current(x, y);
-            return;
-        }
-
-        if (currentPhase === 'combat' && turnPlayerRef.current === side) {
-            e.preventDefault();
-            const aim = aimRef.current;
-            aim.active = true;
-            aim.useKeyboard = false;
-            // Store initial screen position for drag-relative power
-            touchStartRef.current = { sx: screenX, sy: screenY };
-            // Set angle from cannon to tap, start with medium power
-            const cannon = getMyCannonPos();
-            aim.angle = Math.atan2(cannon.y - y, Math.abs(x - cannon.x));
-            aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
-            aim.power = 25; // start at medium power
-        }
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        // Two-finger pan
-        if (e.touches.length === 2 && panTouchRef.current) {
-            e.preventDefault();
-            const canvas = canvasRef.current!;
-            const rect = canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            const scaleX = (canvas.width / dpr) / rect.width;
-            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            // Scale the delta to logical coords for accurate 1:1 panning
-            const deltaScreen = (panTouchRef.current.startX - midX) * scaleX;
-            cameraRef.current.targetX = Math.max(0, Math.min(
-                WORLD_WIDTH - (canvas.width / dpr),
-                panTouchRef.current.camStartX + deltaScreen
-            ));
-            return;
-        }
-
-        if (isDraggingMinimapRef.current && e.touches.length === 1 && canvasRef.current) {
-            e.preventDefault();
-            const canvas = canvasRef.current;
-            const rect = canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            const scaleX = (canvas.width / dpr) / rect.width;
-            const screenX = (e.touches[0].clientX - rect.left) * scaleX;
-
-            const width = canvas.width / dpr;
-            const mmW = 200;
-            const mmX = width - mmW - 10;
-
-            const clickRatioX = Math.max(0, Math.min(1, (screenX - mmX) / mmW));
-            const worldX = clickRatioX * WORLD_WIDTH;
-            cameraRef.current.targetX = Math.max(0, Math.min(WORLD_WIDTH - width, worldX - width / 2));
-            return;
-        }
-
-        if (!aimRef.current.active || e.touches.length !== 1) return;
-        e.preventDefault();
-        const { x: mx, y: my } = getTouchWorldCoords(e.touches[0]);
-        const cannon = getMyCannonPos();
-        const aim = aimRef.current;
-        // Angle always tracks finger-to-cannon direction as before
-        aim.angle = Math.atan2(cannon.y - my, Math.abs(mx - cannon.x));
-        aim.angle = Math.max((10 * Math.PI) / 180, Math.min((170 * Math.PI) / 180, aim.angle));
-
-        // Power from drag distance (screen pixels from initial tap)
-        if (touchStartRef.current) {
-            const touch = e.touches[0];
-            const canvas = canvasRef.current!;
-            const rect = canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            const scaleX = (canvas.width / dpr) / rect.width;
-            const scaleY = (canvas.height / dpr) / rect.height;
-            const currentScreenX = (touch.clientX - rect.left) * scaleX;
-            const currentScreenY = (touch.clientY - rect.top) * scaleY;
-
-            const dx = currentScreenX - touchStartRef.current.sx;
-            const dy = currentScreenY - touchStartRef.current.sy;
-            const dragDist = Math.sqrt(dx * dx + dy * dy);
-
-            // Map drag to 0-100 power using 40% of smaller canvas dimension (responsive)
-            const maxDragPx = Math.min(canvas.width / dpr, canvas.height / dpr) * 0.4;
-            const dragPower = (dragDist / maxDragPx) * 100;
-            // Start at 25 (minimum viable shot) and add drag power
-            aim.power = Math.max(5, Math.min(100, 25 + dragPower));
-        }
-    };
-
-    const handleTouchEnd = (e: React.TouchEvent) => {
-        if (isDraggingMinimapRef.current) {
-            isDraggingMinimapRef.current = false;
-        }
-
-        // End two-finger pan when fingers are lifted
-        if (panTouchRef.current) {
-            if (e.touches.length < 2) {
-                panTouchRef.current = null;
-            }
-            return;
-        }
-
-        const aim = aimRef.current;
-        if (!aim.active) return;
-        e.preventDefault();
-        aim.active = false;
-        touchStartRef.current = null;
-        track('projectile_fired', {
-            angle: Math.round(aim.angle * 180 / Math.PI),
-            power: Math.round(aim.power),
-        });
-        emitMuzzleFlash();
-        onFireRef.current(aim.angle, aim.power);
-    };
-
-    // Keyboard controls for camera + fire mode
+    }, [props.phase, props.mySide, focus]);
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        if (props.phase !== 'combat' || props.turnPlayer !== props.mySide || shotPending || inspect) {
+            trajectory.current = []; return;
+        }
+        trajectory.current = predictTrajectory({ side: props.mySide, angle: aim.angle, power: aim.power,
+            terrainPoints: props.terrain?.points ?? [], hazards: props.hazards ?? [] });
+    }, [aim, props.phase, props.turnPlayer, props.mySide, props.terrain, props.hazards, shotPending, inspect]);
 
-            // Debug overlay toggle
-            if (e.key === '`') {
-                toggleDebug();
-                return;
+    const fire = useCallback(() => {
+        const p = latest.current;
+        if (p.phase !== 'combat' || p.turnPlayer !== p.mySide || pendingRef.current || inspectRef.current) return;
+        pendingRef.current = true; setShotPending(true);
+        gesture.current = null; trajectory.current = [];
+        track('projectile_fired', { angle: Math.round(aimRef.current.angle * 180 / Math.PI), power: Math.round(aimRef.current.power) });
+        p.onFire(aimRef.current.angle, aimRef.current.power);
+    }, []);
+    useEffect(() => {
+        const addEffect = (effect: BattleEffect, sound: () => void) => {
+            effects.current.push(effect);
+            if (effects.current.length > 48) effects.current.shift();
+            if (performance.now() - lastSound.current > 80) { sound(); lastSound.current = performance.now(); }
+        };
+        const { setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback } = latest.current;
+        setBlockDestroyedCallback(data => {
+            if (!reducedMotion.current) {
+                particles.current.emitMaterial(data.position.x, data.position.y, data.material, data.velocity);
+                particles.current.emitSmoke(data.position.x, data.position.y);
             }
+            addEffect({ ...data.position, at: performance.now(), kind: 'break' }, playExplosion);
+        });
+        setProjectileImpactCallback(data => {
+            if (!reducedMotion.current) particles.current.emitImpact(data.position.x, data.position.y);
+            addEffect({ ...data.position, at: performance.now(), kind: 'impact' }, playImpact);
+        });
+        setKingDamageCallback(data => {
+            const p = latest.current;
+            const position = kingFeedbackPosition(data.side, p.gameState, p.kingsHp[data.side]);
+            addEffect({ ...position, at: performance.now(), kind: 'damage', damage: Math.round(data.damage) }, playImpact);
+        });
+        return () => {
+            setBlockDestroyedCallback(null); setProjectileImpactCallback(null); setKingDamageCallback(null);
+        };
+    }, [props.setBlockDestroyedCallback, props.setProjectileImpactCallback, props.setKingDamageCallback]);
 
-            // Camera pan keys
-            if (e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D') {
-                keysRef.current.add(e.key);
-            }
-
-            // Fire mode controls
-            if (phaseRef.current === 'combat' && turnPlayerRef.current === mySideRef.current) {
-                const aim = aimRef.current;
-                const degStep = (2 * Math.PI) / 180;
-
-                switch (e.key) {
-                    case 'ArrowLeft':
-                        e.preventDefault();
-                        aim.angle = Math.min((170 * Math.PI) / 180, aim.angle + degStep);
-                        aim.useKeyboard = true;
-                        break;
-                    case 'ArrowRight':
-                        e.preventDefault();
-                        aim.angle = Math.max((10 * Math.PI) / 180, aim.angle - degStep);
-                        aim.useKeyboard = true;
-                        break;
-                    case 'ArrowUp':
-                        e.preventDefault();
-                        aim.power = Math.min(100, aim.power + 1);
-                        aim.useKeyboard = true;
-                        break;
-                    case 'ArrowDown':
-                        e.preventDefault();
-                        aim.power = Math.max(5, aim.power - 1);
-                        aim.useKeyboard = true;
-                        break;
-                    case ' ':
-                        e.preventDefault();
-                        track('projectile_fired', {
-                            angle: Math.round(aim.angle * 180 / Math.PI),
-                            power: Math.round(aim.power),
-                        });
-                        emitMuzzleFlash();
-                        onFireRef.current(aim.angle, aim.power);
-                        break;
+    useEffect(() => {
+        let raf = 0;
+        let lastFrame = 0;
+        const render = (now: number) => {
+            const canvas = canvasRef.current;
+            const ctx = canvas?.getContext('2d');
+            const p = latest.current;
+            if (canvas && ctx) {
+                const v = view.current;
+                const dpr = Math.min(2, window.devicePixelRatio || 1);
+                const w = Math.round(v.width * dpr), h = Math.round(v.height * dpr);
+                if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+                const delta = lastFrame ? Math.min(50, now - lastFrame) : 16.667;
+                lastFrame = now;
+                const cam = camera.current;
+                if (keys.current.has('a')) { cam.target -= delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
+                if (keys.current.has('d')) { cam.target += delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
+                if (p.phase === 'combat' && cam.manualUntil < now) {
+                    const projectile = p.gameState?.bodies.find(b => b.id === followedProjectile.current);
+                    if (projectile) cam.target = projectile.position.x - v.worldWidth / 2;
+                }
+                cam.target = clampCamera(cam.target, v);
+                const smoothing = reducedMotion.current ? 1 : 1 - Math.exp(-delta / (p.phase === 'reveal' ? 600 : 120));
+                cam.x += (cam.target - cam.x) * smoothing;
+                particles.current.update(delta);
+                effects.current = effects.current.filter(e => now - e.at < (e.kind === 'damage' ? 950 : 420));
+                drawBattle(ctx, { view: v, camera: cam.x, now, reducedMotion: reducedMotion.current,
+                    state: p.gameState, terrain: p.terrain, previous: previous.current,
+                    interpolation: Math.min(1, (now - snapshotAt.current) / 50), kings: p.kingsHp,
+                    names: p.playerNames, side: p.mySide, phase: p.phase, turn: p.turnPlayer,
+                    angle: aimRef.current.angle, trajectory: trajectory.current, hazards: p.hazards ?? [],
+                    effects: effects.current, particles: particles.current, shot: shot.current, ghost: ghost.current,
+                    projectileId: followedProjectile.current,
+                    placementDimensions: PLACEMENT_DIMENSIONS[p.selectedShape ?? 'rectangle'] });
+                if (debugVisible) {
+                    debugStats.updateFrame(now); debugStats.totalBodies = p.gameState?.bodies.length ?? 0;
+                    debugStats.particlesActive = particles.current.count; debugStats.phase = p.phase;
                 }
             }
+            raf = requestAnimationFrame(render);
         };
-
-        const handleKeyUp = (e: KeyboardEvent) => {
-            keysRef.current.delete(e.key);
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
-        };
+        raf = requestAnimationFrame(render);
+        return () => cancelAnimationFrame(raf);
     }, []);
+    useEffect(() => {
+        const host = window as Window & { render_game_to_text?: () => string };
+        const read = () => {
+            const p = latest.current;
+            return JSON.stringify({ coordinates: 'world origin top-left; x right, y down; 2400x600', phase: p.phase,
+                side: p.mySide, turn: p.turnPlayer, mode: p.phase === 'build' ? p.gameMode : inspectRef.current ? 'inspect' : 'aim',
+                aim: { degrees: Math.round(aimRef.current.angle * 180 / Math.PI), power: aimRef.current.power, pending: pendingRef.current },
+                viewport: view.current, camera: camera.current.x, kings: p.kingsHp, artLoaded: cartoon.loaded,
+                bodies: p.gameState?.bodies.filter(b => !b.isStatic).map(b => ({ id: b.id, kind: b.label, x: b.position.x, y: b.position.y, hp: b.blockHp })) ?? [] });
+        };
+        host.render_game_to_text = read;
+        return () => { if (host.render_game_to_text === read) delete host.render_game_to_text; };
+    }, []);
+    useEffect(() => {
+        const down = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLElement && (e.target.matches('input, textarea, button, select') || e.target.isContentEditable)) return;
+            if (e.key === '`') { toggleDebug(); return; }
+            if (['a', 'd'].includes(e.key.toLowerCase())) keys.current.add(e.key.toLowerCase());
+            const p = latest.current;
+            if (e.key.toLowerCase() === 'f' && !e.repeat) {
+                if (document.fullscreenElement) void document.exitFullscreen(); else void stageRef.current?.parentElement?.requestFullscreen();
+            }
+            if (p.phase !== 'combat' || p.turnPlayer !== p.mySide || pendingRef.current || inspectRef.current) return;
+            const { angle, power } = aimRef.current;
+            const step = 2 * Math.PI / 180;
+            if (e.key === 'ArrowLeft') updateAim(angle + step, power);
+            else if (e.key === 'ArrowRight') updateAim(angle - step, power);
+            else if (e.key === 'ArrowUp') updateAim(angle, power + 1);
+            else if (e.key === 'ArrowDown') updateAim(angle, power - 1);
+            else if (e.key === ' ' && !e.repeat) fire();
+            else return;
+            e.preventDefault();
+        };
+        const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
+        const cancel = () => { keys.current.clear(); pointers.current.clear(); gesture.current = null; ghost.current = undefined; };
+        const visibility = () => { if (document.hidden) cancel(); };
+        window.addEventListener('keydown', down); window.addEventListener('keyup', up);
+        window.addEventListener('blur', cancel); document.addEventListener('visibilitychange', visibility);
+        return () => {
+            window.removeEventListener('keydown', down); window.removeEventListener('keyup', up);
+            window.removeEventListener('blur', cancel); document.removeEventListener('visibilitychange', visibility);
+        };
+    }, [fire, updateAim]);
 
-    const handleWheel = (e: React.WheelEvent) => {
-        // Scroll wheel adjusts power during combat
-        if (phaseRef.current !== 'combat' || turnPlayerRef.current !== mySideRef.current) return;
-        e.preventDefault();
-        const aim = aimRef.current;
-        const delta = e.deltaY < 0 ? 2 : -2;
-        aim.power = Math.max(5, Math.min(100, aim.power + delta));
-        aim.useKeyboard = true;
+    const screenPoint = (e: React.PointerEvent<HTMLCanvasElement>): Vector => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        return { x: (e.clientX - rect.left) * view.current.width / rect.width, y: (e.clientY - rect.top) * view.current.height / rect.height };
+    };
+    const panMap = (x: number) => {
+        const box = minimapRect(view.current);
+        focus(clamp((x - box.x) / box.width, 0, 1) * WORLD_WIDTH, true);
+        camera.current.x = camera.current.target;
+    };
+    const aimAt = (point: Vector) => {
+        const p = latest.current;
+        const cannon = cannonPosition(p.mySide, p.terrain?.points ?? []);
+        const world = screenToWorld(point, camera.current.x, view.current);
+        const direction = p.mySide === 'left' ? 1 : -1;
+        // Signed x permits the complete 10-170 degree range on either side.
+        updateAim(Math.atan2(cannon.y - world.y, direction * (world.x - cannon.x)), aimRef.current.power);
+    };
+    const pointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        if (e.button !== 0 && e.pointerType !== 'touch') return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const point = screenPoint(e);
+        pointers.current.set(e.pointerId, point);
+        const p = latest.current;
+        if (pointers.current.size > 1) {
+            const all = [...pointers.current.values()];
+            gesture.current = { kind: 'pan', start: { x: (all[0].x + all[1].x) / 2, y: 0 }, camera: camera.current.x, cancelled: true };
+            ghost.current = undefined; camera.current.manualUntil = performance.now() + 12000; return;
+        }
+        const box = minimapRect(view.current);
+        const onMap = point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height;
+        const kind = onMap ? 'minimap' : p.phase === 'build' && p.gameMode === 'build' ? 'place'
+            : p.phase === 'combat' && p.turnPlayer === p.mySide && !inspectRef.current && !pendingRef.current ? 'aim' : 'pan';
+        gesture.current = { kind, start: point, camera: camera.current.x, cancelled: false };
+        if (kind === 'aim') aimAt(point);
+        if (kind === 'place') ghost.current = screenToWorld(point, camera.current.x, view.current);
+        if (kind === 'minimap') panMap(point.x);
+        if (kind === 'pan') camera.current.manualUntil = performance.now() + 12000;
+    };
+    const pointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        if (!pointers.current.has(e.pointerId)) return;
+        const point = screenPoint(e); pointers.current.set(e.pointerId, point);
+        const action = gesture.current;
+        if (!action) return;
+        if (action.cancelled && pointers.current.size < 2) return;
+        if (action.kind === 'pan') {
+            const all = [...pointers.current.values()];
+            const x = all.length > 1 ? (all[0].x + all[1].x) / 2 : point.x;
+            camera.current.target = clampCamera(action.camera + (action.start.x - x) / view.current.scale, view.current);
+            camera.current.x = camera.current.target; camera.current.manualUntil = performance.now() + 12000;
+        } else if (action.kind === 'minimap') panMap(point.x);
+        else if (action.kind === 'aim') aimAt(point);
+        else if (action.kind === 'place') ghost.current = screenToWorld(point, camera.current.x, view.current);
+    };
+    const endPointer = (e: React.PointerEvent<HTMLCanvasElement>, cancelled: boolean) => {
+        const action = gesture.current;
+        const point = screenPoint(e);
+        pointers.current.delete(e.pointerId);
+        if (!cancelled && action && !action.cancelled && action.kind === 'place' && pointers.current.size === 0) {
+            const p = latest.current;
+            const world = screenToWorld(point, camera.current.x, view.current);
+            const rect = e.currentTarget.getBoundingClientRect();
+            if (p.phase === 'build' && p.gameMode === 'build' && canPlace(world, p.mySide) && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) p.onSpawn(world.x, world.y);
+        }
+        // Release/cancel never fires. Multi-touch stays cancelled until all fingers lift.
+        if (pointers.current.size === 0) { gesture.current = null; ghost.current = undefined; }
+        else if (gesture.current) gesture.current.cancelled = true;
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    };
+    const isMyTurn = props.phase === 'combat' && props.turnPlayer === props.mySide;
+    const toggleInspect = () => { inspectRef.current = !inspectRef.current; setInspect(inspectRef.current); gesture.current = null; };
+    const nudge = (direction: number) => {
+        camera.current.manualUntil = performance.now() + 12000;
+        camera.current.target = clampCamera(camera.current.target + direction * view.current.worldWidth * 0.45, view.current);
     };
 
-    const isMyTurn = phase === 'combat' && turnPlayer === mySide;
-    const cursorClass = (phase === 'build' && gameMode === 'build') ? 'cursor-crosshair'
-        : (phase === 'combat' && !isMyTurn) ? 'cursor-not-allowed'
-        : isMyTurn ? 'cursor-crosshair'
-        : 'cursor-default';
-
-    return (
-        <div ref={containerRef} className="w-full h-full relative">
-            <canvas
-                ref={canvasRef}
-                width={currentCanvasWidth * (window.devicePixelRatio || 1)}
-                height={currentCanvasHeight * (window.devicePixelRatio || 1)}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                onWheel={handleWheel}
-                className={`w-full h-full sm:h-auto game-canvas-responsive sm:border sm:border-[rgba(255,215,0,0.2)] sm:rounded-lg sm:shadow-2xl touch-none ${cursorClass}`}
-            />
+    return <div className="battle-shell">
+        <div ref={stageRef} className="battle-stage">
+            <canvas ref={canvasRef} aria-label="Fortress battlefield" className="battle-canvas"
+                onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={e => endPointer(e, false)}
+                onPointerCancel={e => endPointer(e, true)} onLostPointerCapture={e => { if (pointers.current.has(e.pointerId)) endPointer(e, true); }}
+                onWheel={e => { if (isMyTurn && !shotPending && !inspect) updateAim(aim.angle, aim.power + (e.deltaY < 0 ? 2 : -2)); }} />
         </div>
-    );
-};
+        <div className={`battle-dock ${props.phase === 'combat' ? 'battle-dock-combat' : ''}`}>
+            <nav className="battle-camera" aria-label="Battlefield camera">
+                <button type="button" title="Pan left" aria-label="Pan left" onClick={() => nudge(-1)}><MoveLeft size={18} /></button>
+                <button type="button" title="Recenter battlefield" aria-label="Recenter battlefield" onClick={recenter}><LocateFixed size={18} /></button>
+                <button type="button" title="Pan right" aria-label="Pan right" onClick={() => nudge(1)}><MoveRight size={18} /></button>
+                {props.phase === 'combat' && <button type="button" title={inspect ? 'Aim cannon' : 'Inspect battlefield'} aria-label="Inspect battlefield" aria-pressed={inspect} onClick={toggleInspect}>{inspect ? <Hand size={18} /> : <Crosshair size={18} />}</button>}
+                {size.height < 320 && size.width / size.height > 1.8 && <button type="button" title={overview ? 'Tactical view' : 'Zoom out'} aria-label={overview ? 'Tactical view' : 'Zoom out'} aria-pressed={overview} onClick={() => setOverview(!overview)}>{overview ? <ZoomIn size={18} /> : <ZoomOut size={18} />}</button>}
+            </nav>
+            {props.phase === 'combat' && <>
+                <div className="battle-aim-controls">
+                    <label htmlFor="cannon-angle"><span>Angle <output>{Math.round(aim.angle * 180 / Math.PI)}&deg;</output></span>
+                        <input id="cannon-angle" type="range" min="10" max="170" step="1" value={Math.round(aim.angle * 180 / Math.PI)} disabled={!isMyTurn || shotPending || inspect} onChange={e => updateAim(Number(e.target.value) * Math.PI / 180, aim.power)} /></label>
+                    <label htmlFor="cannon-power"><span>Power <output>{Math.round(aim.power)}</output></span>
+                        <input id="cannon-power" type="range" min="5" max="100" step="1" value={aim.power} disabled={!isMyTurn || shotPending || inspect} onChange={e => updateAim(aim.angle, Number(e.target.value))} /></label>
+                </div>
+                <button className="battle-fire" type="button" disabled={!isMyTurn || shotPending || inspect} onClick={fire}><Flame size={20} /><span>{shotPending ? 'Fired' : isMyTurn ? 'Fire' : 'Waiting'}</span></button>
+            </>}
+        </div>
+    </div>;
+}
 
-export const GameCanvas = React.memo(GameCanvasInner, (prev, next) => {
-    // GameCanvas syncs high-frequency props (gameState, kingsHp) to refs via useEffect.
-    // Those effects MUST fire on prop changes, so we cannot skip re-renders for them.
-    // The render itself is cheap (just returns a <canvas> element), so 20Hz re-renders
-    // from gameState are acceptable (~0.1ms each). We still memoize to prevent re-renders
-    // from parent re-renders that don't change any GameCanvas props.
-    if (prev.gameState !== next.gameState) return false;
-    if (prev.kingsHp !== next.kingsHp) return false;
-    if (prev.terrain !== next.terrain) return false;
-    if (prev.mySide !== next.mySide) return false;
-    if (prev.gameMode !== next.gameMode) return false;
-    if (prev.phase !== next.phase) return false;
-    if (prev.turnPlayer !== next.turnPlayer) return false;
-    if (prev.playerNames !== next.playerNames) return false;
-    if (prev.hazards !== next.hazards) return false;
-    if (prev.roundScore !== next.roundScore) return false;
-    if (prev.currentRound !== next.currentRound) return false;
-    // Callback refs are stable — skip comparison
-    return true;
-});
+export const GameCanvas = React.memo(GameCanvasInner);

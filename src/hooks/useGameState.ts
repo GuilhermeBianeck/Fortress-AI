@@ -3,21 +3,12 @@ import { io, Socket } from 'socket.io-client';
 import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile, CompactGameState, BodyState } from '../types';
 import { debugStats, debugVisible } from '../debug/debugStats';
 import { track } from '../analytics/tracker';
+import { reconstructGameState } from './gameStateSnapshot';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
 const PROFILE_STORAGE_KEY = 'fortress_player_profile';
 const UUID_STORAGE_KEY = 'fortress_player_uuid';
-
-// Compact update tuple indices: [id, x, y, angle, vx, vy, hp]
-const T_ID = 0;
-const T_X = 1;
-const T_Y = 2;
-const T_ANGLE = 3;
-const T_VX = 4;
-const T_VY = 5;
-const T_HP = 6;
-const NULL_HP_SENTINEL = -1;
 
 function getOrCreateUuid(): string {
     let uuid = localStorage.getItem(UUID_STORAGE_KEY);
@@ -87,11 +78,12 @@ export const useGameState = () => {
 
     // Body metadata cache for delta-encoded state reconstruction
     const bodyCacheRef = useRef<Map<number, BodyState>>(new Map());
-    // Reusable array for bodies — rebuilt from cache on each snapshot to avoid Array.from() allocation
-    const bodiesArrayRef = useRef<BodyState[]>([]);
 
-    // Mark unmounted so high-frequency socket handlers can bail out early
-    useEffect(() => () => { mountedRef.current = false; }, []);
+    // StrictMode replays setup after cleanup with the same refs.
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
     // Callback refs for canvas effects
     const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
@@ -121,74 +113,10 @@ export const useGameState = () => {
             // Debug network stats (zero cost when overlay hidden)
             if (debugVisible) debugStats.recordSnapshot(data.t, data);
 
-            const cache = bodyCacheRef.current;
-
-            // On full sync, clear cache so stale entries don't linger
-            if (data.f === 1) {
-                cache.clear();
-            }
-
-            // Process new/full-sync bodies (full metadata)
-            if (data.n) {
-                for (const body of data.n) {
-                    cache.set(body.id, {
-                        id: body.id,
-                        position: body.position,
-                        angle: body.angle,
-                        velocity: body.velocity,
-                        label: body.label,
-                        isStatic: body.isStatic,
-                        width: body.width,
-                        height: body.height,
-                        circleRadius: body.circleRadius,
-                        material: body.material,
-                        color: body.color,
-                        blockHp: body.blockHp,
-                        blockMaxHp: body.blockMaxHp,
-                    });
-                }
-            }
-
-            // Apply compact dynamic updates: [id, x, y, angle, vx, vy, hp]
-            if (data.u) {
-                for (const tuple of data.u) {
-                    const existing = cache.get(tuple[T_ID]);
-                    if (existing) {
-                        // Mutate in-place to avoid object allocation
-                        existing.position.x = tuple[T_X];
-                        existing.position.y = tuple[T_Y];
-                        existing.angle = tuple[T_ANGLE];
-                        existing.velocity.x = tuple[T_VX];
-                        existing.velocity.y = tuple[T_VY];
-                        existing.blockHp = tuple[T_HP] === NULL_HP_SENTINEL ? null : tuple[T_HP];
-                    }
-                }
-            }
-
-            // Remove destroyed bodies
-            if (data.r) {
-                for (const id of data.r) {
-                    cache.delete(id);
-                }
-            }
-
-            // Reconstruct full GameState for canvas — reuse array to avoid allocation
-            const kings = {
-                left: data.k.l,
-                right: data.k.r,
-            };
-
-            const arr = bodiesArrayRef.current;
-            arr.length = 0;
-            for (const v of cache.values()) {
-                arr.push(v);
-            }
-
-            setGameState({
-                bodies: arr,
-                timestamp: data.t,
-                kings,
-            });
+            const snapshot = reconstructGameState(bodyCacheRef.current, data);
+            bodyCacheRef.current = snapshot.bodyCache;
+            setGameState(snapshot.gameState);
+            const { kings } = snapshot.gameState;
 
             // Only update kingsHp state if HP values actually changed.
             // Position (x/y) changes every frame but is consumed via refs in GameCanvas,
@@ -238,7 +166,7 @@ export const useGameState = () => {
         socketRef.current.on('king_damage', (data: { side: Side; hp: number; maxHp: number; damage: number; source: string }) => {
             setKingsHp(prev => ({
                 ...prev,
-                [data.side]: { hp: data.hp, maxHp: data.maxHp },
+                [data.side]: { ...prev[data.side], hp: data.hp, maxHp: data.maxHp },
             }));
             kingDamageCbRef.current?.({ side: data.side, damage: data.damage });
         });
@@ -301,6 +229,9 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('match_started', (data: { side: Side, kingsHp?: { left: KingHpState; right: KingHpState } }) => {
+            // Emitted before the first metadata snapshot for every new round/session.
+            bodyCacheRef.current.clear();
+            setGameState(null);
             track('match_started', { side: data.side });
             setRoomState(prev => prev ? { ...prev, side: data.side, phase: 'build' } : prev);
             if (data.kingsHp) {
@@ -361,7 +292,6 @@ export const useGameState = () => {
 
         socketRef.current.on('rematch_start', () => {
             bodyCacheRef.current.clear();
-            bodiesArrayRef.current.length = 0;
             setRematchState('none');
             setMatchResult(null);
             setMatchScores(null);
@@ -398,6 +328,7 @@ export const useGameState = () => {
 
         return () => {
             socketRef.current?.disconnect();
+            bodyCacheRef.current.clear();
         };
     }, []);
 
@@ -466,7 +397,6 @@ export const useGameState = () => {
     const returnToLobby = useCallback(() => {
         socketRef.current?.emit('leave_room');
         bodyCacheRef.current.clear();
-        bodiesArrayRef.current.length = 0;
         setGameState(null);
         setTerrain(null);
         setBuildStatus({ status: 'idle', message: '' });

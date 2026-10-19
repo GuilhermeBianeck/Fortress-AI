@@ -86,22 +86,412 @@ body {
 /* ═══════════════════════
    Game Container
    ═══════════════════════ */
+.game-shell {
+  min-height: 0;
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+.game-shell .game-header,
+.game-shell .game-build-dock,
+.game-shell .game-phase-row,
+.game-shell .game-desktop-chat,
+.game-shell .game-chat-modal {
+  --bg-deepest: #f4f8f4;
+  --bg-deep: #eff5f0;
+  --bg-surface: #e1ece6;
+  --bg-elevated: #d6e8df;
+  --bg-card: #e0eee7;
+  --gold: #207c7e;
+  --gold-dim: #547b70;
+  --emerald: #21845d;
+  --crimson: #b44c3e;
+  --text-primary: #26464c;
+  --text-secondary: #496a6c;
+  --text-muted: #577675;
+  --border-subtle: #c3d6cc;
+  --border-medium: #aecabe;
+  --border-accent: #6fa698;
+  --phase-banner-bg: #f5faf4;
+  --phase-own-bg: #ffede2;
+  --chat-bg: #f4f8f4;
+  color: var(--text-primary);
+  color-scheme: light;
+}
+
+.game-shell .chat-bubble-mine { background: #d8eee4; border-color: #a6c9b8; }
+.game-shell .chat-bubble-theirs { background: #f5e8e2; border-color: #d8c2b6; }
+
+.game-shell .game-material-swatch {
+  box-shadow: 0 0 0 1px rgba(49, 79, 75, 0.25);
+}
+
+.game-shell .game-header {
+  flex-shrink: 0;
+}
+
+.game-shell .game-main,
+.game-shell .game-container,
+.game-shell .game-battle-row,
+.game-shell .game-battlefield,
+.game-shell .game-canvas-slot {
+  min-width: 0;
+  min-height: 0;
+}
+
+.game-shell .game-container {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1600px;
+  gap: 6px;
+}
+
+.game-shell .game-battle-row {
+  display: flex;
+  flex: 1 1 0;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.game-shell .game-battlefield {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+}
+
+/* This slot gives GameCanvas a measured height, not an intrinsic aspect ratio. */
+.game-shell .game-canvas-slot {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+.game-shell .game-canvas-responsive {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.game-shell .game-phase-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  max-height: 76px;
+  padding: 4px 6px;
+  overflow: auto;
+}
+
+.game-shell .game-phase-content {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* PhaseOverlay keeps its result overlay; compact banners participate in flow. */
+.game-shell .game-phase-row .game-phase-content > div {
+  position: static;
+  inset: auto;
+  width: 100%;
+}
+
+.game-shell .game-phase-row .game-phase-content > div > [role="status"] {
+  --tw-translate-x: 0px;
+  --tw-translate-y: 0px;
+  position: static;
+  inset: auto;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transform: none;
+  translate: none;
+  box-shadow: none;
+}
+
+/* Retain reveal hazard details without spending a row on flavor text. */
+.game-shell .game-phase-row .game-phase-content > .fixed > [role="status"] > p:first-of-type {
+  display: none;
+}
+
+.game-shell .game-phase-result {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.game-shell .game-phase-result > .game-phase-content {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 400px;
+  margin-block: auto;
+}
+
+.game-shell .game-phase-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.game-shell .game-phase-chat,
+.game-shell .game-phase-sound {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+}
+
+.game-shell .game-desktop-chat {
+  flex: 0 0 250px;
+  min-height: 0;
+}
+
+.game-shell .game-desktop-chat > div {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 6px;
+}
+
+.game-shell .game-build-dock {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-height: min(196px, 50%);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--border-medium);
+  background: var(--bg-deep);
+}
+
+.game-shell .game-build-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px;
+}
+
+.game-shell .game-build-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 180px;
+  max-width: 100%;
+  gap: 2px;
+}
+
+.game-shell .game-build-tools button,
+.game-shell .game-prompt-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  touch-action: manipulation;
+}
+
+.game-shell .game-build-modes button {
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-deepest);
+}
+
+.game-shell .game-build-modes button[aria-pressed="true"] {
+  color: var(--emerald);
+  border-color: var(--emerald);
+  background: rgba(39, 174, 96, 0.12);
+}
+
+.game-shell .game-build-options {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.game-shell .game-build-options::-webkit-scrollbar {
+  height: 4px;
+}
+
+.game-shell .game-tool-group {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.game-shell .game-shape-group {
+  padding-left: 12px;
+  border-left: 1px solid var(--border-medium);
+}
+
+.game-shell .game-tool-button {
+  position: relative;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  border: 1px solid transparent;
+}
+
+.game-shell .game-tool-button[aria-pressed="true"] {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--bg-card);
+}
+
+.game-shell .game-tool-button:not(:disabled):hover {
+  background: var(--bg-elevated);
+}
+
+.game-shell .game-tool-button:disabled,
+.game-shell .game-prompt-row :disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.game-shell .game-material-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 2px;
+}
+
+.game-shell .game-block-count {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.game-shell .game-build-done {
+  grid-column: 2;
+  grid-row: 1;
+  width: 96px;
+  height: 44px;
+  border: 1px solid var(--emerald);
+}
+
+.game-shell .game-build-ready {
+  color: var(--emerald);
+  background: var(--bg-deepest);
+}
+
+.game-shell .game-prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.game-shell .game-prompt-row input {
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.game-shell .game-prompt-row input::placeholder {
+  color: var(--text-secondary);
+}
+
+.game-shell .game-prompt-row button {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.game-shell .game-prompt-key {
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.game-shell .game-prompt-submit {
+  color: var(--bg-deepest);
+  background: var(--gold);
+}
+
+.game-shell .game-build-status {
+  min-width: 0;
+  height: 28px;
+  padding: 4px 8px;
+  border-top-width: 1px;
+}
+
 @media (min-width: 640px) {
-  .game-container {
-    max-width: calc((100dvh - 5.5rem) * 4 / 3);
+  .game-shell .game-main {
+    padding: 8px;
+  }
+
+  .game-shell .game-phase-actions {
+    display: none;
   }
 }
 
-@media (max-width: 639px) {
-  .game-container {
-    width: 100%;
+@media (min-width: 768px), (max-height: 500px) and (orientation: landscape) {
+  .game-shell .game-build-tools {
+    grid-template-columns: 180px minmax(0, 1fr) 96px;
+  }
+
+  .game-shell .game-build-options {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .game-shell .game-build-done {
+    grid-column: 3;
   }
 }
 
-/* Canvas: full-screen on mobile, 4:3 on desktop */
-@media (min-width: 640px) {
-  .game-canvas-responsive {
-    aspect-ratio: 4 / 3;
+@media (max-height: 500px) and (orientation: landscape) {
+  .game-shell .game-header,
+  .game-shell .game-desktop-chat {
+    display: none;
+  }
+
+  .game-shell .game-main {
+    padding: 0;
+  }
+
+  .game-shell .game-phase-actions,
+  .game-shell .game-chat-modal {
+    display: flex;
   }
 }
 

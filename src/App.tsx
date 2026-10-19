@@ -2,14 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
-import { GodTools, MobileDoneButton } from './components/GodTools';
-import { sprites } from './sprites';
+import { GodTools } from './components/GodTools';
 import { toggleMute, isMuted } from './audio/SoundManager';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
 import { RankBadge } from './components/RankBadge';
-import { Terminal, Send, Loader2, CheckCircle2, AlertCircle, WifiOff } from 'lucide-react';
+import { KeyRound, Send, Loader2, CheckCircle2, AlertCircle, WifiOff, Volume2, VolumeX } from 'lucide-react';
 import { SpriteIcon } from './components/SpriteIcon';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
@@ -66,10 +65,8 @@ function App() {
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
 
-  // Load sprites + track app load + auto-join from URL
+  // SpriteIcon images load on demand; the battlefield loads its own small art bundle.
   useEffect(() => {
-    sprites.loadAll();
-
     track('app_loaded', {
       viewport_width: window.innerWidth,
       viewport_height: window.innerHeight,
@@ -88,27 +85,14 @@ function App() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tab key to toggle mode (only during build phase)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Tab' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        if (phase === 'build') {
-          e.preventDefault();
-          setGameMode(prev => prev === 'build' ? 'fire' : 'build');
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [phase]);
-
-  // Reset spawn counter when build phase starts.
+  // Reset build controls when a new build phase starts.
   // Pattern: store previous phase in state; check during render (React docs: "Adjusting some state when a prop changes").
   const [prevPhase, setPrevPhase] = useState(phase);
   if (prevPhase !== phase) {
     setPrevPhase(phase);
     if (phase === 'build') {
       setSpawnCount(0);
+      setGameMode('build');
     }
   }
 
@@ -151,9 +135,9 @@ function App() {
   } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
-    <div className="h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top" style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: 'var(--bg-deepest)' }}>
+    <div className={`h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top ${inGame ? 'game-shell' : ''}`} style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: inGame ? '#e4efeb' : 'var(--bg-deepest)' }}>
       {/* Header — hidden on mobile when in-game */}
-      <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'hidden sm:flex' : ''}`} style={{ background: 'rgba(10, 10, 18, 0.9)', boxShadow: '0 1px 0 rgba(255,215,0,0.08), 0 2px 16px rgba(0,0,0,0.4)' }}>
+      <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'game-header hidden sm:flex' : ''}`} style={{ background: inGame ? '#f4f8f4' : 'rgba(10, 10, 18, 0.9)', boxShadow: inGame ? '0 1px 0 #bdcec6' : '0 1px 0 rgba(255,215,0,0.08), 0 2px 16px rgba(0,0,0,0.4)' }}>
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg shrink-0" style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,215,0,0.06))', border: '1px solid rgba(255,215,0,0.2)' }}>
             <SpriteIcon name="logo_crest" size={24} alt="Fortress AI" />
@@ -205,10 +189,10 @@ function App() {
           <button
             onClick={() => setMuted(toggleMute())}
             aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
-            className="min-w-[36px] min-h-[36px] px-1.5 py-1.5 text-xs rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center
+            className="min-w-[44px] min-h-[44px] px-1.5 py-1.5 text-xs rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center
               text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]"
           >
-            <SpriteIcon name="ui_mute" size={18} />
+            {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
           {/* API Key toggle — only shown when user has a custom key or during build phase */}
           {(apiKey || (inGame && phase === 'build')) && (
@@ -259,7 +243,7 @@ function App() {
         </div>
       )}
 
-      <main className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'overflow-hidden sm:p-3 sm:gap-3' : 'overflow-y-auto'}`}>
+      <main className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'game-main overflow-hidden' : 'overflow-y-auto'}`}>
         {/* API Key Input (Modal Overlay) */}
         {showApiKey && (
           <div
@@ -314,15 +298,66 @@ function App() {
             onGetProfile={getProfile}
           />
         ) : (
-          /* Desktop: constrained 4:3. Mobile: full width, fills available height. */
-          <div className="flex flex-col items-center flex-1 w-full h-full min-h-0 sm:gap-3 game-container safe-area-bottom">
+          <div className="game-container">
+            <div className="game-battle-row">
+              <div className="game-battlefield">
+                <div className={phase === 'result' ? 'game-phase-result' : 'game-phase-row'}>
+                  <div className="game-phase-content">
+                    <PhaseOverlay
+                      phase={phase}
+                      phaseEndsAt={phaseEndsAt}
+                      turnPlayer={turnPlayer}
+                      mySide={mySide}
+                      matchResult={matchResult}
+                      playerNames={playerNamesMap}
+                      roundScore={roundScore}
+                      currentRound={currentRound}
+                      rematchState={rematchState}
+                      onRequestRematch={requestRematch}
+                      onReturnToLobby={returnToLobby}
+                      hazards={hazards}
+                      matchScores={matchScores}
+                      playerProfile={playerProfile}
+                      prevTotalScore={prevTotalScore}
+                      prevPlayerProfile={prevPlayerProfile}
+                    />
+                  </div>
+                  {phase !== 'result' && (
+                    <div className="game-phase-actions">
+                      <button
+                        type="button"
+                        onClick={() => setMuted(toggleMute())}
+                        aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
+                        aria-pressed={muted}
+                        title={muted ? 'Unmute sounds' : 'Mute sounds'}
+                        className="game-phase-sound border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-deep)] text-[var(--text-secondary)] touch-manipulation"
+                      >
+                        {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
+                      </button>
+                      {!isSinglePlayer && (
+                        <button
+                          type="button"
+                          onClick={() => setShowChat(!showChat)}
+                          aria-pressed={showChat}
+                          aria-label={showChat ? 'Close chat' : 'Open chat'}
+                          className={`game-phase-chat border rounded-lg touch-manipulation
+                            ${showChat
+                              ? 'bg-[var(--bg-elevated)] border-[var(--border-accent)]'
+                              : 'bg-[var(--bg-deep)] border-[var(--border-subtle)]'
+                            }`}
+                        >
+                          <SpriteIcon name="ui_chat_bubble" size={22} />
+                          {chatMessages.length > 0 && (
+                            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[var(--ember)]" aria-hidden="true" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-            {/* Canvas + Chat row — leave room for prompt bar on mobile during build */}
-            <div className={`flex flex-1 min-h-0 gap-4 items-stretch sm:items-start w-full justify-center ${phase === 'build' ? 'max-h-[calc(100dvh-180px)] sm:max-h-none' : ''}`}>
-              <div className="relative group flex-1 min-w-0">
-                {/* Glow border — desktop only */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-[var(--gold)] to-[var(--ember)] rounded-xl blur opacity-10 group-hover:opacity-20 transition duration-1000 pointer-events-none hidden sm:block"></div>
-                <div className="relative h-full sm:h-auto">
+                {/* GameCanvas measures this flex slot, including its own combat dock. */}
+                <div className="game-canvas-slot">
                   <GameCanvas
                     gameState={gameState}
                     terrain={terrain}
@@ -330,6 +365,7 @@ function App() {
                     kingsHp={kingsHp}
                     mySide={mySide}
                     gameMode={gameMode}
+                    selectedShape={selectedShape}
                     phase={phase}
                     turnPlayer={turnPlayer}
                     onFire={fireProjectile}
@@ -341,83 +377,12 @@ function App() {
                     roundScore={roundScore}
                     currentRound={currentRound}
                   />
-                  {/* Phase overlay — on top of canvas */}
-                  {phase && (
-                    <div className={`absolute inset-x-0 z-10 flex justify-center pointer-events-none ${phase === 'result' ? 'inset-0 items-center' : 'top-0 pt-1 sm:pt-2'
-                      }`}>
-                      <div className="pointer-events-auto max-w-[calc(100%-5rem)] sm:max-w-none">
-                        <PhaseOverlay
-                          phase={phase}
-                          phaseEndsAt={phaseEndsAt}
-                          turnPlayer={turnPlayer}
-                          mySide={mySide}
-                          matchResult={matchResult}
-                          playerNames={playerNamesMap}
-                          roundScore={roundScore}
-                          currentRound={currentRound}
-                          rematchState={rematchState}
-                          onRequestRematch={requestRematch}
-                          onReturnToLobby={returnToLobby}
-                          hazards={hazards}
-                          matchScores={matchScores}
-                          playerProfile={playerProfile}
-                          prevTotalScore={prevTotalScore}
-                          prevPlayerProfile={prevPlayerProfile}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mobile: Chat button — top-right, moved down to clear header (PvP only) */}
-                  {!isSinglePlayer && (
-                    <div className="absolute top-20 right-1 z-20 sm:hidden">
-                      <button
-                        onClick={() => setShowChat(!showChat)}
-                        className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation border
-                          ${showChat
-                            ? 'bg-[var(--bg-elevated)] border-[var(--border-accent)]'
-                            : 'bg-[rgba(10,10,18,0.6)] border-[var(--border-subtle)] active:bg-[var(--bg-elevated)]'
-                          }`}
-                      >
-                        <SpriteIcon name="ui_chat_bubble" size={22} />
-                        {chatMessages.length > 0 && (
-                          <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-[var(--ember)]"></span>
-                        )}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Mobile: Done button - moved down below centered banner */}
-                  {phase === 'build' && (
-                    <div className="absolute top-[60px] inset-x-0 z-10 flex justify-center sm:hidden pointer-events-none">
-                      <div className="pointer-events-auto">
-                        <MobileDoneButton phase={phase} onReady={playerReady} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mobile: God Tools overlaid at bottom of canvas (with spacing) */}
-                  {phase === 'build' && (
-                    <div className="absolute bottom-2 inset-x-0 z-10 p-1.5 sm:hidden pointer-events-auto safe-area-bottom">
-                      <GodTools
-                        selectedMaterial={selectedMaterial}
-                        selectedShape={selectedShape}
-                        onMaterialChange={setSelectedMaterial}
-                        onShapeChange={setSelectedShape}
-                        gameMode={gameMode}
-                        onModeChange={setGameMode}
-                        phase={phase}
-                        onReady={playerReady}
-                        blockCount={spawnCount}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
 
               {/* Chat — visible on xl screens for PvP only */}
               {!isSinglePlayer && (
-                <div className="hidden xl:block">
+                <div className="game-desktop-chat hidden xl:flex">
                   <ChatPanel
                     messages={chatMessages}
                     onSend={sendChatMessage}
@@ -427,9 +392,9 @@ function App() {
               )}
             </div>
 
-            {/* Desktop: God Tools (build phase only) */}
+            {/* One bounded dock shared by phone, tablet and desktop. */}
             {phase === 'build' && (
-              <div className="hidden sm:block w-full order-first">
+              <div className="game-build-dock">
                 <GodTools
                   selectedMaterial={selectedMaterial}
                   selectedShape={selectedShape}
@@ -441,33 +406,64 @@ function App() {
                   onReady={playerReady}
                   blockCount={spawnCount}
                 />
-              </div>
-            )}
+                <form onSubmit={handleSubmitPrompt} className="game-prompt-row" role="search" aria-label="AI fortress builder">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(true)}
+                    aria-label="Configure AI architect API key"
+                    title="Configure AI architect API key"
+                    className="game-prompt-key"
+                  >
+                    <KeyRound size={18} aria-hidden="true" />
+                  </button>
+                  <label htmlFor="ai-prompt-input" className="sr-only">Describe your fortress to the AI architect</label>
+                  <input
+                    id="ai-prompt-input"
+                    type="text"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe your fortress to AI..."
+                    disabled={isBuilding || gameMode !== 'build'}
+                    autoComplete="off"
+                    aria-describedby={isBuilding ? 'build-status' : undefined}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isBuilding || gameMode !== 'build' || !prompt.trim()}
+                    aria-label={isBuilding ? 'Building fortress...' : 'Generate fortress with AI'}
+                    title="Generate fortress with AI"
+                    className="game-prompt-submit"
+                  >
+                    {isBuilding ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
+                  </button>
+                </form>
 
-            {/* Build Status Overlay */}
-            {buildStatus.status !== 'idle' && (
-              <div
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-                className={`w-full border rounded-xl p-2 sm:p-3 backdrop-blur-sm flex items-center gap-2 sm:gap-3 transition-all order-first
-                ${buildStatus.status === 'error'
-                  ? 'bg-[rgba(192,57,43,0.15)] border-[rgba(192,57,43,0.3)] text-[var(--crimson)]'
-                  : buildStatus.status === 'success'
-                    ? 'bg-[rgba(39,174,96,0.15)] border-[rgba(39,174,96,0.3)] text-[var(--emerald)]'
-                    : 'bg-[rgba(255,215,0,0.1)] border-[var(--border-medium)] text-[var(--gold)]'
-                }`}
-              >
-                {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" aria-hidden="true" />}
-                {buildStatus.status === 'success' && <CheckCircle2 size={14} className="shrink-0" aria-hidden="true" />}
-                {buildStatus.status === 'error' && <AlertCircle size={14} className="shrink-0" aria-hidden="true" />}
-                <span className="text-xs sm:text-sm font-mono truncate">{buildStatus.message}</span>
+                {buildStatus.status !== 'idle' && (
+                  <div
+                    id="build-status"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className={`game-build-status flex items-center gap-2
+                      ${buildStatus.status === 'error'
+                        ? 'bg-[rgba(192,57,43,0.15)] border-[rgba(192,57,43,0.3)] text-[var(--crimson)]'
+                        : buildStatus.status === 'success'
+                          ? 'bg-[rgba(39,174,96,0.15)] border-[rgba(39,174,96,0.3)] text-[var(--emerald)]'
+                          : 'bg-[rgba(255,215,0,0.1)] border-[var(--border-medium)] text-[var(--gold)]'
+                      }`}
+                  >
+                    {isBuilding && <Loader2 size={14} className="animate-spin shrink-0" aria-hidden="true" />}
+                    {buildStatus.status === 'success' && <CheckCircle2 size={14} className="shrink-0" aria-hidden="true" />}
+                    {buildStatus.status === 'error' && <AlertCircle size={14} className="shrink-0" aria-hidden="true" />}
+                    <span className="text-xs font-mono truncate" title={buildStatus.message}>{buildStatus.message}</span>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Mobile chat overlay (PvP only) */}
             {showChat && !isSinglePlayer && (
-              <div className="fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-[rgba(10,10,18,0.7)] backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
+              <div className="game-chat-modal fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-[rgba(10,10,18,0.7)] backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
                 <div className="w-full max-w-md mb-0 sm:mb-4 safe-area-bottom">
                   <ChatPanel
                     messages={chatMessages}
@@ -477,53 +473,6 @@ function App() {
                     onClose={() => setShowChat(false)}
                   />
                 </div>
-              </div>
-            )}
-
-            {/* Prompt Input — only in build mode during build phase */}
-            {phase === 'build' && gameMode === 'build' && (
-              <div className="w-full relative">
-                {/* First-build tutorial callout */}
-                {spawnCount === 0 && !isBuilding && buildStatus.status === 'idle' && (
-                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[var(--gold)] text-[var(--bg-deepest)] text-xs font-bold px-3 py-1.5 rounded-lg animate-bounce z-20 pointer-events-none">
-                    Describe your fortress and AI will build it!
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-[var(--gold)]" />
-                  </div>
-                )}
-              <form onSubmit={handleSubmitPrompt} className="w-full card-dark rounded-xl p-2 sm:p-3 flex gap-2 sm:gap-3" role="search" aria-label="AI fortress builder">
-                <div className="p-2 sm:p-2.5 bg-[var(--bg-deep)] rounded-lg shrink-0" aria-hidden="true">
-                  <Terminal size={16} className="text-[var(--gold)]" />
-                </div>
-                <label htmlFor="ai-prompt-input" className="sr-only">Describe your fortress to the AI architect</label>
-                <input
-                  id="ai-prompt-input"
-                  type="text"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your fortress to AI..."
-                  className="w-full min-w-0 bg-transparent outline-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)] font-mono text-xs sm:text-sm"
-                  disabled={isBuilding}
-                  autoComplete="off"
-                  aria-describedby={isBuilding ? 'build-status' : undefined}
-                />
-                <button
-                  type="submit"
-                  disabled={isBuilding || !prompt.trim()}
-                  aria-label={isBuilding ? 'Building fortress…' : 'Generate fortress with AI'}
-                  className="p-2 sm:p-2.5 bg-gradient-to-b from-[var(--gold)] to-[var(--gold-dim)] rounded-lg shrink-0
-                      transition-all duration-200 touch-manipulation shadow-md shadow-[var(--gold-glow)]
-                      disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-lg"
-                >
-                  {isBuilding ? <Loader2 size={16} className="animate-spin text-[var(--bg-deepest)]" aria-hidden="true" /> : <Send size={16} className="text-[var(--bg-deepest)]" aria-hidden="true" />}
-                </button>
-              </form>
-              </div>
-            )}
-
-            {/* Combat hint — desktop only (mobile hint is shown in PhaseOverlay) */}
-            {phase === 'combat' && turnPlayer === mySide && (
-              <div className="hidden sm:block text-[10px] sm:text-xs text-[var(--text-muted)] font-mono text-center">
-                Drag to aim &amp; fire &middot; Scroll / &uarr;&darr; to adjust power &middot; &larr;&rarr; to adjust angle &middot; Space to fire &middot; A/D to pan
               </div>
             )}
           </div>

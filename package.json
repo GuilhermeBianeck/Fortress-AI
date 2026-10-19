@@ -12,7 +12,9 @@
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:ui": "npx playwright test --ui",
     "generate:sprites": "tsx scripts/generate-sprites.ts",
-    "import:sprites": "tsx scripts/import-chatgpt-sprites.ts"
+    "import:sprites": "tsx scripts/import-chatgpt-sprites.ts",
+    "prepare:cartoon": "tsx scripts/prepare-cartoon-assets.ts",
+    "test:game": "tsx --test src/game/*.test.ts src/hooks/gameStateSnapshot.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

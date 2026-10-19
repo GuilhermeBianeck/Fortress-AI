@@ -40,7 +40,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
         <div className={`flex flex-col border border-[var(--border-subtle)] backdrop-blur-md ${mobile
                 ? 'w-full rounded-t-xl h-[50vh]'
                 : 'w-[250px] rounded-xl h-[600px]'
-            }`} style={{ background: 'rgba(10, 10, 18, 0.88)' }}>
+            }`} style={{ background: 'var(--chat-bg, rgba(10, 10, 18, 0.88))' }}>
             {/* Header */}
             <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center">
                 <span className="text-xs text-[var(--gold)] font-bold flex items-center gap-1.5 font-display tracking-wider">
@@ -48,7 +48,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
                     CHAT
                 </span>
                 {mobile && onClose && (
-                    <button onClick={onClose} className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-150 touch-manipulation rounded-lg hover:bg-[var(--bg-elevated)]">
+                    <button onClick={onClose} aria-label="Close chat" className="min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-150 touch-manipulation rounded-lg hover:bg-[var(--bg-elevated)]">
                         <X size={15} />
                     </button>
                 )}
@@ -92,13 +92,15 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder="Send a message..."
+                    aria-label="Chat message"
                     maxLength={200}
-                    className="flex-1 bg-transparent px-2 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none min-w-0"
+                    className="flex-1 bg-transparent px-2 py-2 text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none min-w-0 min-h-[44px]"
                 />
                 <button
                     type="submit"
                     disabled={!text.trim()}
-                    className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-[var(--gold)] hover:bg-[var(--bg-elevated)] transition-all duration-150 touch-manipulation disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Send chat message"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-[var(--gold)] hover:bg-[var(--bg-elevated)] transition-all duration-150 touch-manipulation disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                     <Send size={13} />
                 </button>

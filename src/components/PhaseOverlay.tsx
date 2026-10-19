@@ -62,7 +62,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         return (
             <div className="w-full relative pointer-events-none">
                 {/* Build Banner - Centered, inline timer */}
-                <div role="status" aria-live="polite" aria-atomic="true" className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-2xl text-center" style={{ background: 'rgba(22, 33, 62, 0.85)' }}>
+                <div role="status" aria-live="polite" aria-atomic="true" className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-2xl text-center" style={{ background: 'var(--phase-banner-bg, rgba(22, 33, 62, 0.85))' }}>
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         <Hammer size={14} className="text-[var(--emerald)]" aria-hidden="true" />
                         <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
@@ -96,7 +96,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         };
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-                <div role="status" aria-live="polite" className="rounded-xl px-5 sm:px-8 py-3 sm:py-4 backdrop-blur-xl text-center border border-[var(--border-accent)] pointer-events-auto shadow-2xl" style={{ background: 'rgba(22, 33, 62, 0.9)' }}>
+                <div role="status" aria-live="polite" className="rounded-xl px-5 sm:px-8 py-3 sm:py-4 backdrop-blur-xl text-center border border-[var(--border-accent)] pointer-events-auto shadow-2xl" style={{ background: 'var(--phase-banner-bg, rgba(22, 33, 62, 0.9))' }}>
                     <div className="flex items-center justify-center gap-2">
                         <Eye size={16} className="text-[var(--gold)]" aria-hidden="true" />
                         <span className="text-[var(--gold)] font-bold text-sm sm:text-base font-display">REVEALING KINGDOMS</span>
@@ -125,7 +125,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                 <div role="status" aria-live="polite" aria-atomic="true" className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border pointer-events-auto shadow-2xl text-center ${isMyTurn
                     ? 'border-[rgba(192,57,43,0.4)]'
                     : 'border-[var(--border-subtle)]'
-                    }`} style={{ background: isMyTurn ? 'rgba(192,57,43,0.12)' : 'rgba(22, 33, 62, 0.85)' }}>
+                    }`} style={{ background: isMyTurn ? 'var(--phase-own-bg, rgba(192,57,43,0.12))' : 'var(--phase-banner-bg, rgba(22, 33, 62, 0.85))' }}>
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         {isMyTurn ? <Flame size={14} className="text-[var(--crimson)]" /> : <Clock size={14} className="text-[var(--text-muted)]" />}
                         <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
@@ -140,6 +140,9 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             </span>
                         )}
                     </div>
+                    {roundScore && <span className="text-[var(--text-secondary)] text-[10px] font-medium" aria-label={`Round ${currentRound ?? 1}. Score: left ${roundScore.left}, right ${roundScore.right}`}>
+                        R{currentRound ?? 1} &middot; {roundScore.left} : {roundScore.right}
+                    </span>}
                     {/* Wind Indicator — inline with turn banner */}
                     {windHazard && (() => {
                         const windSpeed = Math.round((windHazard.windStrength ?? 0.0003) * 20000);
@@ -151,12 +154,6 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                             </div>
                         );
                     })()}
-                    {/* Mobile: compact controls hint when it's your turn */}
-                    {isMyTurn && (
-                        <p className="sm:hidden text-[10px] text-[var(--text-muted)] mt-0.5">
-                            Tap and drag to aim · release to fire
-                        </p>
-                    )}
                 </div>
             </div>
         );

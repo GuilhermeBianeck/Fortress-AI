@@ -384,6 +384,7 @@ export const Lobby = ({
                         <button
                             onClick={handleReady}
                             disabled={isReady}
+                            autoFocus
                             className={`w-full max-w-sm mx-auto min-h-[52px] py-3.5 rounded-xl text-lg touch-manipulation
                                 transition-all duration-300
                                 ${isReady

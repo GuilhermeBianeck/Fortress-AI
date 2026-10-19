@@ -123,15 +123,16 @@ export class ParticleSystem {
         }
     }
 
-    update() {
+    update(deltaMs = 1000 / 60) {
+        const step = Math.max(0, Math.min(3, deltaMs / (1000 / 60)));
         let i = 0;
         while (i < this.count) {
             const p = this.pool[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.vy += p.gravity;
-            p.vx *= 0.99; // Air friction
-            p.life--;
+            p.x += p.vx * step;
+            p.y += p.vy * step;
+            p.vy += p.gravity * step;
+            p.vx *= Math.pow(0.99, step);
+            p.life -= step;
 
             if (p.life <= 0) {
                 this.count--;

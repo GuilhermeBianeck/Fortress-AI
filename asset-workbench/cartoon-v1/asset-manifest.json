@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "purpose": "Cartoon battlefield import metadata and visual QA",
+  "assets": [
+    {
+      "name": "king",
+      "source": "masters/C02-king-master.png",
+      "path": "runtime/king.png",
+      "sourceInfo": {
+        "width": 1254,
+        "height": 1254,
+        "transparentFraction": 0.6851357951206856,
+        "nearOpaqueFraction": 0.30193142708881815,
+        "bounds": {
+          "x": 196,
+          "y": 118,
+          "width": 831,
+          "height": 1024
+        }
+      },
+      "outputInfo": {
+        "width": 256,
+        "height": 320,
+        "transparentFraction": 0.58973388671875,
+        "nearOpaqueFraction": 0.38489990234375,
+        "bounds": {
+          "x": 20,
+          "y": 27,
+          "width": 216,
+          "height": 266
+        }
+      },
+      "sourceTrim": {
+        "x": 196,
+        "y": 118,
+        "width": 831,
+        "height": 1024
+      },
+      "pivot": {
+        "x": 151.5858483754513,
+        "y": 292.5335451263537
+      },
+      "edgePadding": 20,
+      "status": "Integrated in the cartoon battlefield; review changes before regenerating masters"
+    },
+    {
+      "name": "cannon_base",
+      "source": "masters/C03-cannon-base.png",
+      "path": "runtime/cannon_base.png",
+      "sourceInfo": {
+        "width": 1254,
+        "height": 1254,
+        "transparentFraction": 0.7217115755896919,
+        "nearOpaqueFraction": 0.2684042642491396,
+        "bounds": {
+          "x": 94,
+          "y": 345,
+          "width": 1074,
+          "height": 622
+        }
+      },
+      "outputInfo": {
+        "width": 512,
+        "height": 320,
+        "transparentFraction": 0.4842529296875,
+        "nearOpaqueFraction": 0.492938232421875,
+        "bounds": {
+          "x": 20,
+          "y": 23,
+          "width": 472,
+          "height": 274
+        }
+      },
+      "sourceTrim": {
+        "x": 94,
+        "y": 345,
+        "width": 1074,
+        "height": 622
+      },
+      "pivot": {
+        "x": 358.95225325884536,
+        "y": 81.12238361266293
+      },
+      "edgePadding": 20,
+      "status": "Integrated in the cartoon battlefield; review changes before regenerating masters"
+    },
+    {
+      "name": "cannon_barrel",
+      "source": "masters/C04-cannon-barrel.png",
+      "path": "runtime/cannon_barrel.png",
+      "sourceInfo": {
+        "width": 1774,
+        "height": 887,
+        "transparentFraction": 0.6671710502066045,
+        "nearOpaqueFraction": 0.31379223126483125,
+        "bounds": {
+          "x": 189,
+          "y": 240,
+          "width": 1392,
+          "height": 458
+        }
+      },
+      "outputInfo": {
+        "width": 768,
+        "height": 320,
+        "transparentFraction": 0.44285481770833335,
+        "nearOpaqueFraction": 0.5332845052083334,
+        "bounds": {
+          "x": 24,
+          "y": 41,
+          "width": 720,
+          "height": 238
+        }
+      },
+      "sourceTrim": {
+        "x": 189,
+        "y": 240,
+        "width": 1392,
+        "height": 458
+      },
+      "pivot": {
+        "x": 185.0006896551724,
+        "y": 170.66758620689654
+      },
+      "edgePadding": 24,
+      "status": "Integrated in the cartoon battlefield; review changes before regenerating masters"
+    },
+    {
+      "name": "wood_surface",
+      "source": "masters/C05-wood-surface.png",
+      "path": "runtime/wood_surface.png",
+      "sourceInfo": {
+        "width": 1254,
+        "height": 1254,
+        "transparentFraction": 0,
+        "nearOpaqueFraction": 1,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1254,
+          "height": 1254
+        }
+      },
+      "outputInfo": {
+        "width": 512,
+        "height": 512,
+        "transparentFraction": 0,
+        "nearOpaqueFraction": 1,
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 512,
+          "height": 512
+        }
+      },
+      "sourceTrim": {
+        "x": 0,
+        "y": 0,
+        "width": 1254,
+        "height": 1254
+      },
+      "pivot": {
+        "x": 256,
+        "y": 512
+      },
+      "edgePadding": 0,
+      "seams": {
+        "horizontalMeanRgbDelta": 1.5110677083333333,
+        "verticalMeanRgbDelta": 4.229817708333333
+      },
+      "status": "Integrated in the cartoon battlefield; review changes before regenerating masters"
+    },
+    {
+      "name": "far_hills",
+      "source": "masters/C06-far-hills.png",
+      "path": "runtime/far_hills.png",
+      "sourceInfo": {
+        "width": 2172,
+        "height": 724,
+        "transparentFraction": 0.5119819806070226,
+        "nearOpaqueFraction": 0.4797084694199404,
+        "bounds": {
+          "x": 0,
+          "y": 307,
+          "width": 2172,
+          "height": 417
+        }
+      },
+      "outputInfo": {
+        "width": 1536,
+        "height": 512,
+        "transparentFraction": 0.5115381876627604,
+        "nearOpaqueFraction": 0.4791882832845052,
+        "bounds": {
+          "x": 0,
+          "y": 217,
+          "width": 1536,
+          "height": 295
+        }
+      },
+      "sourceTrim": {
+        "x": 0,
+        "y": 0,
+        "width": 2172,
+        "height": 724
+      },
+      "pivot": {
+        "x": 768,
+        "y": 512
+      },
+      "edgePadding": 0,
+      "status": "Integrated in the cartoon battlefield; review changes before regenerating masters"
+    },
+    {
+      "name": "distant_fortress",
+      "source": "masters/C07-distant-fortress.png",
+      "path": "runtime/distant_fortress.png",
+      "sourceInfo": {
+        "width": 1254,
+        "height": 1254,
+        "transparentFraction": 0.5906750710326636,
+        "nearOpaqueFraction": 0.38392423352131233,
+        "bounds": {
+          "x": 39,
+          "y": 188,
+          "width": 1191,
+          "height": 914
+        }
+      },
+      "outputInfo": {
+        "width": 512,
+        "height": 448,
+        "transparentFraction": 0.604034423828125,
+        "nearOpaqueFraction": 0.3673313685825893,
+        "bounds": {
+          "x": 32,
+          "y": 52,
+          "width": 448,
+          "height": 344
+        }
+      },
+      "sourceTrim": {
+        "x": 39,
+        "y": 188,
+        "width": 1191,
+        "height": 914
+      },
+      "pivot": {
+        "x": 256,
+        "y": 395.9026028547439
+      },
+      "edgePadding": 32,
+      "status": "Integrated in the cartoon battlefield; review changes before regenerating masters"
+    }
+  ]
+}
