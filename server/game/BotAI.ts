@@ -1,5 +1,7 @@
 import type { Side } from '../types';
 import { BOT_FIRE_DELAY_MS, BOT_BUILD_DELAY_MS } from '../config/constants';
+import { findBotShot, type BallisticsScene, type BotShotPlan } from './botBallistics';
+import type Matter from 'matter-js';
 
 interface BotFortressBlock {
     shape: 'rectangle';
@@ -37,23 +39,57 @@ const FORTRESS_BLUEPRINT: BotFortressBlock[] = [
 export interface BotAIDeps {
     getKingPosition: () => { x: number; y: number };
     getFoundationTopY: () => number;
-    getOpponentKingPosition: () => { x: number; y: number };
+    getBallisticsScene: () => BallisticsScene;
+    canBuild: () => boolean;
+    canFire: () => boolean;
     spawnBlock: (shape: 'rectangle', material: string, x: number, y: number, width: number, height: number) => void;
-    fireProjectile: (side: Side, angle: number, power: number) => void;
+    fireProjectile: (side: Side, angle: number, power: number) => number | undefined;
+    random?: () => number;
+}
+
+export interface BotShotObservation {
+    projectileId: number;
+    closest: Matter.Vector;
+    hitLabel?: string;
+    hitBodyId?: number;
 }
 
 export class BotAI {
     private side: Side;
     private deps: BotAIDeps;
-    private timers: ReturnType<typeof setTimeout>[] = [];
+    private fireTimer?: ReturnType<typeof setTimeout>;
+    private buildTimer?: ReturnType<typeof setTimeout>;
+    private destroyed = false;
+    private aimOffsetX = 0;
+    private observations = 0;
+    private pendingShot?: { id: number; plan: BotShotPlan; targetBodyId: number };
+    private lastTarget?: Matter.Vector;
+    private lastWind = '';
+    private random: () => number;
 
     constructor(side: Side, deps: BotAIDeps) {
         this.side = side;
         this.deps = deps;
+        this.random = deps.random ?? Math.random;
+        this.resetRound();
+    }
+
+    resetRound(): void {
+        this.aimOffsetX = (this.random() < 0.5 ? -1 : 1) * (140 + this.random() * 40);
+        this.observations = 0;
+        this.pendingShot = undefined;
+        this.lastTarget = undefined;
+        this.lastWind = '';
     }
 
     buildFortress(): void {
-        const timer = setTimeout(() => {
+        if (this.destroyed) return;
+        clearTimeout(this.buildTimer);
+        clearTimeout(this.fireTimer);
+        this.resetRound();
+        this.buildTimer = setTimeout(() => {
+            this.buildTimer = undefined;
+            if (this.destroyed || !this.deps.canBuild()) return;
             const kingPos = this.deps.getKingPosition();
             const foundationTopY = this.deps.getFoundationTopY();
 
@@ -65,44 +101,51 @@ export class BotAI {
 
             console.log(`BotAI: Built fortress (${FORTRESS_BLUEPRINT.length} blocks) around king at (${kingPos.x.toFixed(0)}, ${kingPos.y.toFixed(0)})`);
         }, BOT_BUILD_DELAY_MS);
-        this.timers.push(timer);
     }
 
     takeTurn(): void {
-        const timer = setTimeout(() => {
-            const opponentKing = this.deps.getOpponentKingPosition();
-
-            // Add random offset for imperfect aim
-            const targetX = opponentKing.x + (Math.random() * 120 - 60);
-            const targetY = opponentKing.y + (Math.random() * 40 - 20);
-
-            const myKing = this.deps.getKingPosition();
-
-            // Calculate angle and power to hit the target
-            const dx = targetX - myKing.x;
-            const dy = targetY - myKing.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            // Approximate angle and power using projectile physics
-            // The bot fires from the cannon, but we use king position as reference
-            // Power range: 15-40, angle range: 30-70 degrees
-            const normalizedDist = Math.min(dist / 2400, 1);
-            const power = 15 + normalizedDist * 25;
-
-            // Angle: higher for closer targets, lower for farther
-            const baseAngle = 35 + (1 - normalizedDist) * 30; // 35-65 degrees
-            const angleRad = (baseAngle * Math.PI) / 180;
-
-            this.deps.fireProjectile(this.side, angleRad, power);
-            console.log(`BotAI: Fired projectile - angle=${baseAngle.toFixed(1)}deg power=${power.toFixed(1)}`);
+        if (this.destroyed || !this.deps.canFire()) return;
+        clearTimeout(this.fireTimer);
+        this.fireTimer = setTimeout(() => {
+            this.fireTimer = undefined;
+            if (this.destroyed || !this.deps.canFire()) return;
+            const scene = this.deps.getBallisticsScene();
+            const wind = JSON.stringify(scene.wind);
+            if ((this.lastTarget && Math.hypot(scene.target.x - this.lastTarget.x, scene.target.y - this.lastTarget.y) > 100) ||
+                (this.lastWind && wind !== this.lastWind)) {
+                this.aimOffsetX *= 0.5;
+            }
+            this.lastTarget = { ...scene.target };
+            this.lastWind = wind;
+            // Training uncertainty decreases only after observed shots, never merely with time.
+            const uncertainty = Math.max(7, 18 - this.observations * 3);
+            const plan = findBotShot(scene, this.aimOffsetX + (this.random() * 2 - 1) * uncertainty);
+            if (this.destroyed || !this.deps.canFire()) return;
+            const id = this.deps.fireProjectile(this.side, plan.angle, plan.power);
+            if (id !== undefined) this.pendingShot = { id, plan, targetBodyId: scene.targetBodyId };
         }, BOT_FIRE_DELAY_MS);
-        this.timers.push(timer);
+    }
+
+    observeShot(observation: BotShotObservation): void {
+        const pending = this.pendingShot;
+        if (this.destroyed || !pending || observation.projectileId !== pending.id) return;
+        this.pendingShot = undefined;
+        if (!Number.isFinite(observation.closest.x) || !Number.isFinite(observation.closest.y)) return;
+        this.observations++;
+        const blocked = observation.hitLabel && !['Terrain', 'Boundary', 'king'].includes(observation.hitLabel);
+        if (blocked || observation.hitBodyId === pending.targetBodyId) {
+            this.aimOffsetX *= 0.65;
+        } else {
+            const miss = observation.closest.x - pending.plan.target.x;
+            const correction = Math.max(-70, Math.min(70, miss * 0.7));
+            this.aimOffsetX = Math.max(-140, Math.min(140, (this.aimOffsetX - correction) * 0.75));
+        }
     }
 
     destroy(): void {
-        for (const timer of this.timers) {
-            clearTimeout(timer);
-        }
-        this.timers = [];
+        this.destroyed = true;
+        clearTimeout(this.fireTimer);
+        clearTimeout(this.buildTimer);
+        this.pendingShot = undefined;
     }
 }

@@ -1,0 +1,27 @@
+{
+  "created": "2026-10-19",
+  "generator": "Built-in image_gen tool; model selection not exposed by tool; no API key used",
+  "assets": [
+    {
+      "id": "C08",
+      "file": "masters/C08-king-hit.png",
+      "reference": "../cartoon-v1/masters/C02-king-master.png",
+      "transparent_background": true,
+      "prompt": "Use case: identity-preserve. Asset type: ONE transparent game character reaction pose for Fortress AI. Edit target: the attached approved king master. Create the same king reacting to a cannon impact: eyes squeezed shut, eyebrows pinched, mouth a small startled grimace, shoulders slightly tense and hands drawn inward a little. Friendly non-graphic cartoon reaction, no injury. INVARIANTS: preserve exact character identity, brown hair and beard/mustache, gold red-jewel crown, blue tunic and gold belt, red cape, sturdy brown boots, contour weight, painterly smooth cartoon style, upper-left lighting, side view facing right. Crucially keep BOTH BOOTS, both legs, their positions and spacing, their scale, and their shared ground baseline exactly as in the reference. Keep the belt/body scale and crown height fixed. Preserve the reference square canvas composition and all transparent margins; do not zoom or recenter the character. Change expression and upper-body gesture only. This is a registered animation key pose, not a redesign. Output ONE complete isolated full-body king on TRUE TRANSPARENCY. No ground, shadow, effects, projectile, stars, text, labels, border, extra copies or grid. Keep the entire crown, hands, cape and boots visible."
+    },
+    {
+      "id": "C09",
+      "file": "masters/C09-king-victory.png",
+      "reference": "../cartoon-v1/masters/C02-king-master.png",
+      "transparent_background": true,
+      "prompt": "Use case: identity-preserve. Asset type: ONE transparent victory reaction key pose for the Fortress AI king. Edit target is the attached approved king master. Same character joyfully celebrates: broad happy smile, pleased eyes, one clenched fist raised NEXT TO his crown at ear height, the other hand resting proudly at his belt. His highest hand must not extend above the crown, and he must not jump. INVARIANTS: preserve exact brown-haired and bearded character identity, nose/face design, gold red-jewel crown, blue tunic and gold belt, red cape, brown boots, clean painterly smooth cartoon rendering, upper-left daylight, side view facing right. Keep BOTH BOOTS AND LEGS, spacing, ground baseline, body size and their pixel locations exactly unchanged from the reference. Keep the same belt height, crown height, camera, square canvas and clear margins. This is a registered animation key pose, not a redesign, not an action scene. Change only facial expression and upper-body/arm gesture. One complete full-body isolated king, TRUE TRANSPARENT BACKGROUND. No ground, cast shadow, confetti, sparkles, crown trophy, text, labels, props, extra copies or grid. No cropped crown, fist, cape or boots."
+    },
+    {
+      "id": "C10",
+      "file": "masters/C10-king-defeat.png",
+      "reference": "../cartoon-v1/masters/C02-king-master.png",
+      "transparent_background": true,
+      "prompt": "Use case: identity-preserve. Asset type: ONE transparent defeat reaction key pose for the Fortress AI king. Edit target: attached approved king master. Show the SAME king looking disappointed after losing a friendly battle: lowered eyebrows and eyelids, small resigned mouth, head tipped down very slightly, shoulders a little slumped and hands resting near his belt. He stays STANDING upright on the same boots; no kneeling, falling, injury or tears. INVARIANTS: exact same brown-haired bearded face and nose, gold crown with red jewels, blue tunic, gold buckle/belt, red cape, sturdy brown boots, broad clean painterly cartoon style, upper-left sunlight and right-facing side view. Keep BOTH BOOTS and LEGS, spacing, baseline, pixel positions and scale exactly unchanged. Preserve belt height, total character scale, original square canvas, camera, and transparent margins. Change expression and upper-body posture only, minimally. This is a registered animation key pose, not another king. Output ONE complete isolated full-body character on TRUE TRANSPARENCY. No ground, cast shadow, props, smoke, effects, text, labels, grid or duplicate views. Keep every part of crown, cape, hands and boots visible."
+    }
+  ]
+}

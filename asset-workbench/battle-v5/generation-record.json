@@ -1,0 +1,48 @@
+{
+  "tool": "Built-in image_gen.imagegen",
+  "apiKeyRequired": false,
+  "model": "Not independently exposed/selectable by the tool",
+  "reference": "reference/battle.png",
+  "assets": [
+    {
+      "name": "valley",
+      "prompt": "Use case: stylized-concept. Asset type: independent parallax scenery layer for Fortress AI's actual 2D battle. Supplied image is the visual reference. Recreate ONLY its magnificent alpine castle valley: rocky blue mountains, sunlit green slopes and pine trees, pale-stone red-roofed royal citadel centered toward the right, distant arched stone aqueduct and white waterfalls flowing to a lake at the bottom. Match the premium crisp colorful painted-3D cartoon illustration, warm upper-left daylight, lush greens, blue atmospheric distance and coherent perspective. Wide landscape 16:9. Transparent sky above the mountain skyline, actual alpha. Mountains begin around upper third; lush valley fills bottom 65%. No foreground terrain/platform, no foreground towers at either edge, no kings, no cannons, no barrels/blocks, no HUD, controls, text, frames or logos. A continuous scenic background layer with no holes in the lower valley. Castle MUST be visibly grounded on a complete rocky green hill, never an isolated floating sprite. Preserve sharp readable large forms and detailed masonry, no blur, no depth-of-field blur, no pixel art. This is one background layer, not a screenshot or sprite sheet.",
+      "source": "masters/valley.png"
+    },
+    {
+      "name": "sky",
+      "prompt": "Use case: stylized-concept. Asset type: opaque sky backdrop for Fortress AI's illustrated 2D battle. Supplied image is style/color reference only. Generate ONLY the clear brilliant blue daytime sky and beautiful soft sculpted white cumulus cloud banks in that exact premium colorful painted 3D-cartoon fantasy-game style. Wide 16:9 horizontal landscape; vivid blue top, softer pale azure near lower horizon; clouds collect mostly around left and right thirds with open blue center. Large readable fluffy cloud forms, delicate painted texture and sunlit edges, sharp high-resolution illustration without photographic noise or depth-of-field blur. NO mountains, castle, ground, UI, text, objects or characters. Entire image is sky and clouds, opaque edge to edge. Designed to sit behind a separate transparent alpine castle valley. No lens flare, no border, no gradient-only substitute.",
+      "source": "masters/sky.png"
+    },
+    {
+      "name": "earth",
+      "prompt": "Use case: stylized-concept. Asset type: opaque seamless horizontal terrain interior texture, NOT a finished platform. Use supplied battle screenshot only as material/style reference. Fill entire wide 3:1 canvas edge to edge with a continuous side-view cross-section of rich warm brown earth and large angular charcoal gray stone boulders. Match the reference foreground cutaway under the grass: layered fractured rocks, ochre soil, little exposed roots, gold sunlit upper rock facets and deep but readable crevices. Premium crisp painted 3D-cartoon strategy-game rendering. Horizontally tileable, left and right edges must connect smoothly without dark border or obvious repeated tiles. Rockforms broad and irregular, not neat blocks/bricks. Opaque texture all the way to every edge. NO grass, NO sky, NO horizontal ledge surface, NO UI, NO characters, NO text, NO isolated slab or framed rectangle, NO transparency, NO central vignette. Flat side-on material cross-section under arbitrary sloped playable terrain. It must be clear and detailed, not blurred/noisy.",
+      "source": "masters/earth.png"
+    },
+    {
+      "name": "grass",
+      "prompt": "Use case: stylized-concept. Asset type: ONE transparent horizontal grass/turf edge strip for a continuous 2D game terrain contour. Match supplied battle reference's bright premium painted 3D-cartoon grass edge. Very wide 4:1 image, thin lush green/yellow-green grass top extending perfectly level across full left/right edges, small sunlit grass blades and tiny sparse flowers, darker hanging leafy roots and irregular little foliage fringe below. Actual alpha transparency above blades and below hanging leaves. Keep a strong continuous opaque grassy soil ribbon through center so it can join rock ground seamlessly. The physical standing surface is the straight line around 35% of total image height; most leafy fringe hangs below. No rocks/large earth slab, no sky, NO shadows forming a rectangle, no isolated tufts, no UI or text. Entire strip connects continuously across left/right edges with no endcaps, no separated platform blocks. Flat orthographic side-view, detailed but broad readable shapes, warm top-left daylight, crisp no blur. Designed to be bent along sloping terrain as repeated connected segments, not a whole finished platform.",
+      "source": "masters/grass.png"
+    },
+    {
+      "name": "hud",
+      "prompt": "Use case: precise-object-edit. Asset type: ONE blank sapphire and gold HUD frame for Fortress AI gameplay. Use the supplied battle reference for exact polished material/edge style. A very wide horizontal rectangular medieval interface plate, about 5:1 width to height, dark royal sapphire blue enamel inset with subtle broad painted texture, thick clean faceted GOLD outside border and chamfered clipped corners, ivory-gold inner highlight. NO ornament protrusions, no icons, no text, NO portraits, no HP bars, no symbols. Keep center clean, evenly dark enough for white labels; ends simple so the border can be sliced/resized. Straight horizontal top/bottom edges. Frontal orthographic. Same crisp premium painted 3D cartoon aesthetic as reference player panels and bottom dock. True alpha background and generous clear padding all around. A single complete uncut plate, not a full UI or sheet. No blur, no background scene.",
+      "source": "masters/hud.png"
+    },
+    {
+      "name": "fire",
+      "prompt": "Use case: precise-object-edit. Asset type: ONE isolated red FIRE action button background for live HTML text. Recreate supplied battle reference's bottom-right button, without any words, flame icon or symbols. Very wide about 2.8:1 horizontal red ruby enamel center, bright faceted crimson edges, thick polished gold and thin ivory inner bevel, strong chamfered angled corners, premium painted-3D cartoon fantasy game UI. Front-on symmetric shape. Center clean and sufficiently dark red for large cream text. Complete uncut button, generous transparent margin all sides, actual alpha. No UI mockup, no extra assets, no shadows forming an opaque rectangle. No text, no icon, no glowing bloom or blur.",
+      "source": "masters/fire.png"
+    },
+    {
+      "name": "stone",
+      "prompt": "Use case: stylized-concept. Asset type: ONE opaque tileable pale stone material texture for destructible fortress blocks in a 2D game. Supplied screenshot is the visual/material reference. Square canvas filled edge to edge with light warm-gray sandstone, broad subtle chisel marks and a few fine irregular cracks, sunny upper-left facets, premium crisp painted 3D-cartoon finish matching reference stone blocks. IMPORTANT: material ONLY, no individual brick silhouette, no mortar grid, NO frame/border or bevel around image perimeter, NO floor/ground, no grass, no perspective scene, no sky, no text, no icons. Surface detail must remain subtle and large-scale enough to read at 30-60 pixels. Seamless repeating on all edges, uniform brightness, no vignette, no blurry/noisy microtexture. We will draw the block's silhouette and bevels in code to match actual rectangular physics shapes.",
+      "source": "masters/stone.png"
+    },
+    {
+      "name": "cloud",
+      "prompt": "Use case: stylized-concept. Asset type: ONE isolated cloud bank with transparent background for a subtle drifting layer in Fortress AI gameplay. Match supplied battle reference's painted 3D-cartoon sunny cumulus clouds: fluffy sculpted white and very pale azure forms, warm sunlit upper left edges, broad soft volumetric shapes, well-defined clean silhouette with softly transparent wisps at tips. Wide low cloud bank about 3:1, only a single cloud cluster, generous true transparent padding around all sides. No blue sky rectangle, no sky background, no mountains or buildings, no UI, no text. High quality detailed illustration but readable broad forms, not grainy photo, no blur filter or glow. All clouds fully contained in canvas, edges not clipped.",
+      "source": "masters/cloud.png"
+    }
+  ]
+}

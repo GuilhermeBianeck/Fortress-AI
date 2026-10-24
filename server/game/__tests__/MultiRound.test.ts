@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { Server } from 'socket.io';
 import { RoomManager } from '../RoomManager';
-import { ROUNDS_TO_WIN } from '../../config/constants';
+import { ROUNDS_TO_WIN, COMBAT_TURN_DURATION_MS } from '../../config/constants';
 
 // Suppress console.log during tests
 vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -68,7 +68,7 @@ describe('Multi-round match flow (best-of-3)', () => {
         }
 
         // Let combat turn expire to trigger win check
-        vi.advanceTimersByTime(15_000);
+        vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
 
         // Right should have won this round
         expect(room.roundScore.right).toBe(1);
@@ -84,7 +84,7 @@ describe('Multi-round match flow (best-of-3)', () => {
         // Kill left king
         const leftPlayer = session.getPlayerState('socket-1');
         if (leftPlayer) leftPlayer.kingState.hp = 0;
-        vi.advanceTimersByTime(15_000);
+        vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
 
         const roundResultCalls = emitFn.mock.calls.filter(
             (c: any[]) => c[0] === 'round_result'
@@ -110,7 +110,7 @@ describe('Multi-round match flow (best-of-3)', () => {
 
         const leftPlayer = session.getPlayerState('socket-1');
         if (leftPlayer) leftPlayer.kingState.hp = 0;
-        vi.advanceTimersByTime(15_000);
+        vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
 
         // The round result should be marked as final
         const roundResultCalls = emitFn.mock.calls.filter(
@@ -130,7 +130,7 @@ describe('Multi-round match flow (best-of-3)', () => {
 
         const leftPlayer = session.getPlayerState('socket-1');
         if (leftPlayer) leftPlayer.kingState.hp = 0;
-        vi.advanceTimersByTime(15_000);
+        vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
 
         const scoresCalls = emitFn.mock.calls.filter(
             (c: any[]) => c[0] === 'match_scores'

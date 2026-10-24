@@ -1,0 +1,95 @@
+[
+  {
+    "now": 0,
+    "left": {
+      "headTilt": 0,
+      "headX": 0,
+      "headY": 0,
+      "chestScaleX": 1,
+      "chestScaleY": 1,
+      "shoulderY": 0,
+      "armAngle": 0,
+      "capeAngle": 0,
+      "capeScaleX": 1,
+      "blink": false,
+      "gesture": 0,
+      "breath": 0
+    },
+    "right": {
+      "headTilt": 0.01595845190663536,
+      "headX": 0.293086241123593,
+      "headY": -0.07399943725960177,
+      "chestScaleX": 1.0004553811523669,
+      "chestScaleY": 1.001821524609467,
+      "shoulderY": -0.056922644045847515,
+      "armAngle": 0.015751366517925476,
+      "capeAngle": 0.024307149832391024,
+      "capeScaleX": 1.012994483849569,
+      "blink": false,
+      "gesture": 0,
+      "breath": 0.11384528809169503
+    }
+  },
+  {
+    "now": 1600,
+    "left": {
+      "headTilt": 0.015223795743983207,
+      "headX": 0.2744783939455855,
+      "headY": -0.21774229760133804,
+      "chestScaleX": 1.0013399526006237,
+      "chestScaleY": 1.0053598104024946,
+      "shoulderY": -0.16749407507795233,
+      "armAngle": 0.016913618526335848,
+      "capeAngle": 0.027326783689558005,
+      "capeScaleX": 1.0168865795137787,
+      "blink": false,
+      "gesture": 0,
+      "breath": 0.33498815015590466
+    },
+    "right": {
+      "headTilt": 0.015556817507640293,
+      "headX": 0.44053192264344837,
+      "headY": 0.286050566940829,
+      "chestScaleX": 0.9982396888188256,
+      "chestScaleY": 0.9929587552753026,
+      "shoulderY": 0.2200388976467915,
+      "armAngle": -0.013575273720925977,
+      "capeAngle": -0.00809082113776733,
+      "capeScaleX": 0.9759917351711908,
+      "blink": false,
+      "gesture": 0,
+      "breath": -0.440077795293583
+    }
+  },
+  {
+    "now": 6400,
+    "left": {
+      "headTilt": -0.013991905292024088,
+      "headX": 0.2226553014089288,
+      "headY": 0.6364655239483561,
+      "chestScaleX": 0.9960832890833947,
+      "chestScaleY": 0.9843331563335789,
+      "shoulderY": 0.4895888645756585,
+      "armAngle": -0.11727173998671192,
+      "capeAngle": 0.028650745807562675,
+      "capeScaleX": 0.9956418304694256,
+      "blink": false,
+      "gesture": 0.7500000000000001,
+      "breath": -0.979177729151317
+    },
+    "right": {
+      "headTilt": -0.016511681255557523,
+      "headX": -0.0857408581362584,
+      "headY": -0.6473497829025884,
+      "chestScaleX": 1.0039836909717081,
+      "chestScaleY": 1.015934763886833,
+      "shoulderY": -0.4979613714635295,
+      "armAngle": -0.005853579966091753,
+      "capeAngle": 0.013627473276404577,
+      "capeScaleX": 0.9909276761712543,
+      "blink": false,
+      "gesture": 0,
+      "breath": 0.995922742927059
+    }
+  }
+]

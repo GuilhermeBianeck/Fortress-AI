@@ -1,10 +1,17 @@
-import type { BodyState, GameState, KingHpState, Side, TerrainData, Vector } from '../types';
+import type { BodyState, GameState, KingHpState, MatchPhase, Side, TerrainData, Vector } from '../types';
 import { WORLD_WIDTH } from '../types';
 import { cartoon } from '../sprites/cartoon';
 import type { ParticleSystem } from '../effects/particles';
 import { minimapRect, worldToScreen, type Viewport } from './viewport';
 import { cannonPosition, terrainHeight } from './ballistics';
 import { canPlace } from './placement';
+import { kingPresentation } from './kingAnimation';
+import { kingReactions } from '../sprites/kingReactions';
+import { drawLivingKing } from './livingKing';
+import { CANNON_ART, MUZZLE_LOCAL } from './cannonPresentation';
+import { battleArt, type BattleArtName } from '../sprites/battleArt';
+import { gradeBackgroundPixels, groundTextureColumn, healthPanel, sceneryPlacement } from './battlePresentation';
+import { renderedPosition, type RenderTransform } from './snapshotInterpolation';
 
 export interface BattleHazard {
     type: string;
@@ -16,7 +23,7 @@ export interface BattleHazard {
     windStrength?: number;
 }
 
-export interface BattleEffect { x: number; y: number; at: number; kind: 'impact' | 'break' | 'damage'; damage?: number }
+export interface BattleEffect { x: number; y: number; at: number; kind: 'impact' | 'break' | 'damage'; damage?: number; side?: Side; material?: string }
 export interface BattleFrame {
     view: Viewport;
     camera: number;
@@ -24,19 +31,19 @@ export interface BattleFrame {
     reducedMotion: boolean;
     state: GameState | null;
     terrain: TerrainData | null;
-    previous: Map<number, { x: number; y: number; angle: number }>;
-    interpolation: number;
+    transforms: ReadonlyMap<number, RenderTransform>;
     kings: { left: KingHpState; right: KingHpState };
     names?: { left: string; right: string };
     side: Side;
-    phase: string;
+    phase: MatchPhase;
+    winner?: Side | null;
     turn: Side | null;
     angle: number;
     trajectory: Vector[];
     hazards: BattleHazard[];
     effects: BattleEffect[];
     particles: ParticleSystem;
-    shot?: { side: Side; at: number };
+    shot?: { side: Side; at: number; angle: number };
     ghost?: Vector;
     projectileId?: number | null;
     placementDimensions: readonly [number, number];
@@ -61,63 +68,66 @@ function pathTerrain(ctx: CanvasRenderingContext2D, points: Vector[]) {
     ctx.closePath();
 }
 
-let ridgeCache: { image: HTMLImageElement; y: number } | undefined;
-function backgroundRidge(image: HTMLImageElement) {
-    if (ridgeCache?.image === image) return ridgeCache.y;
-    const buffer = document.createElement('canvas');
-    buffer.width = image.width;
-    buffer.height = image.height;
-    const ctx = buffer.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return image.height * 0.6;
-    ctx.drawImage(image, 0, 0);
-    const x = Math.floor(image.width * 0.63);
-    const pixels = ctx.getImageData(x, 0, 1, image.height).data;
-    let y = 0;
-    while (y < image.height && pixels[y * 4 + 3] < 160) y++;
-    ridgeCache = { image, y };
-    return y;
+const atmosphereCache = new WeakMap<HTMLImageElement, HTMLCanvasElement>();
+function atmosphere(image: HTMLImageElement) {
+    const cached = atmosphereCache.get(image);
+    if (cached) return cached;
+    const graded = document.createElement('canvas');
+    graded.width = image.width; graded.height = image.height;
+    const paint = graded.getContext('2d', { willReadFrequently: true })!;
+    paint.drawImage(image, 0, 0);
+    const pixels = paint.getImageData(0, 0, graded.width, graded.height);
+    gradeBackgroundPixels(pixels.data);
+    paint.putImageData(pixels, 0, 0);
+    const output = document.createElement('canvas');
+    output.width = graded.width; output.height = graded.height;
+    const soft = output.getContext('2d')!;
+    soft.filter = 'blur(1.6px)';
+    soft.drawImage(graded, 0, 0);
+    atmosphereCache.set(image, output);
+    return output;
 }
 
 function backdrop(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     const { width, height } = f.view;
-    const sky = ctx.createLinearGradient(0, 0, 0, height);
-    sky.addColorStop(0, '#76c7ed');
-    sky.addColorStop(0.72, '#c5e9ef');
-    sky.addColorStop(1, '#e2f0d3');
-    ctx.fillStyle = sky;
+    ctx.fillStyle = '#a6ccd9';
     ctx.fillRect(0, 0, width, height);
-
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    for (let i = 0; i < 5; i++) {
-        const drift = f.reducedMotion ? 0 : f.now * (0.0015 + i * 0.0002);
-        const x = ((i * 317 + 90 + drift - f.camera * 0.06) % (width + 240) + width + 240) % (width + 240) - 120;
-        const y = 75 + (i % 3) * 35;
-        ctx.beginPath();
-        ctx.ellipse(x, y, 66, 15, 0, 0, Math.PI * 2);
-        ctx.ellipse(x - 22, y - 9, 28, 20, 0, 0, Math.PI * 2);
-        ctx.ellipse(x + 12, y - 14, 33, 25, 0, 0, Math.PI * 2);
-        ctx.fill();
+    const sky = battleArt.get('sky');
+    if (sky) {
+        const s = Math.max(width / sky.width, height / sky.height);
+        ctx.drawImage(atmosphere(sky), (width - sky.width * s) / 2 - 3, (height - sky.height * s) / 2 - 3, sky.width * s + 6, sky.height * s + 6);
     }
-
-    const hills = cartoon.get('far_hills');
-    const fortress = cartoon.get('distant_fortress');
-    if (hills) {
-        const w = Math.max(960, width * 1.25, height * 3.7);
-        const h = w / 3;
-        const x = width * 0.72 - w * 0.63 - f.camera * 0.035;
-        const y = height * 0.49 - backgroundRidge(hills) * h / hills.height;
-        if (fortress) {
-            const fw = Math.min(180, Math.max(112, width * 0.15));
-            const meta = cartoon.metadata('distant_fortress');
-            const s = fw / fortress.width;
-            const baseline = y + backgroundRidge(hills) * h / hills.height + 7;
-            ctx.globalAlpha = 0.8;
-            ctx.drawImage(fortress, x + w * 0.63 - meta.pivot.x * s, baseline - meta.pivot.y * s, fw, fortress.height * s);
-            ctx.globalAlpha = 1;
+    const cloud = battleArt.get('cloud');
+    if (cloud) {
+        for (let i = 0; i < 3; i++) {
+            const w = Math.max(160, width * (0.19 + i * 0.035));
+            const drift = f.reducedMotion ? 0 : f.now * (0.002 + i * 0.0005);
+            const span = width + w * 2;
+            const x = ((width * (i * 0.42 + 0.1) + drift - (f.reducedMotion ? 0 : f.camera * 0.04)) % span + span) % span - w;
+            ctx.globalAlpha = 0.6;
+            ctx.drawImage(atmosphere(cloud), x, height * (0.1 + i * 0.065), w, w * cloud.height / cloud.width);
         }
-        // Both layers use the same camera transform. The ridge occludes the castle foot.
-        ctx.drawImage(hills, x, y, w, h);
+        ctx.globalAlpha = 1;
     }
+    const valley = battleArt.get('valley');
+    if (valley) {
+        const art = sceneryPlacement(width, height, valley.width, valley.height, f.reducedMotion ? 600 : f.camera);
+        ctx.drawImage(atmosphere(valley), art.x, art.y, art.width, art.height);
+    }
+}
+
+const patterns = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern>>();
+function texture(ctx: CanvasRenderingContext2D, name: BattleArtName | 'wood', width: number, height?: number) {
+    const image = name === 'wood' ? cartoon.get('wood_surface') : battleArt.get(name);
+    if (!image) return undefined;
+    let cache = patterns.get(ctx);
+    if (!cache) { cache = new Map(); patterns.set(ctx, cache); }
+    const key = `${name}:${width}:${height}`;
+    if (!cache.has(key)) {
+        const pattern = ctx.createPattern(image, 'repeat');
+        if (pattern) { pattern.setTransform(new DOMMatrix().scale(width / image.width, (height ?? width * image.height / image.width) / image.height)); cache.set(key, pattern); }
+    }
+    return cache.get(key);
 }
 
 function terrain(ctx: CanvasRenderingContext2D, f: BattleFrame) {
@@ -127,21 +137,8 @@ function terrain(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     soil.addColorStop(0.35, '#a17c56');
     soil.addColorStop(1, '#735d4a');
     pathTerrain(ctx, points);
-    ctx.fillStyle = soil;
+    ctx.fillStyle = texture(ctx, 'earth', 430, 160) ?? soil;
     ctx.fill();
-    ctx.save();
-    ctx.clip();
-    ctx.fillStyle = 'rgba(67,51,37,0.16)';
-    const start = Math.max(-80, Math.floor(f.camera / 46) * 46);
-    for (let x = start; x < Math.min(WORLD_WIDTH + 80, f.camera + f.view.worldWidth + 50); x += 46) {
-        for (let y = 495; y < 650; y += 35) {
-            const offset = (y % 3) * 7;
-            ctx.beginPath();
-            ctx.ellipse(x + offset, y, 3 + Math.abs(x % 5), 2, 0.3, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-    ctx.restore();
 
     // One continuous contour, rather than framed blocks repeated across the ground.
     ctx.beginPath();
@@ -158,6 +155,24 @@ function terrain(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     ctx.strokeStyle = '#bdde70';
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    const grass = battleArt.get('grass');
+    if (grass) {
+        // Small overlapping quads follow the real terrain without framed tiles or collider changes.
+        const begin = Math.max(-80, Math.floor((f.camera - 8) / 4) * 4);
+        const end = Math.min(WORLD_WIDTH + 80, f.camera + f.view.worldWidth + 8);
+        const height = 360 * grass.height / grass.width;
+        for (let x = begin; x < end; x += 4) {
+            const y = terrainHeight(points, x), next = terrainHeight(points, x + 4);
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(Math.atan2(next - y, 4));
+            const sx = groundTextureColumn(x) * grass.width;
+            ctx.drawImage(grass, sx, 0, Math.min(grass.width - sx, grass.width * 4 / 360 + 1), grass.height,
+                -0.5, -height * 0.15, Math.hypot(4, next - y) + 1, height);
+            ctx.restore();
+        }
+    }
 
     if (f.phase === 'build') {
         const zone = f.terrain?.buildZones.find(z => f.side === 'left' ? z.x < WORLD_WIDTH / 2 : z.x >= WORLD_WIDTH / 2);
@@ -223,23 +238,38 @@ function hazards(ctx: CanvasRenderingContext2D, f: BattleFrame) {
 
 function cannon(ctx: CanvasRenderingContext2D, f: BattleFrame, side: Side) {
     const pos = cannonPosition(side, f.terrain?.points ?? []);
-    const angle = side === f.side ? f.angle : Math.PI / 4;
+    const angle = side === f.side ? f.angle : f.shot?.side === side ? f.shot.angle : Math.PI / 4;
     const facing = side === 'left' ? 1 : -1;
     const base = cartoon.get('cannon_base');
     const barrel = cartoon.get('cannon_barrel');
     const kickAge = f.shot?.side === side ? f.now - f.shot.at : 1000;
     const kick = f.reducedMotion ? 0 : Math.max(0, 1 - kickAge / 240) * 5;
     ctx.save();
-    ctx.translate(pos.x, pos.y - 9);
+    ctx.translate(pos.x, pos.y + CANNON_ART.originY);
     ctx.scale(facing, 1);
     if (base && barrel) {
-        const baseScale = 78 / base.width;
-        const barrelScale = 105 / barrel.width;
+        const baseScale = CANNON_ART.baseWidth / base.width;
+        const barrelScale = CANNON_ART.barrelWidth / barrel.width;
         const bp = cartoon.metadata('cannon_base').pivot;
         const rp = cartoon.metadata('cannon_barrel').pivot;
         ctx.save();
         ctx.rotate(-angle);
         ctx.drawImage(barrel, -rp.x * barrelScale - kick, -rp.y * barrelScale, barrel.width * barrelScale, barrel.height * barrelScale);
+        if (!f.reducedMotion && kickAge >= 0 && kickAge < 130) {
+            const pulse = Math.sin(Math.PI * kickAge / 130);
+            ctx.save();
+            ctx.translate(MUZZLE_LOCAL.x - kick, MUZZLE_LOCAL.y);
+            ctx.scale(0.65 + pulse * 0.6, 0.8 + pulse * 0.3);
+            ctx.globalAlpha = 1 - kickAge / 150;
+            ctx.fillStyle = '#ffbe48'; ctx.strokeStyle = '#e78836'; ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(-3, -5); ctx.lineTo(8, -5); ctx.lineTo(14, -12); ctx.lineTo(19, -5);
+            ctx.lineTo(33, 0); ctx.lineTo(19, 5); ctx.lineTo(14, 12); ctx.lineTo(8, 5); ctx.lineTo(-3, 5);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#fffbe0';
+            ctx.beginPath(); ctx.ellipse(7, 0, 12, 4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
         ctx.restore();
         ctx.drawImage(base, -bp.x * baseScale, -bp.y * baseScale, base.width * baseScale, base.height * baseScale);
     } else {
@@ -261,8 +291,8 @@ function block(ctx: CanvasRenderingContext2D, b: BodyState) {
     const h = b.height || 40;
     const mat = b.label === 'foundation' ? 'foundation' : b.material || b.label;
     const [light, fill, dark] = MATERIALS[mat] ?? MATERIALS.stone;
-    const texture = mat === 'wood' ? cartoon.get('wood_surface') : undefined;
-    if (texture) ctx.drawImage(texture, -w / 2, -h / 2, w, h);
+    const surface = mat === 'wood' ? texture(ctx, 'wood', 70) : mat === 'stone' || mat === 'foundation' ? texture(ctx, 'stone', 100) : undefined;
+    if (surface) { ctx.fillStyle = surface; ctx.fillRect(-w / 2, -h / 2, w, h); }
     else {
         const gradient = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
         gradient.addColorStop(0, light);
@@ -276,6 +306,16 @@ function block(ctx: CanvasRenderingContext2D, b: BodyState) {
     ctx.strokeRect(-w / 2, -h / 2, w, h);
     ctx.fillStyle = 'rgba(255,255,255,0.26)';
     ctx.fillRect(-w / 2 + 2, -h / 2 + 2, w - 4, 2);
+    ctx.fillStyle = 'rgba(41,33,26,0.2)';
+    ctx.fillRect(-w / 2 + 1, h / 2 - 3, w - 2, 2);
+    if (mat === 'wood') {
+        ctx.strokeStyle = '#80501d'; ctx.lineWidth = 2;
+        ctx.strokeRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+        ctx.fillStyle = '#ffe0a1';
+        for (const x of [-w / 2 + 5, w / 2 - 5]) for (const y of [-h / 2 + 5, h / 2 - 5]) {
+            ctx.beginPath(); ctx.arc(x, y, 1.2, 0, Math.PI * 2); ctx.fill();
+        }
+    }
     if (mat === 'steel') {
         ctx.fillStyle = light;
         for (const x of [-w / 2 + 5, w / 2 - 5]) for (const y of [-h / 2 + 5, h / 2 - 5]) {
@@ -297,42 +337,57 @@ function block(ctx: CanvasRenderingContext2D, b: BodyState) {
 function entities(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     for (const b of f.state?.bodies ?? []) {
         if (b.isStatic && b.label !== 'foundation') continue;
-        const old = f.previous.get(b.id);
-        const t = f.interpolation;
-        const x = old ? old.x + (b.position.x - old.x) * t : b.position.x;
-        const y = old ? old.y + (b.position.y - old.y) * t : b.position.y;
+        const { x, y } = renderedPosition(b, f.transforms);
         if (x < f.camera - 100 || x > f.camera + f.view.worldWidth + 100) continue;
-        const delta = old ? Math.atan2(Math.sin(b.angle - old.angle), Math.cos(b.angle - old.angle)) : 0;
-        const angle = old ? old.angle + delta * t : b.angle;
+        const angle = f.transforms.get(b.id)?.angle ?? b.angle;
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(angle);
         if (b.label === 'king') {
-            const king = cartoon.get('king');
             const kingSide = Math.abs(x - (f.kings.left.x ?? 300)) < Math.abs(x - (f.kings.right.x ?? 2100)) ? 'left' : 'right';
+            const hit = [...f.effects].reverse().find(e => e.kind === 'damage' && e.side === kingSide);
+            const presentation = kingPresentation({ now: f.now, side: kingSide, phase: f.phase, winner: f.winner, hitAt: hit?.at, reducedMotion: f.reducedMotion });
+            const king = kingReactions.get(presentation.pose, kingSide);
             const facing = kingSide === 'left' ? 1 : -1;
             const radius = b.circleRadius || 16;
-            const breath = f.reducedMotion ? 1 : 1 + Math.sin(f.now * 0.0025) * 0.008;
             ctx.fillStyle = 'rgba(39,59,54,0.14)';
             ctx.beginPath(); ctx.ellipse(0, radius + 1, 19, 4, 0, 0, Math.PI * 2); ctx.fill();
-            if (king) {
-                const scale = 70 / king.height;
-                const pivot = cartoon.metadata('king').pivot;
-                ctx.translate(0, radius);
-                ctx.scale(facing, breath);
+            ctx.save();
+            ctx.translate(0, radius);
+            ctx.scale(facing, 1);
+            const articulated = presentation.pose === 'idle' && drawLivingKing(ctx, {
+                side: kingSide, now: f.now, height: 80, reducedMotion: f.reducedMotion,
+                shootAt: f.shot?.side === kingSide ? f.shot.at : undefined,
+                looking: f.turn === kingSide ? 0.5 : 0,
+            });
+            if (!articulated && king) {
+                const scale = 80 / king.height;
+                const pivot = kingReactions.metadata(kingSide).pivot;
+                ctx.scale(1, presentation.scaleY);
+                ctx.rotate(presentation.tilt);
                 ctx.drawImage(king, -pivot.x * scale, -pivot.y * scale, king.width * scale, king.height * scale);
-            } else {
+            }
+            ctx.restore();
+            if (!articulated && !king) {
                 ctx.fillStyle = '#efb949';
                 ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
             }
         } else if (b.label === 'projectile' || b.circleRadius) {
             const radius = b.circleRadius || 9;
             if (b.label === 'projectile') {
-                const length = Math.min(32, Math.hypot(b.velocity.x, b.velocity.y));
+                const length = Math.min(f.reducedMotion ? 18 : 96, Math.hypot(b.velocity.x, b.velocity.y) * 1.6);
                 const direction = Math.atan2(b.velocity.y, b.velocity.x) - angle;
-                ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-                ctx.lineWidth = 5;
-                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-Math.cos(direction) * length, -Math.sin(direction) * length); ctx.stroke();
+                const dx = Math.cos(direction), dy = Math.sin(direction);
+                const trail = ctx.createLinearGradient(-dx * length, -dy * length, 0, 0);
+                trail.addColorStop(0, 'rgba(255,247,207,0)');
+                trail.addColorStop(0.7, 'rgba(255,245,198,0.28)');
+                trail.addColorStop(1, 'rgba(255,252,229,0.7)');
+                ctx.fillStyle = trail;
+                ctx.beginPath(); ctx.moveTo(-dx * length, -dy * length);
+                ctx.lineTo(-dx * radius - dy * radius * 0.7, -dy * radius + dx * radius * 0.7);
+                ctx.lineTo(dx * radius, dy * radius);
+                ctx.lineTo(-dx * radius + dy * radius * 0.7, -dy * radius - dx * radius * 0.7);
+                ctx.closePath(); ctx.fill();
             }
             ctx.fillStyle = b.label === 'projectile' ? '#314a60' : '#8c9a9a';
             ctx.strokeStyle = '#f4e2b1'; ctx.lineWidth = 2;
@@ -344,36 +399,60 @@ function entities(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     }
 }
 
+function plate(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) {
+    const image = battleArt.get('hud');
+    if (!image) { ctx.fillStyle = '#123959'; ctx.fillRect(x, y, width, height); return; }
+    const s = Math.round(image.height * 0.35), d = Math.min(18, height / 3, width / 4);
+    const sx = [0, s, image.width - s], sy = [0, s, image.height - s];
+    const sw = [s, image.width - 2 * s, s], sh = [s, image.height - 2 * s, s];
+    const dx = [x, x + d, x + width - d], dy = [y, y + d, y + height - d];
+    const dw = [d, width - 2 * d, d], dh = [d, height - 2 * d, d];
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) ctx.drawImage(image, sx[col], sy[row], sw[col], sh[row], dx[col], dy[row], dw[col], dh[row]);
+}
+
 function health(ctx: CanvasRenderingContext2D, f: BattleFrame, side: Side) {
-    const width = Math.min(188, (f.view.width - 30) / 2);
-    const x = side === 'left' ? 10 : f.view.width - width - 10;
+    const panel = healthPanel(f.view.width, f.view.height, side);
+    const { compact, width, x, y: top, height: h, portraitWidth: pw } = panel;
     const king = f.kings[side];
-    ctx.fillStyle = 'rgba(249,253,248,0.91)';
-    ctx.strokeStyle = side === 'left' ? '#3f8e9c' : '#be6c66';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(x, 10, width, 44, 6); ctx.fill(); ctx.stroke();
-    ctx.font = '600 12px system-ui';
+    plate(ctx, x, top, width, h);
+    const portrait = kingReactions.get('idle', side);
+    if (portrait) {
+        ctx.save();
+        const cx = x + pw / 2 + 9;
+        ctx.translate(cx, top + 6);
+        if (side === 'right') ctx.scale(-1, 1);
+        ctx.drawImage(portrait, portrait.width * 0.08, portrait.height * 0.02, portrait.width * 0.84, portrait.height * 0.55, -pw / 2, 0, pw, h - 15);
+        ctx.restore();
+    }
+    const content = x + pw + 15, right = x + width - 12, available = right - content;
+    ctx.font = `700 ${compact ? 11 : 16}px system-ui`;
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#26434b';
+    ctx.fillStyle = '#fff8e5';
     let name = f.names?.[side] || (side === f.side ? 'You' : 'Opponent');
-    while (ctx.measureText(name).width > width - 68 && name.length > 1) name = name.slice(0, -2) + '\u2026';
-    ctx.fillText(name, x + 8, 27);
+    while (ctx.measureText(name).width > available - 30 && name.length > 1) name = name.slice(0, -2) + '\u2026';
+    ctx.fillText(name, content, top + (compact ? 19 : 27));
     ctx.textAlign = 'right';
-    ctx.fillText(`${Math.max(0, Math.ceil(king.hp))}`, x + width - 8, 27);
-    ctx.fillStyle = '#d8e5dc';
-    ctx.fillRect(x + 8, 34, width - 16, 10);
-    ctx.fillStyle = side === 'left' ? '#31a98a' : '#df7b69';
-    ctx.fillRect(x + 8, 34, (width - 16) * Math.max(0, Math.min(1, king.hp / Math.max(1, king.maxHp))), 10);
+    ctx.fillText(`${Math.max(0, Math.ceil(king.hp))}`, right, top + (compact ? 19 : 27));
+    const by = top + (compact ? 26 : 37), bh = compact ? 10 : 16;
+    ctx.fillStyle = '#051c32'; ctx.fillRect(content, by, available, bh);
+    const gloss = ctx.createLinearGradient(0, by, 0, by + bh);
+    gloss.addColorStop(0, side === 'left' ? '#ffb29a' : '#a7ffbd');
+    gloss.addColorStop(0.32, side === 'left' ? '#fb4243' : '#24df66');
+    gloss.addColorStop(1, side === 'left' ? '#ab1422' : '#08763c');
+    ctx.fillStyle = gloss;
+    ctx.fillRect(content, by, available * Math.max(0, Math.min(1, king.hp / Math.max(1, king.maxHp))), bh);
+    ctx.strokeStyle = '#d8b96b'; ctx.lineWidth = 1;
+    ctx.strokeRect(content, by, available, bh);
 }
 
 function minimap(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     const box = minimapRect(f.view);
     ctx.save();
-    ctx.fillStyle = 'rgba(245,252,244,0.88)';
-    ctx.strokeStyle = 'rgba(57,95,89,0.55)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(box.x, box.y, box.width, box.height, 4); ctx.fill(); ctx.stroke();
+    plate(ctx, box.x - 4, box.y - 4, box.width + 8, box.height + 8);
     ctx.beginPath(); ctx.rect(box.x, box.y, box.width, box.height); ctx.clip();
+    ctx.fillStyle = '#a6daed'; ctx.fillRect(box.x + 3, box.y + 3, box.width - 6, box.height - 6);
+    const valley = battleArt.get('valley');
+    if (valley) { ctx.globalAlpha = 0.65; ctx.drawImage(valley, box.x, box.y, box.width, box.height); ctx.globalAlpha = 1; }
     const sx = box.width / WORLD_WIDTH;
     const sy = box.height / 600;
     ctx.beginPath(); ctx.moveTo(box.x, box.y + box.height);
@@ -382,10 +461,13 @@ function minimap(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     ctx.fillStyle = '#88aa6b'; ctx.fill();
     for (const b of f.state?.bodies ?? []) {
         if (b.isStatic) continue;
-        ctx.fillStyle = b.label === 'king' ? '#d68926' : b.label === 'projectile' ? '#d64c48' : '#51748b';
-        ctx.fillRect(box.x + b.position.x * sx - 1, box.y + b.position.y * sy - 2, b.label === 'king' ? 4 : 2, 3);
+        ctx.fillStyle = b.label === 'king'
+            ? (Math.abs(b.position.x - (f.kings.left.x ?? 600)) < Math.abs(b.position.x - (f.kings.right.x ?? 1800)) ? '#bb5948' : '#167f7a')
+            : b.label === 'projectile' ? '#d64c48' : '#51748b';
+        const position = renderedPosition(b, f.transforms);
+        ctx.fillRect(box.x + position.x * sx - 1, box.y + position.y * sy - 2, b.label === 'king' ? 4 : 2, 3);
     }
-    ctx.strokeStyle = '#2c778d';
+    ctx.strokeStyle = '#fff1ae';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(box.x + f.camera * sx, box.y + 1, f.view.worldWidth * sx, box.height - 2);
     ctx.restore();
@@ -399,7 +481,6 @@ export function drawBattle(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     ctx.translate(-f.camera, -top);
     terrain(ctx, f);
     hazards(ctx, f);
-    cannon(ctx, f, 'left'); cannon(ctx, f, 'right');
     if (f.trajectory.length && f.phase === 'combat' && f.turn === f.side) {
         ctx.save();
         ctx.setLineDash([2, 11]);
@@ -413,6 +494,8 @@ export function drawBattle(ctx: CanvasRenderingContext2D, f: BattleFrame) {
         ctx.restore();
     }
     entities(ctx, f);
+    // Foreground barrels occlude the emerging projectile instead of drawing it over metal.
+    cannon(ctx, f, 'left'); cannon(ctx, f, 'right');
     if (f.ghost && f.phase === 'build') {
         const valid = canPlace(f.ghost, f.side);
         const [width, height] = f.placementDimensions;
@@ -432,10 +515,20 @@ export function drawBattle(ctx: CanvasRenderingContext2D, f: BattleFrame) {
             const text = `-${effect.damage}`;
             const y = effect.y - 35 - age * (f.reducedMotion ? 0 : 30);
             ctx.strokeText(text, effect.x, y); ctx.fillText(text, effect.x, y);
+        } else if (effect.kind === 'impact') {
+            ctx.strokeStyle = '#fff7cb';
+            ctx.lineWidth = 4 * (1 - age);
+            ctx.beginPath(); ctx.arc(effect.x, effect.y, 7 + age * (f.reducedMotion ? 3 : 35), 0, Math.PI * 2); ctx.stroke();
+            if (!f.reducedMotion && age < 0.24) {
+                ctx.fillStyle = '#fff4c5';
+                ctx.beginPath(); ctx.ellipse(effect.x, effect.y, 12 * (1 - age), 9 * (1 - age), 0, 0, Math.PI * 2); ctx.fill();
+            }
         } else {
-            ctx.strokeStyle = effect.kind === 'break' ? '#ffc56b' : '#fff5bc';
-            ctx.lineWidth = 5 * (1 - age);
-            ctx.beginPath(); ctx.arc(effect.x, effect.y, 8 + age * (f.reducedMotion ? 4 : 32), 0, Math.PI * 2); ctx.stroke();
+            // Breakage stays material-colored; ice and stone do not erupt as fireballs.
+            ctx.globalAlpha *= 0.24;
+            ctx.strokeStyle = (MATERIALS[effect.material ?? 'stone'] ?? MATERIALS.stone)[0];
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(effect.x, effect.y, 6 + age * (f.reducedMotion ? 2 : 19), 0, Math.PI * 2); ctx.stroke();
         }
         ctx.restore();
     }
@@ -443,7 +536,7 @@ export function drawBattle(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     health(ctx, f, 'left'); health(ctx, f, 'right'); minimap(ctx, f);
     const projectile = f.state?.bodies.find(b => b.id === f.projectileId);
     if (projectile) {
-        const point = worldToScreen(projectile.position, f.camera, f.view);
+        const point = worldToScreen(renderedPosition(projectile, f.transforms), f.camera, f.view);
         if (point.y < 65) {
             const x = Math.max(16, Math.min(f.view.width - 16, point.x));
             ctx.fillStyle = '#325773';

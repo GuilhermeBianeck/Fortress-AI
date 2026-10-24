@@ -1,0 +1,450 @@
+{
+  "version": 1,
+  "unitHeight": 320,
+  "assets": [
+    {
+      "name": "ember_body",
+      "character": "ember",
+      "side": "left",
+      "part": "body",
+      "path": "runtime/ember_body.png",
+      "width": 207,
+      "height": 206,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "pivot": {
+        "x": 97,
+        "y": 198
+      },
+      "source": "masters/ember-rig.png",
+      "sourceCell": {
+        "x": 0,
+        "y": 0,
+        "width": 570,
+        "height": 600
+      },
+      "sourceBounds": {
+        "x": 102,
+        "y": 147,
+        "width": 426,
+        "height": 423
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 191,
+        "height": 190
+      },
+      "bytes": 49684
+    },
+    {
+      "name": "ember_head_open",
+      "character": "ember",
+      "side": "left",
+      "part": "head_open",
+      "path": "runtime/ember_head_open.png",
+      "width": 157,
+      "height": 176,
+      "anchor": {
+        "x": 8,
+        "y": -185
+      },
+      "pivot": {
+        "x": 72.86,
+        "y": 140.79999999999998
+      },
+      "source": "masters/ember-rig.png",
+      "sourceCell": {
+        "x": 570,
+        "y": 0,
+        "width": 454,
+        "height": 600
+      },
+      "sourceBounds": {
+        "x": 19,
+        "y": 123,
+        "width": 385,
+        "height": 438
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 141,
+        "height": 160
+      },
+      "bytes": 35332
+    },
+    {
+      "name": "ember_head_closed",
+      "character": "ember",
+      "side": "left",
+      "part": "head_closed",
+      "path": "runtime/ember_head_closed.png",
+      "width": 157,
+      "height": 176,
+      "anchor": {
+        "x": 8,
+        "y": -185
+      },
+      "pivot": {
+        "x": 72.86,
+        "y": 140.79999999999998
+      },
+      "source": "masters/ember-rig.png",
+      "sourceCell": {
+        "x": 0,
+        "y": 600,
+        "width": 570,
+        "height": 540
+      },
+      "sourceBounds": {
+        "x": 122,
+        "y": 29,
+        "width": 387,
+        "height": 436
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 141,
+        "height": 160
+      },
+      "bytes": 34833
+    },
+    {
+      "name": "ember_arm",
+      "character": "ember",
+      "side": "left",
+      "part": "arm",
+      "path": "runtime/ember_arm.png",
+      "width": 85,
+      "height": 128,
+      "anchor": {
+        "x": -54,
+        "y": -170
+      },
+      "pivot": {
+        "x": 42.5,
+        "y": 19.200000000000003
+      },
+      "source": "masters/ember-rig.png",
+      "sourceCell": {
+        "x": 512,
+        "y": 600,
+        "width": 512,
+        "height": 500
+      },
+      "sourceBounds": {
+        "x": 191,
+        "y": 85,
+        "width": 214,
+        "height": 345
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 69,
+        "height": 112
+      },
+      "bytes": 11418
+    },
+    {
+      "name": "ember_cape",
+      "character": "ember",
+      "side": "left",
+      "part": "cape",
+      "path": "runtime/ember_cape.png",
+      "width": 158,
+      "height": 170,
+      "anchor": {
+        "x": -20,
+        "y": -177
+      },
+      "pivot": {
+        "x": 110.24,
+        "y": 26.48
+      },
+      "source": "masters/ember-rig.png",
+      "sourceCell": {
+        "x": 0,
+        "y": 1060,
+        "width": 600,
+        "height": 476
+      },
+      "sourceBounds": {
+        "x": 56,
+        "y": 37,
+        "width": 447,
+        "height": 367
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 142,
+        "height": 154
+      },
+      "bytes": 23086
+    },
+    {
+      "name": "ember_chest",
+      "character": "ember",
+      "side": "left",
+      "part": "chest",
+      "path": "runtime/ember_chest.png",
+      "width": 144,
+      "height": 91,
+      "anchor": {
+        "x": 0,
+        "y": -108
+      },
+      "pivot": {
+        "x": 72,
+        "y": 83
+      },
+      "source": "masters/ember-rig.png",
+      "sourceCell": {
+        "x": 600,
+        "y": 1100,
+        "width": 424,
+        "height": 436
+      },
+      "sourceBounds": {
+        "x": 4,
+        "y": 77,
+        "width": 380,
+        "height": 188
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 128,
+        "height": 75
+      },
+      "bytes": 16662
+    },
+    {
+      "name": "ivory_body",
+      "character": "ivory",
+      "side": "right",
+      "part": "body",
+      "path": "runtime/ivory_body.png",
+      "width": 161,
+      "height": 206,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "pivot": {
+        "x": 80,
+        "y": 198
+      },
+      "source": "masters/ivory-rig.png",
+      "sourceCell": {
+        "x": 0,
+        "y": 0,
+        "width": 570,
+        "height": 600
+      },
+      "sourceBounds": {
+        "x": 155,
+        "y": 84,
+        "width": 371,
+        "height": 485
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 145,
+        "height": 190
+      },
+      "bytes": 38378
+    },
+    {
+      "name": "ivory_head_open",
+      "character": "ivory",
+      "side": "right",
+      "part": "head_open",
+      "path": "runtime/ivory_head_open.png",
+      "width": 139,
+      "height": 176,
+      "anchor": {
+        "x": 8,
+        "y": -185
+      },
+      "pivot": {
+        "x": 64.58000000000001,
+        "y": 140.79999999999998
+      },
+      "source": "masters/ivory-rig.png",
+      "sourceCell": {
+        "x": 570,
+        "y": 0,
+        "width": 454,
+        "height": 600
+      },
+      "sourceBounds": {
+        "x": 23,
+        "y": 86,
+        "width": 369,
+        "height": 480
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 123,
+        "height": 160
+      },
+      "bytes": 34935
+    },
+    {
+      "name": "ivory_head_closed",
+      "character": "ivory",
+      "side": "right",
+      "part": "head_closed",
+      "path": "runtime/ivory_head_closed.png",
+      "width": 139,
+      "height": 176,
+      "anchor": {
+        "x": 8,
+        "y": -185
+      },
+      "pivot": {
+        "x": 64.58000000000001,
+        "y": 140.79999999999998
+      },
+      "source": "masters/ivory-rig.png",
+      "sourceCell": {
+        "x": 0,
+        "y": 600,
+        "width": 570,
+        "height": 540
+      },
+      "sourceBounds": {
+        "x": 107,
+        "y": 12,
+        "width": 371,
+        "height": 473
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 123,
+        "height": 160
+      },
+      "bytes": 34747
+    },
+    {
+      "name": "ivory_arm",
+      "character": "ivory",
+      "side": "right",
+      "part": "arm",
+      "path": "runtime/ivory_arm.png",
+      "width": 82,
+      "height": 128,
+      "anchor": {
+        "x": -54,
+        "y": -170
+      },
+      "pivot": {
+        "x": 41,
+        "y": 19.200000000000003
+      },
+      "source": "masters/ivory-rig.png",
+      "sourceCell": {
+        "x": 512,
+        "y": 600,
+        "width": 512,
+        "height": 500
+      },
+      "sourceBounds": {
+        "x": 186,
+        "y": 82,
+        "width": 206,
+        "height": 352
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 66,
+        "height": 112
+      },
+      "bytes": 11478
+    },
+    {
+      "name": "ivory_cape",
+      "character": "ivory",
+      "side": "right",
+      "part": "cape",
+      "path": "runtime/ivory_cape.png",
+      "width": 158,
+      "height": 170,
+      "anchor": {
+        "x": -20,
+        "y": -177
+      },
+      "pivot": {
+        "x": 110.24,
+        "y": 26.48
+      },
+      "source": "masters/ivory-rig.png",
+      "sourceCell": {
+        "x": 0,
+        "y": 1060,
+        "width": 600,
+        "height": 476
+      },
+      "sourceBounds": {
+        "x": 54,
+        "y": 45,
+        "width": 514,
+        "height": 388
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 142,
+        "height": 154
+      },
+      "bytes": 25463
+    },
+    {
+      "name": "ivory_chest",
+      "character": "ivory",
+      "side": "right",
+      "part": "chest",
+      "path": "runtime/ivory_chest.png",
+      "width": 144,
+      "height": 91,
+      "anchor": {
+        "x": 0,
+        "y": -108
+      },
+      "pivot": {
+        "x": 72,
+        "y": 83
+      },
+      "source": "masters/ivory-rig.png",
+      "sourceCell": {
+        "x": 600,
+        "y": 1100,
+        "width": 424,
+        "height": 436
+      },
+      "sourceBounds": {
+        "x": 37,
+        "y": 74,
+        "width": 326,
+        "height": 230
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 128,
+        "height": 75
+      },
+      "bytes": 18381
+    }
+  ]
+}

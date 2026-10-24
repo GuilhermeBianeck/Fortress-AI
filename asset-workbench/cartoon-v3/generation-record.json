@@ -1,0 +1,28 @@
+{
+  "tool": "built-in image_gen.imagegen",
+  "apiKeyRequired": false,
+  "model": "Not selectable or independently exposed by the built-in tool",
+  "reference": "../cartoon-v1/masters/C02-king-master.png (style only); rival idle master for registered pose edits",
+  "records": [
+    {
+      "pose": "idle",
+      "file": "masters/C11-rival-idle.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: individual transparent full-body king sprite for Fortress AI.\nInput image 1 is the STYLE and scale reference, NOT the identity to copy.\nCreate a genuinely DIFFERENT rival king in the exact same polished friendly side-view cartoon game art style. The existing warm brown-haired bearded king has a red cape and blue tunic. The new rival is a dignified silver-haired king with short swept-back silver hair, a neatly pointed white beard, expressive arched eyebrows, a slightly longer/angular face and slimmer but sturdy proportions. Give him a tall platinum-and-gold crown with a prominent teal diamond gem, a rich teal tunic with silver trim and belt, an ivory-white cape with small fur collar, and dark blue leather boots. He must be recognizably different in silhouette and face, not merely a recolor of the reference.\nStanding idle, calm confident little smile, hands relaxed at sides, 3/4 side view FACING RIGHT. Full character from crown to boot soles, matching reference camera, roughly same visual height and ground baseline. Upper-left daylight, smooth crisp painterly cartoon shading and broad color groups readable at 48-70 pixels. Generous clear transparent margin on all four sides. Square canvas, same composition as reference.\nTrue alpha transparent background. No ground, no contact shadow, no text, no labels, no extra characters, no objects, no scene, no panel. One individual sprite only. This is the base registered idle pose for later hit/win/loss edits."
+    },
+    {
+      "pose": "hit",
+      "file": "masters/C12-rival-hit.png",
+      "prompt": "Use case: identity-preserve. Edit the supplied transparent rival king sprite to create exactly ONE HIT reaction pose for the same game character.\nChange only face and upper-body gesture: eyes squeezed shut, teeth clenched in a nonviolent cartoon flinch, shoulders slightly hunched, hands drawn inward a little. Preserve the silver hair, pointed white beard, platinum/gold crown with teal diamond, teal silver-trimmed tunic, ivory fur-collared cape, dark blue boots, identity, lighting, viewpoint and illustration finish EXACTLY.\nCRITICAL REGISTRATION: same square canvas and exact original pixel composition/scale. Keep BOTH BOOTS AND LEGS, belt height, foot placements, ground baseline, crown top and overall character height unchanged. No moving, recentering, zooming, independent trimming, or resizing. Feet must occupy the identical pixels as the input; only facial expression and upper arms change. Full uncropped crown, cape and boots with generous transparent padding.\nTrue alpha transparent background. Facing RIGHT. No background, ground, shadow, numbers, stars, impact effects, text, UI, extra assets. Individual registered sprite, not a sheet."
+    },
+    {
+      "pose": "victory",
+      "file": "masters/C13-rival-victory.png",
+      "prompt": "Use case: identity-preserve. Edit the supplied transparent silver-haired rival king sprite into ONE VICTORY key pose for the same character.\nChange only the face and upper arms: warm proud joyful smile, eyebrows lifted, his nearer hand raised in a small celebratory clenched fist beside his cheek and crown, no higher than the crown top; other hand resting confidently at the belt. Keep the entire lower body, BOTH BOOTS, foot positions, baseline, belt, crown top, character height/scale and exact canvas coordinates unchanged. Do not recenter, resize, zoom, crop, change camera or change outfit. Same silver hair, pointed white beard, platinum/gold teal-gem crown, teal/silver tunic, ivory fur-collared cape and dark blue boots. Preserve the reference lighting and polished cartoon game finish.\nCRITICAL: same square canvas and exact full-body framing with clear transparent padding. Boot pixels must remain identical to the idle reference, for animation registration. Facing RIGHT. Real alpha transparency. No ground, shadow, text, stars, confetti, trophy, extra sprites or effects. One individual pose only, not a sheet."
+    },
+    {
+      "pose": "defeat",
+      "file": "masters/C14-rival-defeat.png",
+      "prompt": "Use case: identity-preserve. Edit the supplied transparent silver-haired rival king sprite to ONE DEFEAT reaction, keeping him standing and nonviolent.\nChange only expression and upper posture: brows tilted with disappointment, eyes looking downward, closed small frown, shoulders gently slumped, hands relaxed at sides. Keep the silver-haired pointed white beard face identity, gold/platinum teal diamond crown, teal/silver tunic, ivory cape/fur collar and dark blue boots EXACTLY.\nCRITICAL ANIMATION REGISTRATION: same square canvas, same camera and composition, same pixel scale, same crown-top height and same leg/boot positions. Keep BOTH BOOTS AND LEGS identical to input, with identical foot baseline. Do not bend knees, sit, fall, zoom, move, crop, or independently recenter the figure. Full crown and boots visible, generous transparent margins.\nFacing RIGHT. Premium polished clean cartoon game shading in same upper-left daylight as reference. True transparent alpha background. No ground, shadow, tears, stars, effects, text, background scene, UI or extra sprites. One registered key pose, not a sprite sheet."
+    }
+  ]
+}

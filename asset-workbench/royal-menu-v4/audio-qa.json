@@ -1,0 +1,1201 @@
+{
+  "source": {
+    "path": "asset-workbench/royal-menu-v4/reference/animation.mp4",
+    "sha256": "9d60762e184b80170c739bf9277b19a774b5f231d0026f2af963af2f843f930c",
+    "codec": "aac",
+    "frames": 384000,
+    "durationSeconds": 8,
+    "sampleRate": 48000,
+    "channels": 2,
+    "longestSilentRunSeconds": 0.000020833333333333333,
+    "perChannel": [
+      {
+        "peak": 0.31591230630874634,
+        "peakDbfs": -10.00866911799189,
+        "rmsDbfs": -28.49088666873897,
+        "dcOffset": 0.0005168600303345578,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.005164213212791664,
+        "adjacentStepP999": 0.038961971178650856,
+        "adjacentStepMax": 0.09025724045932293,
+        "seam": {
+          "firstSample": -0.0000099928938652738,
+          "lastSample": -0.026732705533504486,
+          "absoluteStep": 0.026722712639639212,
+          "stepDbfs": -31.462389168966794,
+          "slopeChange": 0.026707285068368947,
+          "before50msRmsDbfs": -32.97433171953609,
+          "after50msRmsDbfs": -47.227976575271235,
+          "levelChangeDb": -14.25364485573514
+        }
+      },
+      {
+        "peak": 0.3158489763736725,
+        "peakDbfs": -10.010410525209325,
+        "rmsDbfs": -28.52214210570787,
+        "dcOffset": 0.0006065515204327381,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.005149920906441081,
+        "adjacentStepP999": 0.03905477747321129,
+        "adjacentStepMax": 0.09017598442733288,
+        "seam": {
+          "firstSample": -0.00007210369949461892,
+          "lastSample": -0.003115537343546748,
+          "absoluteStep": 0.0030434336440521292,
+          "stepDbfs": -50.33272325450439,
+          "slopeChange": 0.0032065850609797053,
+          "before50msRmsDbfs": -32.63006699622495,
+          "after50msRmsDbfs": -48.173259497696904,
+          "levelChangeDb": -15.543192501471964
+        }
+      }
+    ],
+    "waveform100ms": [
+      {
+        "seconds": 0,
+        "rmsDbfs": -36.00439425520265,
+        "peakDbfs": -22.18493116233195
+      },
+      {
+        "seconds": 0.1,
+        "rmsDbfs": -24.728089774651274,
+        "peakDbfs": -14.435796093738436
+      },
+      {
+        "seconds": 0.2,
+        "rmsDbfs": -23.88760565180933,
+        "peakDbfs": -11.266593877671575
+      },
+      {
+        "seconds": 0.3,
+        "rmsDbfs": -24.63737861714987,
+        "peakDbfs": -13.330840212927015
+      },
+      {
+        "seconds": 0.4,
+        "rmsDbfs": -27.93063641389532,
+        "peakDbfs": -18.550000370874695
+      },
+      {
+        "seconds": 0.5,
+        "rmsDbfs": -30.28064570058905,
+        "peakDbfs": -19.790020514390083
+      },
+      {
+        "seconds": 0.6,
+        "rmsDbfs": -30.999402153182352,
+        "peakDbfs": -20.265258269658254
+      },
+      {
+        "seconds": 0.7,
+        "rmsDbfs": -27.458555343234075,
+        "peakDbfs": -16.775404195313214
+      },
+      {
+        "seconds": 0.8,
+        "rmsDbfs": -25.918547805907146,
+        "peakDbfs": -16.728000946261666
+      },
+      {
+        "seconds": 0.9,
+        "rmsDbfs": -35.156445880236774,
+        "peakDbfs": -24.668684392620946
+      },
+      {
+        "seconds": 1,
+        "rmsDbfs": -28.396287125714803,
+        "peakDbfs": -16.794262241636137
+      },
+      {
+        "seconds": 1.1,
+        "rmsDbfs": -30.752341420917194,
+        "peakDbfs": -21.01967932641983
+      },
+      {
+        "seconds": 1.2,
+        "rmsDbfs": -27.978337286017748,
+        "peakDbfs": -18.73731234627296
+      },
+      {
+        "seconds": 1.3,
+        "rmsDbfs": -25.453838358355757,
+        "peakDbfs": -13.464731903928806
+      },
+      {
+        "seconds": 1.4,
+        "rmsDbfs": -26.879708578039896,
+        "peakDbfs": -18.68275000873381
+      },
+      {
+        "seconds": 1.5,
+        "rmsDbfs": -26.892558816916843,
+        "peakDbfs": -18.355568910783795
+      },
+      {
+        "seconds": 1.6,
+        "rmsDbfs": -27.565355245926945,
+        "peakDbfs": -19.043436008420674
+      },
+      {
+        "seconds": 1.7,
+        "rmsDbfs": -33.00910335647863,
+        "peakDbfs": -20.581607588897597
+      },
+      {
+        "seconds": 1.8,
+        "rmsDbfs": -36.696299170370665,
+        "peakDbfs": -19.715082388768565
+      },
+      {
+        "seconds": 1.9,
+        "rmsDbfs": -26.31481719548768,
+        "peakDbfs": -16.49018177802371
+      },
+      {
+        "seconds": 2,
+        "rmsDbfs": -31.414918738019452,
+        "peakDbfs": -20.510803670710164
+      },
+      {
+        "seconds": 2.1,
+        "rmsDbfs": -36.9787653753564,
+        "peakDbfs": -20.753711927215242
+      },
+      {
+        "seconds": 2.2,
+        "rmsDbfs": -25.104443379585113,
+        "peakDbfs": -12.563361474909641
+      },
+      {
+        "seconds": 2.3,
+        "rmsDbfs": -32.77175913974546,
+        "peakDbfs": -18.299011486526826
+      },
+      {
+        "seconds": 2.4,
+        "rmsDbfs": -27.244159480230756,
+        "peakDbfs": -15.636836809041858
+      },
+      {
+        "seconds": 2.5,
+        "rmsDbfs": -30.070379538993475,
+        "peakDbfs": -17.75487837558563
+      },
+      {
+        "seconds": 2.6,
+        "rmsDbfs": -34.87623768504828,
+        "peakDbfs": -21.474160374638174
+      },
+      {
+        "seconds": 2.7,
+        "rmsDbfs": -25.409373785125382,
+        "peakDbfs": -12.03701041649557
+      },
+      {
+        "seconds": 2.8,
+        "rmsDbfs": -26.246197162473468,
+        "peakDbfs": -18.26008922097618
+      },
+      {
+        "seconds": 2.9,
+        "rmsDbfs": -24.67526183828168,
+        "peakDbfs": -11.744615336611417
+      },
+      {
+        "seconds": 3,
+        "rmsDbfs": -24.163204582655048,
+        "peakDbfs": -10.00866911799189
+      },
+      {
+        "seconds": 3.1,
+        "rmsDbfs": -25.972226414064853,
+        "peakDbfs": -11.78660512907423
+      },
+      {
+        "seconds": 3.2,
+        "rmsDbfs": -29.66565787991427,
+        "peakDbfs": -14.907461142115457
+      },
+      {
+        "seconds": 3.3,
+        "rmsDbfs": -32.392166192544316,
+        "peakDbfs": -18.200682238569183
+      },
+      {
+        "seconds": 3.4,
+        "rmsDbfs": -36.27728875645061,
+        "peakDbfs": -23.278283124982654
+      },
+      {
+        "seconds": 3.5,
+        "rmsDbfs": -40.63707436213571,
+        "peakDbfs": -27.34045023468368
+      },
+      {
+        "seconds": 3.6,
+        "rmsDbfs": -48.657096692771695,
+        "peakDbfs": -37.45815422805463
+      },
+      {
+        "seconds": 3.7,
+        "rmsDbfs": -45.91253930898601,
+        "peakDbfs": -34.196730165027816
+      },
+      {
+        "seconds": 3.8,
+        "rmsDbfs": -41.97244324084549,
+        "peakDbfs": -30.379159132574635
+      },
+      {
+        "seconds": 3.9,
+        "rmsDbfs": -39.55586434384641,
+        "peakDbfs": -29.053037230997827
+      },
+      {
+        "seconds": 4,
+        "rmsDbfs": -28.868862699483877,
+        "peakDbfs": -16.86133860567204
+      },
+      {
+        "seconds": 4.1,
+        "rmsDbfs": -29.877183103147434,
+        "peakDbfs": -17.775773834493865
+      },
+      {
+        "seconds": 4.2,
+        "rmsDbfs": -32.259661825165175,
+        "peakDbfs": -15.328455614149753
+      },
+      {
+        "seconds": 4.3,
+        "rmsDbfs": -26.887538459308207,
+        "peakDbfs": -15.231768207090258
+      },
+      {
+        "seconds": 4.4,
+        "rmsDbfs": -29.799146267283525,
+        "peakDbfs": -18.730884475170466
+      },
+      {
+        "seconds": 4.5,
+        "rmsDbfs": -28.2511664965793,
+        "peakDbfs": -17.839823234758523
+      },
+      {
+        "seconds": 4.6,
+        "rmsDbfs": -34.812066566128024,
+        "peakDbfs": -18.77938051727568
+      },
+      {
+        "seconds": 4.7,
+        "rmsDbfs": -27.86597472978624,
+        "peakDbfs": -17.777199651060304
+      },
+      {
+        "seconds": 4.8,
+        "rmsDbfs": -31.527138198111192,
+        "peakDbfs": -21.606985258507034
+      },
+      {
+        "seconds": 4.9,
+        "rmsDbfs": -26.910125557053664,
+        "peakDbfs": -14.52410887900815
+      },
+      {
+        "seconds": 5,
+        "rmsDbfs": -29.709376208646443,
+        "peakDbfs": -14.892644266954454
+      },
+      {
+        "seconds": 5.1,
+        "rmsDbfs": -28.81766273032411,
+        "peakDbfs": -16.618253844788367
+      },
+      {
+        "seconds": 5.2,
+        "rmsDbfs": -30.731937219679082,
+        "peakDbfs": -19.784207734005467
+      },
+      {
+        "seconds": 5.3,
+        "rmsDbfs": -29.21682004893863,
+        "peakDbfs": -18.833300704521637
+      },
+      {
+        "seconds": 5.4,
+        "rmsDbfs": -33.23159876938323,
+        "peakDbfs": -18.479524436816376
+      },
+      {
+        "seconds": 5.5,
+        "rmsDbfs": -38.209170448154126,
+        "peakDbfs": -27.343153676074635
+      },
+      {
+        "seconds": 5.6,
+        "rmsDbfs": -38.48735413584098,
+        "peakDbfs": -27.479737588767676
+      },
+      {
+        "seconds": 5.7,
+        "rmsDbfs": -39.36052710922321,
+        "peakDbfs": -26.223210095055045
+      },
+      {
+        "seconds": 5.8,
+        "rmsDbfs": -32.369872521203796,
+        "peakDbfs": -20.165568458085588
+      },
+      {
+        "seconds": 5.9,
+        "rmsDbfs": -32.18389979581072,
+        "peakDbfs": -21.76687303080394
+      },
+      {
+        "seconds": 6,
+        "rmsDbfs": -33.11760949542277,
+        "peakDbfs": -22.528467968482158
+      },
+      {
+        "seconds": 6.1,
+        "rmsDbfs": -34.14496435204072,
+        "peakDbfs": -24.05355987931882
+      },
+      {
+        "seconds": 6.2,
+        "rmsDbfs": -26.926732738944988,
+        "peakDbfs": -12.362634516497227
+      },
+      {
+        "seconds": 6.3,
+        "rmsDbfs": -23.742614779046068,
+        "peakDbfs": -13.961848894997432
+      },
+      {
+        "seconds": 6.4,
+        "rmsDbfs": -24.728048485876556,
+        "peakDbfs": -14.568506288034524
+      },
+      {
+        "seconds": 6.5,
+        "rmsDbfs": -26.925589049541472,
+        "peakDbfs": -17.418969079506418
+      },
+      {
+        "seconds": 6.6,
+        "rmsDbfs": -27.721006077196435,
+        "peakDbfs": -18.585526251867
+      },
+      {
+        "seconds": 6.7,
+        "rmsDbfs": -25.207263987349062,
+        "peakDbfs": -15.8491132722964
+      },
+      {
+        "seconds": 6.8,
+        "rmsDbfs": -23.47445889520273,
+        "peakDbfs": -13.721199304784331
+      },
+      {
+        "seconds": 6.9,
+        "rmsDbfs": -25.19293532608163,
+        "peakDbfs": -16.8945388410102
+      },
+      {
+        "seconds": 7,
+        "rmsDbfs": -28.23496834468017,
+        "peakDbfs": -17.46751204993729
+      },
+      {
+        "seconds": 7.1,
+        "rmsDbfs": -30.60133988392638,
+        "peakDbfs": -20.20934565269481
+      },
+      {
+        "seconds": 7.2,
+        "rmsDbfs": -31.461305284430793,
+        "peakDbfs": -22.429453867126412
+      },
+      {
+        "seconds": 7.3,
+        "rmsDbfs": -30.507160797859576,
+        "peakDbfs": -20.69263362116439
+      },
+      {
+        "seconds": 7.4,
+        "rmsDbfs": -33.04818957388805,
+        "peakDbfs": -20.81071941301436
+      },
+      {
+        "seconds": 7.5,
+        "rmsDbfs": -32.92819647458621,
+        "peakDbfs": -22.376120950600473
+      },
+      {
+        "seconds": 7.6,
+        "rmsDbfs": -28.73526428308232,
+        "peakDbfs": -17.907072980215062
+      },
+      {
+        "seconds": 7.7,
+        "rmsDbfs": -28.509501614880506,
+        "peakDbfs": -18.040409085998334
+      },
+      {
+        "seconds": 7.8,
+        "rmsDbfs": -29.125499672415984,
+        "peakDbfs": -19.18810439760812
+      },
+      {
+        "seconds": 7.9,
+        "rmsDbfs": -31.48299326164036,
+        "peakDbfs": -21.4063536748261
+      }
+    ]
+  },
+  "output": {
+    "path": "public/audio/royal-menu-loop.wav",
+    "sha256": "04a40cf859030e0cf195e261f4febc8c19a259eee3f1ac2c2c308159d8b8c40e",
+    "bytes": 307244,
+    "format": "PCM signed 16-bit little-endian WAV",
+    "frames": 76800,
+    "durationSeconds": 1.6,
+    "sampleRate": 48000,
+    "channels": 2,
+    "longestSilentRunSeconds": 0,
+    "perChannel": [
+      {
+        "peak": 0.138671875,
+        "peakDbfs": -17.16023224513511,
+        "rmsDbfs": -30.09589955446541,
+        "dcOffset": 0.001240853468577067,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.002547586413734504,
+        "adjacentStepP999": 0.01458740234375,
+        "adjacentStepMax": 0.044525146484375,
+        "seam": {
+          "firstSample": 0.0001220703125,
+          "lastSample": 0.003265380859375,
+          "absoluteStep": 0.003143310546875,
+          "stepDbfs": -50.05225420509092,
+          "slopeChange": 0.00079345703125,
+          "before50msRmsDbfs": -27.085463785900448,
+          "after50msRmsDbfs": -27.027751767315923,
+          "levelChangeDb": 0.05771201858452409
+        }
+      },
+      {
+        "peak": 0.145843505859375,
+        "peakDbfs": -16.722258088778478,
+        "rmsDbfs": -30.089800999951773,
+        "dcOffset": 0.001370555559794108,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.0025443932614025097,
+        "adjacentStepP999": 0.016021728515625,
+        "adjacentStepMax": 0.04803466796875,
+        "seam": {
+          "firstSample": 0.0208740234375,
+          "lastSample": 0.02264404296875,
+          "absoluteStep": 0.00177001953125,
+          "stepDbfs": -55.04043882793561,
+          "slopeChange": 0.0008544921875,
+          "before50msRmsDbfs": -27.01800797496563,
+          "after50msRmsDbfs": -26.640450464316388,
+          "levelChangeDb": 0.3775575106492419
+        }
+      }
+    ],
+    "waveform100ms": [
+      {
+        "seconds": 0,
+        "rmsDbfs": -27.728316116516353,
+        "peakDbfs": -17.569216662949778
+      },
+      {
+        "seconds": 0.1,
+        "rmsDbfs": -29.92585298258291,
+        "peakDbfs": -20.420340724666385
+      },
+      {
+        "seconds": 0.2,
+        "rmsDbfs": -30.72123061563207,
+        "peakDbfs": -21.58574575837924
+      },
+      {
+        "seconds": 0.3,
+        "rmsDbfs": -28.207559206695187,
+        "peakDbfs": -18.84924453523026
+      },
+      {
+        "seconds": 0.4,
+        "rmsDbfs": -26.474723376381277,
+        "peakDbfs": -16.722258088778478
+      },
+      {
+        "seconds": 0.5,
+        "rmsDbfs": -28.193230997179946,
+        "peakDbfs": -19.894089268804713
+      },
+      {
+        "seconds": 0.6,
+        "rmsDbfs": -31.23524630803932,
+        "peakDbfs": -20.46776660894238
+      },
+      {
+        "seconds": 0.7,
+        "rmsDbfs": -33.60158332302258,
+        "peakDbfs": -23.211470248869684
+      },
+      {
+        "seconds": 0.8,
+        "rmsDbfs": -34.46155122211594,
+        "peakDbfs": -25.428406918593925
+      },
+      {
+        "seconds": 0.9,
+        "rmsDbfs": -33.50743659554123,
+        "peakDbfs": -23.692609369277623
+      },
+      {
+        "seconds": 1,
+        "rmsDbfs": -36.04839606329223,
+        "peakDbfs": -23.81100875814809
+      },
+      {
+        "seconds": 1.1,
+        "rmsDbfs": -35.92848466741578,
+        "peakDbfs": -25.374104504717533
+      },
+      {
+        "seconds": 1.2,
+        "rmsDbfs": -31.85493800705682,
+        "peakDbfs": -21.300936976087034
+      },
+      {
+        "seconds": 1.3,
+        "rmsDbfs": -32.54613618369219,
+        "peakDbfs": -21.801575370415534
+      },
+      {
+        "seconds": 1.4,
+        "rmsDbfs": -29.7050800975244,
+        "peakDbfs": -16.77329809081025
+      },
+      {
+        "seconds": 1.5,
+        "rmsDbfs": -26.869772109420552,
+        "peakDbfs": -17.275686620735648
+      }
+    ]
+  },
+  "intro": {
+    "path": "public/audio/royal-menu-intro.wav",
+    "sha256": "ee458bcd2127cbfa0ffb82d482eeab83025cfad04841098787c72710f2bd7296",
+    "frames": 288000,
+    "durationSeconds": 6,
+    "sampleRate": 48000,
+    "channels": 2,
+    "longestSilentRunSeconds": 0.0016041666666666667,
+    "perChannel": [
+      {
+        "peak": 0.2236328125,
+        "peakDbfs": -13.00928948599848,
+        "rmsDbfs": -31.830766757648785,
+        "dcOffset": 0.0001331758499145508,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.003987492461890073,
+        "adjacentStepP999": 0.029205322265625,
+        "adjacentStepMax": 0.06390380859375,
+        "seam": {
+          "firstSample": 0,
+          "lastSample": 0,
+          "absoluteStep": 0,
+          "stepDbfs": null,
+          "slopeChange": 0,
+          "before50msRmsDbfs": -46.100170823198454,
+          "after50msRmsDbfs": -50.277178444662844,
+          "levelChangeDb": -4.177007621464386
+        }
+      },
+      {
+        "peak": 0.223602294921875,
+        "peakDbfs": -13.010474868414247,
+        "rmsDbfs": -31.884437258651328,
+        "dcOffset": 0.00017358197106255425,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.003977065122857409,
+        "adjacentStepP999": 0.02923583984375,
+        "adjacentStepMax": 0.063812255859375,
+        "seam": {
+          "firstSample": 0,
+          "lastSample": 0,
+          "absoluteStep": 0,
+          "stepDbfs": null,
+          "slopeChange": 0,
+          "before50msRmsDbfs": -45.20128684479594,
+          "after50msRmsDbfs": -51.248976812459915,
+          "levelChangeDb": -6.047689967663982
+        }
+      }
+    ],
+    "waveform100ms": [
+      {
+        "seconds": 0,
+        "rmsDbfs": -39.00670293326588,
+        "peakDbfs": -25.184268035075903
+      },
+      {
+        "seconds": 0.1,
+        "rmsDbfs": -27.728344958707204,
+        "peakDbfs": -17.435997934847776
+      },
+      {
+        "seconds": 0.2,
+        "rmsDbfs": -26.88787411442194,
+        "peakDbfs": -14.267213541559705
+      },
+      {
+        "seconds": 0.3,
+        "rmsDbfs": -27.63763235884752,
+        "peakDbfs": -16.331335964142554
+      },
+      {
+        "seconds": 0.4,
+        "rmsDbfs": -30.930910525111518,
+        "peakDbfs": -21.55081798840439
+      },
+      {
+        "seconds": 0.5,
+        "rmsDbfs": -33.28089809789917,
+        "peakDbfs": -22.792069973011237
+      },
+      {
+        "seconds": 0.6,
+        "rmsDbfs": -33.99961584785171,
+        "peakDbfs": -23.265348336967108
+      },
+      {
+        "seconds": 0.7,
+        "rmsDbfs": -30.458794667277633,
+        "peakDbfs": -19.774461352901646
+      },
+      {
+        "seconds": 0.8,
+        "rmsDbfs": -28.918791555896156,
+        "peakDbfs": -19.72809528387898
+      },
+      {
+        "seconds": 0.9,
+        "rmsDbfs": -38.15669279776855,
+        "peakDbfs": -27.670212794985865
+      },
+      {
+        "seconds": 1,
+        "rmsDbfs": -31.396543944923568,
+        "peakDbfs": -19.79514820909414
+      },
+      {
+        "seconds": 1.1,
+        "rmsDbfs": -33.75263410689348,
+        "peakDbfs": -24.019014139731325
+      },
+      {
+        "seconds": 1.2,
+        "rmsDbfs": -30.97857519385223,
+        "peakDbfs": -21.736585245755577
+      },
+      {
+        "seconds": 1.3,
+        "rmsDbfs": -28.454091283312856,
+        "peakDbfs": -16.464401983739243
+      },
+      {
+        "seconds": 1.4,
+        "rmsDbfs": -29.879960643960555,
+        "peakDbfs": -21.681723416014613
+      },
+      {
+        "seconds": 1.5,
+        "rmsDbfs": -29.89284010842296,
+        "peakDbfs": -21.356536743988634
+      },
+      {
+        "seconds": 1.6,
+        "rmsDbfs": -30.56561128874332,
+        "peakDbfs": -22.04300341756932
+      },
+      {
+        "seconds": 1.7,
+        "rmsDbfs": -36.00942140408008,
+        "peakDbfs": -23.58380765891049
+      },
+      {
+        "seconds": 1.8,
+        "rmsDbfs": -39.696574063665196,
+        "peakDbfs": -22.715638018521283
+      },
+      {
+        "seconds": 1.9,
+        "rmsDbfs": -29.315093427591762,
+        "peakDbfs": -19.489902520671706
+      },
+      {
+        "seconds": 2,
+        "rmsDbfs": -34.41522609207671,
+        "peakDbfs": -23.512023038441615
+      },
+      {
+        "seconds": 2.1,
+        "rmsDbfs": -39.97900920800821,
+        "peakDbfs": -23.75364890113978
+      },
+      {
+        "seconds": 2.2,
+        "rmsDbfs": -28.10467414098894,
+        "peakDbfs": -15.56355516848349
+      },
+      {
+        "seconds": 2.3,
+        "rmsDbfs": -35.77200815562861,
+        "peakDbfs": -21.297858510827776
+      },
+      {
+        "seconds": 2.4,
+        "rmsDbfs": -30.244359209265156,
+        "peakDbfs": -18.638222314107317
+      },
+      {
+        "seconds": 2.5,
+        "rmsDbfs": -33.07058802595772,
+        "peakDbfs": -20.755000132551743
+      },
+      {
+        "seconds": 2.6,
+        "rmsDbfs": -37.87654989921224,
+        "peakDbfs": -24.47274494985198
+      },
+      {
+        "seconds": 2.7,
+        "rmsDbfs": -28.409651416039484,
+        "peakDbfs": -15.037444209861452
+      },
+      {
+        "seconds": 2.8,
+        "rmsDbfs": -29.246532011096647,
+        "peakDbfs": -21.26100178096553
+      },
+      {
+        "seconds": 2.9,
+        "rmsDbfs": -27.67553070442693,
+        "peakDbfs": -14.744526163872429
+      },
+      {
+        "seconds": 3,
+        "rmsDbfs": -27.163436255700297,
+        "peakDbfs": -13.00928948599848
+      },
+      {
+        "seconds": 3.1,
+        "rmsDbfs": -28.97246878266525,
+        "peakDbfs": -14.786602718134603
+      },
+      {
+        "seconds": 3.2,
+        "rmsDbfs": -32.66590549941333,
+        "peakDbfs": -17.90836079666841
+      },
+      {
+        "seconds": 3.3,
+        "rmsDbfs": -35.39242279681545,
+        "peakDbfs": -21.199919323621796
+      },
+      {
+        "seconds": 3.4,
+        "rmsDbfs": -39.27745243621109,
+        "peakDbfs": -26.281056212785327
+      },
+      {
+        "seconds": 3.5,
+        "rmsDbfs": -43.63763724097321,
+        "peakDbfs": -30.343811930720385
+      },
+      {
+        "seconds": 3.6,
+        "rmsDbfs": -51.65743475503596,
+        "peakDbfs": -40.45379091865761
+      },
+      {
+        "seconds": 3.7,
+        "rmsDbfs": -48.91290219481009,
+        "peakDbfs": -37.20623000296672
+      },
+      {
+        "seconds": 3.8,
+        "rmsDbfs": -44.97269121054227,
+        "peakDbfs": -33.38225645659825
+      },
+      {
+        "seconds": 3.9,
+        "rmsDbfs": -42.55614787584818,
+        "peakDbfs": -32.0539326257679
+      },
+      {
+        "seconds": 4,
+        "rmsDbfs": -31.869118167964366,
+        "peakDbfs": -19.86272279606101
+      },
+      {
+        "seconds": 4.1,
+        "rmsDbfs": -32.87740147985699,
+        "peakDbfs": -20.775263840281465
+      },
+      {
+        "seconds": 4.2,
+        "rmsDbfs": -35.25997827027409,
+        "peakDbfs": -18.32881390272749
+      },
+      {
+        "seconds": 4.3,
+        "rmsDbfs": -29.88777199925365,
+        "peakDbfs": -18.23096206456093
+      },
+      {
+        "seconds": 4.4,
+        "rmsDbfs": -32.7994075085045,
+        "peakDbfs": -21.73011289848287
+      },
+      {
+        "seconds": 4.5,
+        "rmsDbfs": -31.251450127608216,
+        "peakDbfs": -20.83925929790299
+      },
+      {
+        "seconds": 4.6,
+        "rmsDbfs": -37.81238367360162,
+        "peakDbfs": -21.778773471902856
+      },
+      {
+        "seconds": 4.7,
+        "rmsDbfs": -30.86626024346726,
+        "peakDbfs": -20.77816251864578
+      },
+      {
+        "seconds": 4.8,
+        "rmsDbfs": -34.52743541628145,
+        "peakDbfs": -24.60685810785812
+      },
+      {
+        "seconds": 4.9,
+        "rmsDbfs": -29.910381332430703,
+        "peakDbfs": -17.52524750047928
+      },
+      {
+        "seconds": 5,
+        "rmsDbfs": -32.70962286572965,
+        "peakDbfs": -17.893788899310245
+      },
+      {
+        "seconds": 5.1,
+        "rmsDbfs": -31.81793272875009,
+        "peakDbfs": -19.61832357909205
+      },
+      {
+        "seconds": 5.2,
+        "rmsDbfs": -33.73221676184352,
+        "peakDbfs": -22.7847616935409
+      },
+      {
+        "seconds": 5.3,
+        "rmsDbfs": -32.217118632682336,
+        "peakDbfs": -21.834253699547777
+      },
+      {
+        "seconds": 5.4,
+        "rmsDbfs": -36.23189492846865,
+        "peakDbfs": -21.47823792515114
+      },
+      {
+        "seconds": 5.5,
+        "rmsDbfs": -41.20942409165008,
+        "peakDbfs": -30.343811930720385
+      },
+      {
+        "seconds": 5.6,
+        "rmsDbfs": -41.48766456668719,
+        "peakDbfs": -30.47561855159539
+      },
+      {
+        "seconds": 5.7,
+        "rmsDbfs": -42.36064073821109,
+        "peakDbfs": -29.22440050192641
+      },
+      {
+        "seconds": 5.8,
+        "rmsDbfs": -35.37265451798337,
+        "peakDbfs": -23.165553544733687
+      },
+      {
+        "seconds": 5.9,
+        "rmsDbfs": -39.22454343638341,
+        "peakDbfs": -25.21320495125016
+      }
+    ],
+    "fadeInSeconds": 0.01,
+    "fadeOutSeconds": 0.12,
+    "loop": false,
+    "note": "One-shot; seam metrics are descriptive only, not a loop requirement."
+  },
+  "speech": {
+    "verificationArtifact": "asset-workbench/royal-menu-v4/audio-speech-verification.json",
+    "sourceWordRegionSeconds": [
+      0.65,
+      5.45
+    ],
+    "introSourceRegionSeconds": [
+      0,
+      6
+    ],
+    "musicSourceRegionSeconds": [
+      6,
+      8
+    ],
+    "guardSeconds": 0.55,
+    "method": "Exclude the entire speech-bearing region in time. No EQ, cancellation, or crossfade is claimed to remove speech.",
+    "automatedCheck": "Default English ASR recognized lexical words in the intro, none in source 6-8s or five concatenated music loops. Non-lexical [SPEECH] markers at loop joins remain in the evidence; human review is required.",
+    "humanApproval": "Pending; ASR non-detection is not human listening approval."
+  },
+  "musicSource": {
+    "frames": 96000,
+    "durationSeconds": 2,
+    "sampleRate": 48000,
+    "channels": 2,
+    "longestSilentRunSeconds": 0,
+    "perChannel": [
+      {
+        "peak": 0.20040453970432281,
+        "peakDbfs": -13.961848894997432,
+        "rmsDbfs": -27.646559977893574,
+        "dcOffset": 0.0015253176116390168,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.0033821735810771656,
+        "adjacentStepP999": 0.02004419080913067,
+        "adjacentStepMax": 0.06784415245056152,
+        "seam": {
+          "firstSample": 0.02323264814913273,
+          "lastSample": -0.026732705533504486,
+          "absoluteStep": 0.049965353682637215,
+          "stepDbfs": -26.026620681274572,
+          "slopeChange": 0.04940668120980263,
+          "before50msRmsDbfs": -32.97433171953609,
+          "after50msRmsDbfs": -33.20924654398834,
+          "levelChangeDb": -0.2349148244522538
+        }
+      },
+      {
+        "peak": 0.24091745913028717,
+        "peakDbfs": -12.362634516497227,
+        "rmsDbfs": -27.64079304880131,
+        "dcOffset": 0.0017032717702946331,
+        "clippedSamples": 0,
+        "adjacentStepRms": 0.0033671674704642894,
+        "adjacentStepP999": 0.021797452121973038,
+        "adjacentStepMax": 0.0724157840013504,
+        "seam": {
+          "firstSample": 0.012577790766954422,
+          "lastSample": -0.003115537343546748,
+          "absoluteStep": 0.01569332811050117,
+          "stepDbfs": -36.08569890168013,
+          "slopeChange": 0.016703335335478187,
+          "before50msRmsDbfs": -32.63006699622495,
+          "after50msRmsDbfs": -33.21130126901976,
+          "levelChangeDb": -0.5812342727948143
+        }
+      }
+    ],
+    "waveform100ms": [
+      {
+        "seconds": 0,
+        "rmsDbfs": -33.11760949542277,
+        "peakDbfs": -22.528467968482158
+      },
+      {
+        "seconds": 0.1,
+        "rmsDbfs": -34.14496435204072,
+        "peakDbfs": -24.05355987931882
+      },
+      {
+        "seconds": 0.2,
+        "rmsDbfs": -26.926732738944988,
+        "peakDbfs": -12.362634516497227
+      },
+      {
+        "seconds": 0.3,
+        "rmsDbfs": -23.742614779046068,
+        "peakDbfs": -13.961848894997432
+      },
+      {
+        "seconds": 0.4,
+        "rmsDbfs": -24.728048485876556,
+        "peakDbfs": -14.568506288034524
+      },
+      {
+        "seconds": 0.5,
+        "rmsDbfs": -26.925589049541472,
+        "peakDbfs": -17.418969079506418
+      },
+      {
+        "seconds": 0.6,
+        "rmsDbfs": -27.721006077196435,
+        "peakDbfs": -18.585526251867
+      },
+      {
+        "seconds": 0.7,
+        "rmsDbfs": -25.207263987349062,
+        "peakDbfs": -15.8491132722964
+      },
+      {
+        "seconds": 0.8,
+        "rmsDbfs": -23.47445889520273,
+        "peakDbfs": -13.721199304784331
+      },
+      {
+        "seconds": 0.9,
+        "rmsDbfs": -25.19293532608163,
+        "peakDbfs": -16.8945388410102
+      },
+      {
+        "seconds": 1,
+        "rmsDbfs": -28.23496834468017,
+        "peakDbfs": -17.46751204993729
+      },
+      {
+        "seconds": 1.1,
+        "rmsDbfs": -30.60133988392638,
+        "peakDbfs": -20.20934565269481
+      },
+      {
+        "seconds": 1.2,
+        "rmsDbfs": -31.461305284430793,
+        "peakDbfs": -22.429453867126412
+      },
+      {
+        "seconds": 1.3,
+        "rmsDbfs": -30.507160797859576,
+        "peakDbfs": -20.69263362116439
+      },
+      {
+        "seconds": 1.4,
+        "rmsDbfs": -33.04818957388805,
+        "peakDbfs": -20.81071941301436
+      },
+      {
+        "seconds": 1.5,
+        "rmsDbfs": -32.92819647458621,
+        "peakDbfs": -22.376120950600473
+      },
+      {
+        "seconds": 1.6,
+        "rmsDbfs": -28.73526428308232,
+        "peakDbfs": -17.907072980215062
+      },
+      {
+        "seconds": 1.7,
+        "rmsDbfs": -28.509501614880506,
+        "peakDbfs": -18.040409085998334
+      },
+      {
+        "seconds": 1.8,
+        "rmsDbfs": -29.125499672415984,
+        "peakDbfs": -19.18810439760812
+      },
+      {
+        "seconds": 1.9,
+        "rmsDbfs": -31.48299326164036,
+        "peakDbfs": -21.4063536748261
+      }
+    ]
+  },
+  "processing": {
+    "crossfadeSeconds": 0.4,
+    "overlapFrames": 19200,
+    "attenuationDb": -3,
+    "method": "Tail/head equal-power crossfade with smoothstep phase; retained middle unchanged except gain and PCM16 quantization.",
+    "layout": "Music only: source[6.4s:7.6s], then crossfade(source[7.6s:8s], source[6s:6.4s]). No source before 6s enters the loop.",
+    "speedChange": false,
+    "encoderPadding": false,
+    "runtimeGain": 0.6
+  },
+  "playback": {
+    "onceScope": "Document lifetime, including controller disposal/recreation and BFCache restoration.",
+    "urls": {
+      "intro": "/audio/royal-menu-intro.wav",
+      "music": "/audio/royal-menu-loop.wav?v=instrumental-2"
+    },
+    "welcomeEligibility": "First trusted, unmuted, visible-menu gesture. Muted gestures do not consume or arm the welcome.",
+    "welcomeConsumedWhen": "A source containing the intro successfully starts while unmuted; never at fetch, decode, or unlock.",
+    "interruption": "Skip the remaining intro on mute, route exit, hide, or disposal. Never replay its start.",
+    "firstBuffer": {
+      "durationSeconds": 7.6,
+      "loopStart": 6,
+      "loopEnd": 7.6,
+      "sourceStartOffset": 0
+    },
+    "subsequentBuffer": {
+      "durationSeconds": 1.6,
+      "loopStart": 0,
+      "loopEnd": 1.6
+    },
+    "transition": "The final 120ms of the faded intro overlaps the end of the music period, followed by a contiguous native music wrap."
+  },
+  "periodicJoins": [
+    {
+      "frame": 0,
+      "seconds": 0,
+      "steps": [
+        0.003143310546875,
+        0.00177001953125
+      ]
+    },
+    {
+      "frame": 57600,
+      "seconds": 1.2,
+      "steps": [
+        0.0006103515625,
+        0.00079345703125
+      ]
+    }
+  ],
+  "oversampledPeak": {
+    "amplitude": 0.14586268365383148,
+    "dbfs": -16.721116006694665,
+    "factor": 4,
+    "method": "FFmpeg 192 kHz sinc resampling, 64-tap filter"
+  },
+  "checks": {
+    "exactDuration": true,
+    "noClipping": true,
+    "introNoClipping": true,
+    "introFadedAtBothEnds": true,
+    "conservativeHeadroom": true,
+    "seamWithinNormalSteps": true,
+    "smoothPeriodicSlope": true,
+    "boundedBoundaryEnvelopeChange": true,
+    "noAddedSilentGap": true,
+    "lowerWorstBoundaryJump": true,
+    "sourceUnchanged": true
+  },
+  "browserValidation": {
+    "performed": false,
+    "reason": "This preparation script does not launch browsers. See verification.md and tests/e2e/royal-menu.spec.ts for separate runtime validation."
+  },
+  "humanListening": {
+    "performed": false,
+    "reason": "No human listening session available; numerical QA cannot establish musical or perceptual seamlessness."
+  },
+  "reproduce": {
+    "prepare": "npx tsx scripts/prepare-menu-audio.ts",
+    "verifySpeech": "npx tsx scripts/prepare-menu-audio.ts --verify-speech",
+    "tests": "npx tsx --test src/audio/menuAmbience.test.ts",
+    "dependency": "Optional --verify-speech uses uv with PocketSphinx 5.1.1 (~34 MB source distribution, bundled English model), isolated outside this repository. No runtime dependency or cloud audio upload."
+  }
+}

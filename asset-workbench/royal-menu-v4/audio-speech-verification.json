@@ -1,0 +1,386 @@
+{
+  "recognizer": "PocketSphinx",
+  "version": "5.1.1",
+  "mode": "Unconstrained default English model, local CPU, 16 kHz mono analysis; not forced alignment.",
+  "documentation": "https://pocketsphinx.readthedocs.io/en/stable/pocketsphinx.html",
+  "source": {
+    "path": "asset-workbench/royal-menu-v4/reference/animation.mp4",
+    "sha256": "9d60762e184b80170c739bf9277b19a774b5f231d0026f2af963af2f843f930c"
+  },
+  "intro": {
+    "path": "public/audio/royal-menu-intro.wav",
+    "sha256": "ee458bcd2127cbfa0ffb82d482eeab83025cfad04841098787c72710f2bd7296"
+  },
+  "loop": {
+    "path": "public/audio/royal-menu-loop.wav",
+    "sha256": "04a40cf859030e0cf195e261f4febc8c19a259eee3f1ac2c2c308159d8b8c40e"
+  },
+  "sourceRecognition": {
+    "hypothesis": "welcome heroes to fort thursday i prepare for battle",
+    "words": [
+      {
+        "word": "welcome",
+        "startSeconds": 0.65,
+        "endSeconds": 1.2
+      },
+      {
+        "word": "heroes(2)",
+        "startSeconds": 1.2,
+        "endSeconds": 1.81
+      },
+      {
+        "word": "to",
+        "startSeconds": 1.81,
+        "endSeconds": 2.03
+      },
+      {
+        "word": "fort",
+        "startSeconds": 2.03,
+        "endSeconds": 2.39
+      },
+      {
+        "word": "thursday",
+        "startSeconds": 2.39,
+        "endSeconds": 2.91
+      },
+      {
+        "word": "i",
+        "startSeconds": 2.91,
+        "endSeconds": 3.4
+      },
+      {
+        "word": "prepare",
+        "startSeconds": 4.0,
+        "endSeconds": 4.6
+      },
+      {
+        "word": "for",
+        "startSeconds": 4.6,
+        "endSeconds": 4.78
+      },
+      {
+        "word": "battle",
+        "startSeconds": 4.78,
+        "endSeconds": 5.45
+      }
+    ],
+    "nonLexicalEvents": [],
+    "segments": [
+      {
+        "word": "<s>",
+        "startSeconds": 0.0,
+        "endSeconds": 0.41
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 0.41,
+        "endSeconds": 0.65
+      },
+      {
+        "word": "welcome",
+        "startSeconds": 0.65,
+        "endSeconds": 1.2
+      },
+      {
+        "word": "heroes(2)",
+        "startSeconds": 1.2,
+        "endSeconds": 1.81
+      },
+      {
+        "word": "to",
+        "startSeconds": 1.81,
+        "endSeconds": 2.03
+      },
+      {
+        "word": "fort",
+        "startSeconds": 2.03,
+        "endSeconds": 2.39
+      },
+      {
+        "word": "thursday",
+        "startSeconds": 2.39,
+        "endSeconds": 2.91
+      },
+      {
+        "word": "i",
+        "startSeconds": 2.91,
+        "endSeconds": 3.4
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 3.4,
+        "endSeconds": 3.58
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 3.58,
+        "endSeconds": 4.0
+      },
+      {
+        "word": "prepare",
+        "startSeconds": 4.0,
+        "endSeconds": 4.6
+      },
+      {
+        "word": "for",
+        "startSeconds": 4.6,
+        "endSeconds": 4.78
+      },
+      {
+        "word": "battle",
+        "startSeconds": 4.78,
+        "endSeconds": 5.45
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 5.45,
+        "endSeconds": 6.44
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 6.44,
+        "endSeconds": 7.31
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 7.31,
+        "endSeconds": 7.67
+      },
+      {
+        "word": "</s>",
+        "startSeconds": 7.67,
+        "endSeconds": 7.99
+      }
+    ]
+  },
+  "introRecognition": {
+    "hypothesis": "welcome heroes to fort thursday i prepare for battle",
+    "words": [
+      {
+        "word": "welcome",
+        "startSeconds": 0.65,
+        "endSeconds": 1.2
+      },
+      {
+        "word": "heroes(2)",
+        "startSeconds": 1.2,
+        "endSeconds": 1.81
+      },
+      {
+        "word": "to",
+        "startSeconds": 1.81,
+        "endSeconds": 2.03
+      },
+      {
+        "word": "fort",
+        "startSeconds": 2.03,
+        "endSeconds": 2.38
+      },
+      {
+        "word": "thursday",
+        "startSeconds": 2.38,
+        "endSeconds": 2.91
+      },
+      {
+        "word": "i",
+        "startSeconds": 2.91,
+        "endSeconds": 3.43
+      },
+      {
+        "word": "prepare",
+        "startSeconds": 4.0,
+        "endSeconds": 4.6
+      },
+      {
+        "word": "for",
+        "startSeconds": 4.6,
+        "endSeconds": 4.78
+      },
+      {
+        "word": "battle",
+        "startSeconds": 4.78,
+        "endSeconds": 5.45
+      }
+    ],
+    "nonLexicalEvents": [],
+    "segments": [
+      {
+        "word": "<s>",
+        "startSeconds": 0.0,
+        "endSeconds": 0.42
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 0.42,
+        "endSeconds": 0.65
+      },
+      {
+        "word": "welcome",
+        "startSeconds": 0.65,
+        "endSeconds": 1.2
+      },
+      {
+        "word": "heroes(2)",
+        "startSeconds": 1.2,
+        "endSeconds": 1.81
+      },
+      {
+        "word": "to",
+        "startSeconds": 1.81,
+        "endSeconds": 2.03
+      },
+      {
+        "word": "fort",
+        "startSeconds": 2.03,
+        "endSeconds": 2.38
+      },
+      {
+        "word": "thursday",
+        "startSeconds": 2.38,
+        "endSeconds": 2.91
+      },
+      {
+        "word": "i",
+        "startSeconds": 2.91,
+        "endSeconds": 3.43
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 3.43,
+        "endSeconds": 3.58
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 3.58,
+        "endSeconds": 4.0
+      },
+      {
+        "word": "prepare",
+        "startSeconds": 4.0,
+        "endSeconds": 4.6
+      },
+      {
+        "word": "for",
+        "startSeconds": 4.6,
+        "endSeconds": 4.78
+      },
+      {
+        "word": "battle",
+        "startSeconds": 4.78,
+        "endSeconds": 5.45
+      },
+      {
+        "word": "</s>",
+        "startSeconds": 5.45,
+        "endSeconds": 5.99
+      }
+    ]
+  },
+  "musicSourceRecognition": {
+    "hypothesis": "",
+    "words": [],
+    "nonLexicalEvents": [],
+    "segments": [
+      {
+        "word": "<s>",
+        "startSeconds": 6.0,
+        "endSeconds": 6.44
+      },
+      {
+        "word": "</s>",
+        "startSeconds": 6.44,
+        "endSeconds": 7.99
+      }
+    ]
+  },
+  "fiveLoopRecognition": {
+    "hypothesis": "",
+    "words": [],
+    "nonLexicalEvents": [
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 1.53,
+        "endSeconds": 1.64
+      },
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 3.13,
+        "endSeconds": 3.24
+      },
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 4.73,
+        "endSeconds": 4.84
+      },
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 6.33,
+        "endSeconds": 6.44
+      }
+    ],
+    "segments": [
+      {
+        "word": "<s>",
+        "startSeconds": 0.0,
+        "endSeconds": 1.53
+      },
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 1.53,
+        "endSeconds": 1.64
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 1.64,
+        "endSeconds": 3.13
+      },
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 3.13,
+        "endSeconds": 3.24
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 3.24,
+        "endSeconds": 4.73
+      },
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 4.73,
+        "endSeconds": 4.84
+      },
+      {
+        "word": "<sil>",
+        "startSeconds": 4.84,
+        "endSeconds": 6.33
+      },
+      {
+        "word": "[SPEECH]",
+        "startSeconds": 6.33,
+        "endSeconds": 6.44
+      },
+      {
+        "word": "</s>",
+        "startSeconds": 6.44,
+        "endSeconds": 7.99
+      }
+    ]
+  },
+  "detectedLastWordEndSeconds": 5.45,
+  "musicGuardAfterDetectedSpeechSeconds": 0.55,
+  "checks": {
+    "sourceSpeechDetected": true,
+    "speechEndsBeforeMusic": true,
+    "introSpeechDetected": true,
+    "noWordsInMusicSource": true,
+    "noWordsAcrossFiveMusicLoops": true
+  },
+  "limitations": [
+    "ASR absence of words does not prove absence of faint speech, reverb, or singing.",
+    "The repeated loop may produce non-lexical [SPEECH] acoustic markers; these are retained, not treated as verified words or dismissed as proof of silence.",
+    "Word spelling and 10 ms frame timestamps are estimates, not a verified transcript.",
+    "No human listening performed here. Main must listen to the isolated tail and several loop boundaries."
+  ],
+  "vocalSeparationPerformed": false,
+  "humanListeningPerformed": false
+}

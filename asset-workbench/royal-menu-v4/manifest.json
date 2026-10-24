@@ -1,0 +1,349 @@
+{
+  "version": 1,
+  "reference": "reference/interface.png",
+  "assets": [
+    {
+      "name": "courtyard",
+      "path": "runtime/courtyard.webp",
+      "source": "masters/courtyard.png",
+      "width": 1600,
+      "height": 1002,
+      "pivot": {
+        "x": 800,
+        "y": 1002
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1600,
+        "height": 1002
+      },
+      "alpha": {
+        "clear": 0,
+        "soft": 0
+      },
+      "sourceInfo": {
+        "width": 1585,
+        "height": 992,
+        "alpha": {
+          "clear": 0,
+          "soft": 0
+        },
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1585,
+          "height": 992
+        }
+      },
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "width": 1585,
+        "height": 992
+      },
+      "bytes": 309620
+    },
+    {
+      "name": "panel",
+      "path": "runtime/panel.webp",
+      "source": "masters/panel.png",
+      "width": 1100,
+      "height": 880,
+      "pivot": {
+        "x": 550,
+        "y": 870
+      },
+      "bounds": {
+        "x": 10,
+        "y": 10,
+        "width": 1080,
+        "height": 859
+      },
+      "alpha": {
+        "clear": 0.14476756198347107,
+        "soft": 0.01843595041322314
+      },
+      "sourceInfo": {
+        "width": 1419,
+        "height": 1108,
+        "alpha": {
+          "clear": 0.24266211777755728,
+          "soft": 0.018163118889338352
+        },
+        "bounds": {
+          "x": 63,
+          "y": 14,
+          "width": 1293,
+          "height": 1029
+        }
+      },
+      "crop": {
+        "x": 63,
+        "y": 14,
+        "width": 1293,
+        "height": 1029
+      },
+      "bytes": 185564,
+      "contentInset": {
+        "left": 0.14,
+        "right": 0.14,
+        "top": 0.13,
+        "bottom": 0.11
+      }
+    },
+    {
+      "name": "logo",
+      "path": "runtime/logo.webp",
+      "source": "masters/logo.png",
+      "width": 1200,
+      "height": 395,
+      "pivot": {
+        "x": 600,
+        "y": 385
+      },
+      "bounds": {
+        "x": 10,
+        "y": 10,
+        "width": 1179,
+        "height": 375
+      },
+      "alpha": {
+        "clear": 0.4450337552742616,
+        "soft": 0.027651898734177217
+      },
+      "sourceInfo": {
+        "width": 2172,
+        "height": 724,
+        "alpha": {
+          "clear": 0.4561762970198305,
+          "soft": 0.023256819592401536
+        },
+        "bounds": {
+          "x": 21,
+          "y": 15,
+          "width": 2132,
+          "height": 677
+        }
+      },
+      "crop": {
+        "x": 21,
+        "y": 15,
+        "width": 2132,
+        "height": 677
+      },
+      "bytes": 123328
+    },
+    {
+      "name": "button_emerald",
+      "path": "runtime/button_emerald.webp",
+      "source": "masters/button_emerald.png",
+      "width": 900,
+      "height": 231,
+      "pivot": {
+        "x": 450,
+        "y": 221
+      },
+      "bounds": {
+        "x": 10,
+        "y": 10,
+        "width": 880,
+        "height": 210
+      },
+      "alpha": {
+        "clear": 0.1438864838864839,
+        "soft": 0.015622895622895623
+      },
+      "sourceInfo": {
+        "width": 2164,
+        "height": 727,
+        "alpha": {
+          "clear": 0.39374775938389095,
+          "soft": 0.01872010922765168
+        },
+        "bounds": {
+          "x": 66,
+          "y": 113,
+          "width": 2021,
+          "height": 483
+        }
+      },
+      "crop": {
+        "x": 66,
+        "y": 113,
+        "width": 2021,
+        "height": 483
+      },
+      "bytes": 35636
+    },
+    {
+      "name": "button_sapphire",
+      "path": "runtime/button_sapphire.webp",
+      "source": "masters/button_sapphire.png",
+      "width": 600,
+      "height": 154,
+      "pivot": {
+        "x": 300,
+        "y": 144
+      },
+      "bounds": {
+        "x": 10,
+        "y": 10,
+        "width": 580,
+        "height": 134
+      },
+      "alpha": {
+        "clear": 0.18852813852813852,
+        "soft": 0.016493506493506494
+      },
+      "sourceInfo": {
+        "width": 2172,
+        "height": 724,
+        "alpha": {
+          "clear": 0.451573517291902,
+          "soft": 0.021833633486971298
+        },
+        "bounds": {
+          "x": 114,
+          "y": 143,
+          "width": 1944,
+          "height": 448
+        }
+      },
+      "crop": {
+        "x": 114,
+        "y": 143,
+        "width": 1944,
+        "height": 448
+      },
+      "bytes": 16282
+    },
+    {
+      "name": "field",
+      "path": "runtime/field.webp",
+      "source": "masters/field.png",
+      "width": 900,
+      "height": 164,
+      "pivot": {
+        "x": 450,
+        "y": 154
+      },
+      "bounds": {
+        "x": 10,
+        "y": 10,
+        "width": 880,
+        "height": 144
+      },
+      "alpha": {
+        "clear": 0.1519579945799458,
+        "soft": 0.014776422764227642
+      },
+      "sourceInfo": {
+        "width": 2172,
+        "height": 724,
+        "alpha": {
+          "clear": 0.6110873701453965,
+          "soft": 0.011619506934057772
+        },
+        "bounds": {
+          "x": 120,
+          "y": 194,
+          "width": 1932,
+          "height": 316
+        }
+      },
+      "crop": {
+        "x": 120,
+        "y": 194,
+        "width": 1932,
+        "height": 316
+      },
+      "bytes": 17050
+    },
+    {
+      "name": "torch",
+      "path": "runtime/torch.webp",
+      "source": "masters/torch.png",
+      "width": 160,
+      "height": 233,
+      "pivot": {
+        "x": 80,
+        "y": 223
+      },
+      "bounds": {
+        "x": 10,
+        "y": 10,
+        "width": 140,
+        "height": 212
+      },
+      "alpha": {
+        "clear": 0.5490879828326181,
+        "soft": 0.09699570815450644
+      },
+      "sourceInfo": {
+        "width": 1145,
+        "height": 1374,
+        "alpha": {
+          "clear": 0.6473757810364664,
+          "soft": 0.06896194453449273
+        },
+        "bounds": {
+          "x": 171,
+          "y": 36,
+          "width": 805,
+          "height": 1221
+        }
+      },
+      "crop": {
+        "x": 171,
+        "y": 36,
+        "width": 805,
+        "height": 1221
+      },
+      "bytes": 13456,
+      "flameSplit": 0.56
+    },
+    {
+      "name": "banner_red",
+      "path": "runtime/banner_red.webp",
+      "source": "masters/banner_red.png",
+      "width": 256,
+      "height": 522,
+      "pivot": {
+        "x": 128,
+        "y": 512
+      },
+      "bounds": {
+        "x": 10,
+        "y": 10,
+        "width": 236,
+        "height": 502
+      },
+      "alpha": {
+        "clear": 0.4168911637931034,
+        "soft": 0.026602909482758622
+      },
+      "sourceInfo": {
+        "width": 827,
+        "height": 1902,
+        "alpha": {
+          "clear": 0.4622067778205847,
+          "soft": 0.01936038816138298
+        },
+        "bounds": {
+          "x": 25,
+          "y": 108,
+          "width": 779,
+          "height": 1657
+        }
+      },
+      "crop": {
+        "x": 25,
+        "y": 108,
+        "width": 779,
+        "height": 1657
+      },
+      "bytes": 28098
+    }
+  ]
+}

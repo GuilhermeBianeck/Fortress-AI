@@ -17,7 +17,7 @@ async function start(page: Page) {
     await page.getByRole('button', { name: /BATTLE/ }).click();
     await page.getByRole('button', { name: /READY FOR BATTLE/ }).click();
     await expect(page.locator('.battle-canvas')).toBeVisible();
-    await expect.poll(async () => (await read(page)).artLoaded).toBe(6);
+    await expect.poll(async () => (await read(page)).artLoaded).toBe(4);
     await expect.poll(async () => (await read(page)).bodies.filter(b => b.kind === 'king').length).toBe(2);
 }
 
@@ -175,17 +175,19 @@ test('two players can chat and use the mirrored right-side cannon', async ({ pag
         await other.getByRole('button', { name: /READY FOR BATTLE/ }).press('Enter');
         await expect(other.locator('.battle-canvas')).toBeVisible();
         await expect.poll(async () => (await read(other)).side).toBe('right');
-        await expect.poll(async () => (await read(other)).artLoaded).toBe(6);
+        await expect.poll(async () => (await read(other)).artLoaded).toBe(4);
+        await page.getByRole('button', { name: 'Open chat', exact: true }).click();
         await page.getByRole('textbox', { name: 'Chat message' }).fill('Royal crew ready');
         await page.getByRole('button', { name: 'Send chat message' }).click();
         await other.getByRole('button', { name: 'Open chat', exact: true }).click();
         await expect(other.locator('.game-chat-modal').getByText('Royal crew ready', { exact: true })).toBeVisible();
         await other.getByRole('textbox', { name: 'Chat message' }).fill('Cannons ready');
         await other.getByRole('button', { name: 'Send chat message' }).click();
-        await expect(page.locator('.game-desktop-chat').getByText('Cannons ready', { exact: true })).toBeVisible();
+        await expect(page.locator('.game-chat-modal').getByText('Cannons ready', { exact: true })).toBeVisible();
         await other.waitForTimeout(500);
         await other.screenshot({ path: 'output/cartoon-v1/pvp-mobile-chat.png' });
         await other.locator('.game-chat-modal').getByRole('button', { name: 'Close chat', exact: true }).click();
+        await page.locator('.game-chat-modal').getByRole('button', { name: 'Close chat', exact: true }).click();
         await page.screenshot({ path: 'output/cartoon-v1/pvp-desktop-build.png' });
         await page.getByRole('button', { name: 'Done building, ready for battle' }).click();
         await other.getByRole('button', { name: 'Done building, ready for battle' }).click();

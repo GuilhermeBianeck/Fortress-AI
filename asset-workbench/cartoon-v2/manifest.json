@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "reference": "../cartoon-v1/runtime/king.png",
+  "assets": [
+    {
+      "name": "hit",
+      "path": "runtime/king_hit.png",
+      "source": "masters/C08-king-hit.png",
+      "width": 256,
+      "height": 320,
+      "pivot": {
+        "x": 151.5858483754513,
+        "y": 292.5335451263537
+      },
+      "silhouette": {
+        "left": 21,
+        "top": 27,
+        "right": 233,
+        "bottom": 292,
+        "center": 127,
+        "width": 213,
+        "transparent": 0.5931884765625
+      },
+      "feet": {
+        "left": 87,
+        "top": 278,
+        "right": 217,
+        "bottom": 292,
+        "center": 152,
+        "width": 131,
+        "transparent": 0.5931884765625
+      },
+      "registration": {
+        "scale": 1,
+        "dx": 0,
+        "dy": 0
+      }
+    },
+    {
+      "name": "victory",
+      "path": "runtime/king_victory.png",
+      "source": "masters/C09-king-victory.png",
+      "width": 256,
+      "height": 320,
+      "pivot": {
+        "x": 151.5858483754513,
+        "y": 292.5335451263537
+      },
+      "silhouette": {
+        "left": 20,
+        "top": 27,
+        "right": 228,
+        "bottom": 292,
+        "center": 124,
+        "width": 209,
+        "transparent": 0.56558837890625
+      },
+      "feet": {
+        "left": 87,
+        "top": 278,
+        "right": 217,
+        "bottom": 292,
+        "center": 152,
+        "width": 131,
+        "transparent": 0.56558837890625
+      },
+      "registration": {
+        "scale": 1,
+        "dx": 0,
+        "dy": 0
+      }
+    },
+    {
+      "name": "defeat",
+      "path": "runtime/king_defeat.png",
+      "source": "masters/C10-king-defeat.png",
+      "width": 256,
+      "height": 320,
+      "pivot": {
+        "x": 151.5858483754513,
+        "y": 292.5335451263537
+      },
+      "silhouette": {
+        "left": 20,
+        "top": 34,
+        "right": 224,
+        "bottom": 292,
+        "center": 122,
+        "width": 205,
+        "transparent": 0.592919921875
+      },
+      "feet": {
+        "left": 87,
+        "top": 278,
+        "right": 217,
+        "bottom": 292,
+        "center": 152,
+        "width": 131,
+        "transparent": 0.592919921875
+      },
+      "registration": {
+        "scale": 1,
+        "dx": 0,
+        "dy": 0
+      }
+    }
+  ]
+}

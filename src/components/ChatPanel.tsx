@@ -20,6 +20,29 @@ function formatTime(ts: number): string {
 export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPanelProps) => {
     const [text, setText] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!mobile || !onClose) return;
+        const previousFocus = document.activeElement as HTMLElement | null;
+        const panel = panelRef.current;
+        inputRef.current?.focus({ preventScroll: true });
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+            if (event.key !== 'Tab' || !panel) return;
+            const controls = [...panel.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')];
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        };
+        panel?.addEventListener('keydown', handleKey);
+        return () => {
+            panel?.removeEventListener('keydown', handleKey);
+            if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+        };
+    }, [mobile, onClose]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -37,7 +60,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
     };
 
     return (
-        <div className={`flex flex-col border border-[var(--border-subtle)] backdrop-blur-md ${mobile
+        <div ref={panelRef} className={`battle-chat-panel flex flex-col border border-[var(--border-subtle)] backdrop-blur-md ${mobile
                 ? 'w-full rounded-t-xl h-[50vh]'
                 : 'w-[250px] rounded-xl h-[600px]'
             }`} style={{ background: 'var(--chat-bg, rgba(10, 10, 18, 0.88))' }}>
@@ -57,6 +80,9 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
             {/* Message list */}
             <div
                 ref={scrollRef}
+                role="log"
+                aria-label="Battle messages"
+                aria-live="polite"
                 className="flex-1 overflow-y-auto px-2.5 py-2 space-y-2 text-sm"
             >
                 {messages.length === 0 && (
@@ -88,6 +114,7 @@ export const ChatPanel = ({ messages, onSend, mySide, mobile, onClose }: ChatPan
             {/* Input */}
             <form onSubmit={handleSubmit} className="border-t border-[var(--border-subtle)] flex items-center gap-1 px-2 py-1.5">
                 <input
+                    ref={inputRef}
                     type="text"
                     value={text}
                     onChange={(e) => setText(e.target.value)}

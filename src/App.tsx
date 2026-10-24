@@ -1,18 +1,31 @@
-import { useState, useEffect, useRef } from 'react';
-import type { FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
 import { GodTools } from './components/GodTools';
 import { toggleMute, isMuted } from './audio/SoundManager';
+import { setMenuAmbience, disposeMenuAmbience } from './audio/menuAmbience';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
 import { RankBadge } from './components/RankBadge';
-import { KeyRound, Send, Loader2, CheckCircle2, AlertCircle, WifiOff, Volume2, VolumeX } from 'lucide-react';
+import { KeyRound, Send, Loader2, CheckCircle2, AlertCircle, WifiOff, Volume2, VolumeX, MessageCircle, X } from 'lucide-react';
 import { SpriteIcon } from './components/SpriteIcon';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
 import { track } from './analytics/tracker';
+import { royalMenu } from './sprites/royalMenu';
+import { battleArt } from './sprites/battleArt';
+import './components/RoyalMenuShell.css';
+import './components/BattleShell.css';
+
+const battleShellStyle = {
+  '--battle-hud-art': `url("${battleArt.url('hud')}")`,
+  '--battle-fire-art': `url("${battleArt.url('fire')}")`,
+  '--battle-input-art': `url("${royalMenu.url('field')}")`,
+  '--battle-blue-art': `url("${royalMenu.url('button_sapphire')}")`,
+  '--battle-green-art': `url("${royalMenu.url('button_emerald')}")`,
+} as CSSProperties;
 
 function App() {
   const {
@@ -31,6 +44,7 @@ function App() {
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
   const [gameMode, setGameMode] = useState<GameMode>('build');
   const [showChat, setShowChat] = useState(false);
+  const closeChat = useCallback(() => setShowChat(false), []);
   const [spawnCount, setSpawnCount] = useState(0);
 
   // Player name state (persisted)
@@ -46,24 +60,13 @@ function App() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showRankPanel, setShowRankPanel] = useState(false);
   const [muted, setMuted] = useState(isMuted());
-
-  // Auto-start first game for new users (ref-based to survive Strict Mode double-invocation)
-  const autoStartRef = useRef(false);
-  useEffect(() => {
-    if (autoStartRef.current) return;
-    const hasPlayed = localStorage.getItem('fortress_has_played');
-    const urlRoom = new URLSearchParams(window.location.search).get('room');
-    if (!hasPlayed && !urlRoom && phase === 'lobby' && isConnected && !roomState) {
-      autoStartRef.current = true;
-      // Mark as played IMMEDIATELY so it never triggers again, even if user refreshes mid-match
-      localStorage.setItem('fortress_has_played', '1');
-      const t = setTimeout(() => createRoom(undefined, 'single'), 1000);
-      return () => { clearTimeout(t); autoStartRef.current = false; };
-    }
-  }, [phase, isConnected, roomState, createRoom]);
+  const apiDialogRef = useRef<HTMLDivElement>(null);
 
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
+
+  useEffect(() => { setMenuAmbience(!inGame, muted); }, [inGame, muted]);
+  useEffect(() => () => disposeMenuAmbience(), []);
 
   // SpriteIcon images load on demand; the battlefield loads its own small art bundle.
   useEffect(() => {
@@ -94,7 +97,24 @@ function App() {
       setSpawnCount(0);
       setGameMode('build');
     }
+    if (phase === 'lobby') setShowChat(false);
   }
+
+  useEffect(() => {
+    if (!showApiKey) return;
+    const dialog = apiDialogRef.current;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowApiKey(false);
+      if (event.key !== 'Tab' || !dialog) return;
+      const controls = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')];
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    dialog?.addEventListener('keydown', handleKey);
+    return () => dialog?.removeEventListener('keydown', handleKey);
+  }, [showApiKey]);
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -135,9 +155,9 @@ function App() {
   } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
-    <div className={`h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top ${inGame ? 'game-shell' : ''}`} style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: inGame ? '#e4efeb' : 'var(--bg-deepest)' }}>
-      {/* Header — hidden on mobile when in-game */}
-      <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'game-header hidden sm:flex' : ''}`} style={{ background: inGame ? '#f4f8f4' : 'rgba(10, 10, 18, 0.9)', boxShadow: inGame ? '0 1px 0 #bdcec6' : '0 1px 0 rgba(255,215,0,0.08), 0 2px 16px rgba(0,0,0,0.4)' }}>
+    <div className={`h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top ${inGame ? 'game-shell' : 'menu-shell'}`} style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: inGame ? '#55a9df' : 'var(--bg-deepest)', ...(inGame ? battleShellStyle : {}) }}>
+      {/* The approved menu header stays separate from the in-game HUD. */}
+      <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'game-header hidden' : 'menu-header'}`} style={{ background: '#f4f8f4', boxShadow: '0 1px 0 #bdcec6' }}>
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg shrink-0" style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,215,0,0.06))', border: '1px solid rgba(255,215,0,0.2)' }}>
             <SpriteIcon name="logo_crest" size={24} alt="Fortress AI" />
@@ -254,10 +274,13 @@ function App() {
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
             onClick={(e) => { if (e.target === e.currentTarget) setShowApiKey(false); }}
           >
-            <div className="w-full max-w-md card-dark rounded-xl p-5 shadow-2xl border border-[var(--border-accent)] animate-scale-in">
-              <label id="api-key-dialog-title" htmlFor="api-key-input" className="text-sm font-bold text-[var(--gold)] mb-3 block">Configure AI Architect</label>
+            <div ref={apiDialogRef} className="battle-api-dialog w-full max-w-md card-dark rounded-xl p-5 shadow-2xl border border-[var(--border-accent)] animate-scale-in">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <label id="api-key-dialog-title" htmlFor="api-key-input" className="text-sm font-bold text-[var(--gold)] block">Configure AI Architect</label>
+                <button type="button" aria-label="Close AI architect settings" onClick={() => setShowApiKey(false)} className="battle-api-close min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={20} aria-hidden="true" /></button>
+              </div>
               <p id="api-key-dialog-desc" className="text-xs text-[var(--text-muted)] mb-4">
-                Enter your Google Gemini API key to enable AI fortress generation. Your key is stored locally in your browser and never sent to our servers.
+                Add your Google Gemini API key for AI fortress generation. Your key is saved in this browser and sent with your build requests.
               </p>
               <div className="flex gap-2">
                 <input
@@ -298,15 +321,25 @@ function App() {
             onGetProfile={getProfile}
           />
         ) : (
-          <div className="game-container">
-            <div className="game-battle-row">
+          <div className="game-container" data-phase={phase}>
+            <div className="game-battle-row" inert={(showChat && !isSinglePlayer) || showApiKey}>
               <div className="game-battlefield">
                 <div className={phase === 'result' ? 'game-phase-result' : 'game-phase-row'}>
+                  {phase !== 'result' && (
+                    <div className="game-battle-identity" aria-label={`Fortress AI. Room ${roomState?.roomId ?? ''}`}>
+                      <SpriteIcon name="logo_crest" size={42} />
+                      <div>
+                        <span className="game-battle-brand">FORTRESS <b>AI</b></span>
+                        <span className="game-battle-room">Room: {roomState?.roomId}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="game-phase-content">
                     <PhaseOverlay
                       phase={phase}
                       phaseEndsAt={phaseEndsAt}
                       turnPlayer={turnPlayer}
+                      shotInFlight={gameState?.bodies.some(body => body.label === 'projectile' && Math.hypot(body.velocity.x, body.velocity.y) > 1)}
                       mySide={mySide}
                       matchResult={matchResult}
                       playerNames={playerNamesMap}
@@ -346,7 +379,7 @@ function App() {
                               : 'bg-[var(--bg-deep)] border-[var(--border-subtle)]'
                             }`}
                         >
-                          <SpriteIcon name="ui_chat_bubble" size={22} />
+                          {showChat ? <X size={22} aria-hidden="true" /> : <MessageCircle size={22} aria-hidden="true" />}
                           {chatMessages.length > 0 && (
                             <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[var(--ember)]" aria-hidden="true" />
                           )}
@@ -376,25 +409,16 @@ function App() {
                     hazards={hazards}
                     roundScore={roundScore}
                     currentRound={currentRound}
+                    winner={matchResult?.winner}
                   />
                 </div>
               </div>
 
-              {/* Chat — visible on xl screens for PvP only */}
-              {!isSinglePlayer && (
-                <div className="game-desktop-chat hidden xl:flex">
-                  <ChatPanel
-                    messages={chatMessages}
-                    onSend={sendChatMessage}
-                    mySide={mySide}
-                  />
-                </div>
-              )}
             </div>
 
             {/* One bounded dock shared by phone, tablet and desktop. */}
             {phase === 'build' && (
-              <div className="game-build-dock">
+              <div className="game-build-dock" inert={(showChat && !isSinglePlayer) || showApiKey}>
                 <GodTools
                   selectedMaterial={selectedMaterial}
                   selectedShape={selectedShape}
@@ -461,16 +485,16 @@ function App() {
               </div>
             )}
 
-            {/* Mobile chat overlay (PvP only) */}
+            {/* Chat never consumes battlefield width, including on desktop. */}
             {showChat && !isSinglePlayer && (
-              <div className="game-chat-modal fixed inset-0 z-50 xl:hidden flex items-end justify-center bg-[rgba(10,10,18,0.7)] backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
-                <div className="w-full max-w-md mb-0 sm:mb-4 safe-area-bottom">
+              <div className="game-chat-modal" onClick={(e) => { if (e.target === e.currentTarget) setShowChat(false); }}>
+                <div className="game-chat-window safe-area-bottom" role="dialog" aria-modal="true" aria-label="Battle chat">
                   <ChatPanel
                     messages={chatMessages}
                     onSend={sendChatMessage}
                     mySide={mySide}
                     mobile
-                    onClose={() => setShowChat(false)}
+                    onClose={closeChat}
                   />
                 </div>
               </div>

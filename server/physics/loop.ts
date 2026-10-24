@@ -86,9 +86,11 @@ export class GameLoop {
 
         // Snapshot broadcast
         const now = Date.now();
-        if (now - this.lastSnapshotTime > (1000 / SNAPSHOT_RATE)) {
+        const elapsed = now - this.lastSnapshotTime;
+        if (elapsed >= SNAPSHOT_INTERVAL_MS) {
             this.broadcastState();
-            this.lastSnapshotTime = now;
+            // Preserve the deadline remainder: resetting to now turns 20Hz into ~15Hz on 16ms ticks.
+            this.lastSnapshotTime = this.lastSnapshotTime === 0 ? now : now - elapsed % SNAPSHOT_INTERVAL_MS;
         }
     }
 

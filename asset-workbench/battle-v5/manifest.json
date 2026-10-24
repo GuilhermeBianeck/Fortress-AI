@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "name": "sky",
+      "path": "runtime/sky.webp",
+      "source": "masters/sky.png",
+      "width": 1672,
+      "height": 941,
+      "alpha": {
+        "clear": 0
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1672,
+        "height": 941
+      },
+      "sourceInfo": {
+        "width": 1672,
+        "height": 941,
+        "alpha": {
+          "clear": 0
+        },
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1672,
+          "height": 941
+        }
+      },
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "width": 1672,
+        "height": 941
+      },
+      "bytes": 198256,
+      "periodic": false,
+      "alphaSeamMean": null
+    },
+    {
+      "name": "valley",
+      "path": "runtime/valley.webp",
+      "source": "masters/valley.png",
+      "width": 1672,
+      "height": 941,
+      "alpha": {
+        "clear": 0.3147058001006768
+      },
+      "bounds": {
+        "x": 0,
+        "y": 186,
+        "width": 1672,
+        "height": 755
+      },
+      "sourceInfo": {
+        "width": 1672,
+        "height": 941,
+        "alpha": {
+          "clear": 0.3147058001006768
+        },
+        "bounds": {
+          "x": 0,
+          "y": 186,
+          "width": 1672,
+          "height": 755
+        }
+      },
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "width": 1672,
+        "height": 941
+      },
+      "bytes": 626786,
+      "periodic": false,
+      "alphaSeamMean": null
+    },
+    {
+      "name": "cloud",
+      "path": "runtime/cloud.webp",
+      "source": "masters/cloud.png",
+      "width": 900,
+      "height": 239,
+      "alpha": {
+        "clear": 0.47853556485355647
+      },
+      "bounds": {
+        "x": 1,
+        "y": 0,
+        "width": 898,
+        "height": 239
+      },
+      "sourceInfo": {
+        "width": 2171,
+        "height": 724,
+        "alpha": {
+          "clear": 0.6019064717992829
+        },
+        "bounds": {
+          "x": 21,
+          "y": 71,
+          "width": 2120,
+          "height": 563
+        }
+      },
+      "crop": {
+        "x": 21,
+        "y": 71,
+        "width": 2120,
+        "height": 563
+      },
+      "bytes": 58456,
+      "periodic": false,
+      "alphaSeamMean": null
+    },
+    {
+      "name": "earth",
+      "path": "runtime/earth.webp",
+      "source": "masters/earth.png",
+      "width": 922,
+      "height": 341,
+      "alpha": {
+        "clear": 0
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 922,
+        "height": 341
+      },
+      "sourceInfo": {
+        "width": 2172,
+        "height": 724,
+        "alpha": {
+          "clear": 0
+        },
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 2172,
+          "height": 724
+        }
+      },
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "width": 2172,
+        "height": 724
+      },
+      "bytes": 142368,
+      "periodic": true,
+      "alphaSeamMean": 0
+    },
+    {
+      "name": "grass",
+      "path": "runtime/grass.webp",
+      "source": "masters/grass.png",
+      "width": 922,
+      "height": 131,
+      "alpha": {
+        "clear": 0.3000861055455283
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 922,
+        "height": 131
+      },
+      "sourceInfo": {
+        "width": 2172,
+        "height": 724,
+        "alpha": {
+          "clear": 0.7255368425872226
+        },
+        "bounds": {
+          "x": 0,
+          "y": 267,
+          "width": 2172,
+          "height": 277
+        }
+      },
+      "crop": {
+        "x": 0,
+        "y": 267,
+        "width": 2172,
+        "height": 277
+      },
+      "bytes": 81470,
+      "periodic": true,
+      "alphaSeamMean": 17.213740458015266,
+      "surface": 0.15
+    },
+    {
+      "name": "stone",
+      "path": "runtime/stone.webp",
+      "source": "masters/stone.png",
+      "width": 512,
+      "height": 512,
+      "alpha": {
+        "clear": 0
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 512
+      },
+      "sourceInfo": {
+        "width": 1254,
+        "height": 1254,
+        "alpha": {
+          "clear": 0
+        },
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1254,
+          "height": 1254
+        }
+      },
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "width": 1254,
+        "height": 1254
+      },
+      "bytes": 54358,
+      "periodic": false,
+      "alphaSeamMean": null
+    },
+    {
+      "name": "hud",
+      "path": "runtime/hud.webp",
+      "source": "masters/hud.png",
+      "width": 1200,
+      "height": 194,
+      "alpha": {
+        "clear": 0.02333762886597938
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1200,
+        "height": 193
+      },
+      "sourceInfo": {
+        "width": 2172,
+        "height": 724,
+        "alpha": {
+          "clear": 0.5355262354628979
+        },
+        "bounds": {
+          "x": 44,
+          "y": 175,
+          "width": 2084,
+          "height": 337
+        }
+      },
+      "crop": {
+        "x": 44,
+        "y": 175,
+        "width": 2084,
+        "height": 337
+      },
+      "bytes": 37062,
+      "periodic": false,
+      "alphaSeamMean": null,
+      "slice": 0.12
+    },
+    {
+      "name": "fire",
+      "path": "runtime/fire.webp",
+      "source": "masters/fire.png",
+      "width": 700,
+      "height": 189,
+      "alpha": {
+        "clear": 0.023907785336356766
+      },
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 700,
+        "height": 189
+      },
+      "sourceInfo": {
+        "width": 2098,
+        "height": 749,
+        "alpha": {
+          "clear": 0.39303310037787914
+        },
+        "bounds": {
+          "x": 103,
+          "y": 106,
+          "width": 1895,
+          "height": 512
+        }
+      },
+      "crop": {
+        "x": 103,
+        "y": 106,
+        "width": 1895,
+        "height": 512
+      },
+      "bytes": 22780,
+      "periodic": false,
+      "alphaSeamMean": null
+    }
+  ]
+}

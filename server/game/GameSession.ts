@@ -10,12 +10,13 @@ import type { TerrainResult } from '../physics/terrain';
 import { MatchStateMachine } from './MatchStateMachine';
 import { ScoreManager } from './ScoreManager';
 import { BotAI } from './BotAI';
+import { closestOnSegment } from './botBallistics';
+import { closingSpeed, kingImpactDamage, projectileBlockDamage } from './impactDamage';
 import {
-    MATERIAL_PROPS, DAMAGE_MULTIPLIERS, MATERIAL_BLOCK_HP,
-    KING_MAX_HP, IMPACT_THRESHOLD, DAMAGE_SCALE,
+    MATERIAL_PROPS, MATERIAL_BLOCK_HP,
+    KING_MAX_HP,
     PROJECTILE_RADIUS, PROJECTILE_DENSITY, PROJECTILE_RESTITUTION,
     PROJECTILE_FRICTION, PROJECTILE_LIFESPAN_MS,
-    PROJECTILE_BLOCK_DAMAGE_MULT, PROJECTILE_MIN_IMPACT,
     WORLD_WIDTH, CANVAS_HEIGHT,
     LEFT_SIDE, RIGHT_SIDE, LEFT_CANNON_X, RIGHT_CANNON_X,
     FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS,
@@ -64,6 +65,11 @@ export class GameSession {
     private roomId: string;
     private projectileTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
     private projectileBodies: Set<Matter.Body> = new Set();
+    private projectileHits = new Map<number, Set<number>>();
+    private botShotTracks = new Map<number, {
+        target: Matter.Vector; previous: Matter.Vector; closest: Matter.Vector; distance: number;
+    }>();
+    private destroyed = false;
     private kingsMap: Map<Side, KingState> = new Map();
     private stateMachine: MatchStateMachine;
     private onPhaseChangeCallback?: (phase: MatchPhase) => void;
@@ -169,15 +175,24 @@ export class GameSession {
                     if (!ps) return 0;
                     return this.getFoundationTopY(ps.kingBody.position.x);
                 },
-                getOpponentKingPosition: () => {
-                    const ps = this.getPlayerBySide(opponentSide);
-                    return ps ? { x: ps.kingBody.position.x, y: ps.kingBody.position.y } : { x: 0, y: 0 };
+                getBallisticsScene: () => {
+                    const opponent = this.getPlayerBySide(opponentSide)!;
+                    return {
+                        side: botSide,
+                        cannon: { x: botPlayer.cannonX, y: this.interpolateTerrainY(botPlayer.cannonX) - 20 },
+                        target: { ...opponent.kingBody.position }, targetBodyId: opponent.kingBody.id,
+                        gravity: { ...this.engine.gravity }, wind: this.windHazards,
+                        windTick: this.hazardTickCounter % 4,
+                        bodies: Matter.Composite.allBodies(this.world),
+                    };
                 },
+                canBuild: () => !this.destroyed && this.stateMachine.getPhase() === 'build',
+                canFire: () => !this.destroyed && this.stateMachine.canFire() && this.stateMachine.getCurrentTurn() === botSide,
                 spawnBlock: (shape, material, x, y, width, height) => {
                     this.createBody(shape, material, x, y, [width, height]);
                 },
                 fireProjectile: (side, angle, power) => {
-                    this.fireProjectile(side, angle, power);
+                    return this.fireProjectile(side, angle, power);
                 },
             });
         }
@@ -406,8 +421,8 @@ export class GameSession {
         this.fireProjectile(player.side, data.angle, data.power);
     }
 
-    fireProjectile(side: Side, rawAngle: number, rawPower: number): void {
-        if (!this.stateMachine.canFire()) return;
+    fireProjectile(side: Side, rawAngle: number, rawPower: number): number | undefined {
+        if (this.destroyed || !this.stateMachine.canFire() || this.stateMachine.getCurrentTurn() !== side) return;
         if (!Number.isFinite(rawAngle) || !Number.isFinite(rawPower)) return;
 
         const player = this.getPlayerBySide(side);
@@ -434,6 +449,7 @@ export class GameSession {
 
         // Enable CCD to prevent tunneling through terrain
         (body as GameBody).isBullet = true;
+        (body as GameBody).side = side;
 
         Matter.World.add(this.world, body);
 
@@ -455,12 +471,24 @@ export class GameSession {
         const timer = setTimeout(() => this.removeProjectile(body), PROJECTILE_LIFESPAN_MS);
         this.projectileTimers.set(body.id, timer);
         this.projectileBodies.add(body);
+        this.projectileHits.set(body.id, new Set());
+        if (this.botAI && this.getBotPlayer()?.side === side) {
+            const opponent = this.getPlayerBySide(side === 'left' ? 'right' : 'left');
+            if (opponent) {
+                const target = { ...opponent.kingBody.position };
+                this.botShotTracks.set(body.id, {
+                    target, previous: { ...body.position }, closest: { ...body.position },
+                    distance: Matter.Vector.magnitude(Matter.Vector.sub(body.position, target)),
+                });
+            }
+        }
 
         console.log(`Projectile fired by ${side}: angle=${(angle * 180 / Math.PI).toFixed(1)}deg power=${power.toFixed(1)}`);
 
         // Tell state machine a projectile was fired, wait for settle
         this.stateMachine.onProjectileFired();
         this.stateMachine.waitForSettle();
+        return body.id;
     }
 
     handlePlayerBuildReady(socketId: string): void {
@@ -476,10 +504,13 @@ export class GameSession {
 
     handleForfeit(): void {
         // Stop the game loop and state machine
+        this.destroyed = true;
+        this.botAI?.destroy();
         this.stateMachine.destroy();
     }
 
     destroy() {
+        this.destroyed = true;
         this.botAI?.destroy();
         this.botAI = null;
         this.gameLoop.stop();
@@ -489,6 +520,8 @@ export class GameSession {
         }
         this.projectileTimers.clear();
         this.projectileBodies.clear();
+        this.projectileHits.clear();
+        this.botShotTracks.clear();
         for (const timer of this.hazardTimers) {
             clearInterval(timer);
         }
@@ -739,8 +772,22 @@ export class GameSession {
 
     private setupCollisionHandlers() {
         Matter.Events.on(this.engine, 'collisionStart', (event) => {
+            const processedPairs = new Set<string>();
             for (const pair of event.pairs) {
                 const { bodyA, bodyB } = pair;
+                const pairId = [bodyA.id, bodyB.id].sort((a, b) => a - b).join(':');
+                if (processedPairs.has(pairId)) continue;
+                processedPairs.add(pairId);
+                const projectile = bodyA.label === 'projectile' ? bodyA : bodyB.label === 'projectile' ? bodyB : null;
+                const hitBody = projectile === bodyA ? bodyB : bodyA;
+                if (projectile) {
+                    this.observeBotProjectile(projectile, hitBody);
+                    const hits = this.projectileHits.get(projectile.id) ?? new Set<number>();
+                    this.projectileHits.set(projectile.id, hits);
+                    if (hits.has(hitBody.id)) continue;
+                    hits.add(hitBody.id);
+                }
+                const speed = closingSpeed(pair.collision.bodyA, pair.collision.bodyB, pair.collision.normal);
 
                 // --- King damage from any collision (check BOTH kings) ---
                 for (const ps of this.players.values()) {
@@ -752,24 +799,16 @@ export class GameSession {
                     else if (bodyB.id === ps.kingState.bodyId) { kingBody = bodyB; otherBody = bodyA; kingHit = true; }
 
                     if (kingHit && kingBody && otherBody && ps.kingState.hp > 0) {
-                        const relativeVelocityX = kingBody.velocity.x - otherBody.velocity.x;
-                        const relativeVelocityY = kingBody.velocity.y - otherBody.velocity.y;
-                        const relativeSpeed = Math.hypot(relativeVelocityX, relativeVelocityY);
-                        const reducedMass = otherBody.isStatic
-                            ? kingBody.mass
-                            : (kingBody.mass * otherBody.mass) / (kingBody.mass + otherBody.mass);
-                        const impactForce = relativeSpeed * reducedMass;
-                        if (impactForce >= IMPACT_THRESHOLD && Number.isFinite(impactForce)) {
-                            const multiplier = DAMAGE_MULTIPLIERS[otherBody.label] ?? 1.0;
-                            const damage = ((impactForce - IMPACT_THRESHOLD) * multiplier) * DAMAGE_SCALE;
+                        const damage = Math.min(ps.kingState.hp, kingImpactDamage(kingBody, otherBody, speed));
+                        if (damage > 0) {
                             ps.kingState.hp = Math.max(0, ps.kingState.hp - damage);
                             ps.kingState.position = { x: ps.kingBody.position.x, y: ps.kingBody.position.y };
 
                             // Record damage for scoring (attacker is the opposite side)
-                            const attackerSide: Side = ps.side === 'left' ? 'right' : 'left';
-                            this.scoreManager.recordDamage(attackerSide, damage);
+                            const attackerSide: Side = (otherBody as GameBody).side ?? (ps.side === 'left' ? 'right' : 'left');
+                            if (attackerSide !== ps.side) this.scoreManager.recordDamage(attackerSide, damage);
 
-                            console.log(`${ps.side} King hit by ${otherBody.label} | force=${impactForce.toFixed(1)} | damage=${damage.toFixed(1)} | HP=${ps.kingState.hp.toFixed(1)}/${ps.kingState.maxHp}`);
+                            console.log(`${ps.side} King hit by ${otherBody.label} | speed=${speed.toFixed(1)} | damage=${damage.toFixed(1)} | HP=${ps.kingState.hp.toFixed(1)}/${ps.kingState.maxHp}`);
 
                             this.io.to(this.roomId).emit('king_damage', {
                                 side: ps.side,
@@ -788,16 +827,7 @@ export class GameSession {
                 }
 
                 // --- Projectile vs block damage ---
-                let projectile: Matter.Body | null = null;
-                let block: Matter.Body | null = null;
-
-                if (bodyA.label === 'projectile' && bodyB.label !== 'projectile') {
-                    projectile = bodyA;
-                    block = bodyB;
-                } else if (bodyB.label === 'projectile' && bodyA.label !== 'projectile') {
-                    projectile = bodyB;
-                    block = bodyA;
-                }
+                const block = projectile && hitBody.label !== 'projectile' ? hitBody : null;
 
                 if (projectile && block) {
                     // Emit impact for any non-terrain hit
@@ -809,10 +839,9 @@ export class GameSession {
 
                     // Block HP damage (skip terrain, king, other projectiles)
                     const blockHp = (block as GameBody).blockHp;
-                    if (blockHp != null && block.label !== 'Terrain' && block.label !== 'king') {
-                        const impactForce = projectile.speed * projectile.mass;
-                        if (impactForce >= PROJECTILE_MIN_IMPACT) {
-                            const blockDamage = impactForce * PROJECTILE_BLOCK_DAMAGE_MULT;
+                    if (blockHp != null && blockHp > 0 && block.label !== 'Terrain' && block.label !== 'king') {
+                        const blockDamage = projectileBlockDamage(projectile, block, speed);
+                        if (blockDamage > 0) {
                             (block as GameBody).blockHp = Math.max(0, blockHp - blockDamage);
 
                             if (((block as GameBody).blockHp ?? 0) <= 0) {
@@ -828,6 +857,28 @@ export class GameSession {
                     }
                 }
             }
+        });
+    }
+
+    private sampleBotProjectile(body: Matter.Body): void {
+        const track = this.botShotTracks.get(body.id);
+        if (!track) return;
+        const point = closestOnSegment(track.previous, body.position, track.target);
+        const distance = Math.hypot(point.x - track.target.x, point.y - track.target.y);
+        if (distance < track.distance) {
+            track.closest = point;
+            track.distance = distance;
+        }
+        track.previous = { ...body.position };
+    }
+
+    private observeBotProjectile(body: Matter.Body, hit?: Matter.Body): void {
+        this.sampleBotProjectile(body);
+        const track = this.botShotTracks.get(body.id);
+        if (!track) return;
+        this.botShotTracks.delete(body.id);
+        this.botAI?.observeShot({
+            projectileId: body.id, closest: track.closest, hitLabel: hit?.label, hitBodyId: hit?.id,
         });
     }
 
@@ -854,6 +905,7 @@ export class GameSession {
     private checkProjectileBounds() {
         const tickMaxSpeed = PHYSICS_MAX_SPEED;
         for (const body of this.projectileBodies) {
+            this.sampleBotProjectile(body);
             if (body.position.y > CANVAS_HEIGHT + 50 ||
                 body.position.x < -50 ||
                 body.position.x > WORLD_WIDTH + 50) {
@@ -873,6 +925,8 @@ export class GameSession {
     }
 
     private removeProjectile(body: Matter.Body) {
+        this.observeBotProjectile(body);
+        this.projectileHits.delete(body.id);
         // Use the projectile Set for O(1) membership check
         if (this.projectileBodies.has(body)) {
             Matter.Composite.remove(this.world, body);

@@ -7,6 +7,14 @@ import { debugStats, debugVisible, toggleDebug } from '../debug/debugStats';
 import { track } from '../analytics/tracker';
 import { playFire, playImpact, playExplosion } from '../audio/SoundManager';
 import { cartoon } from '../sprites/cartoon';
+import { kingReactions } from '../sprites/kingReactions';
+import { livingKings } from '../sprites/livingKings';
+import { livingKingState } from '../game/livingKing';
+import { battleArt } from '../sprites/battleArt';
+import { healthPanel, renderPixelRatio } from '../game/battlePresentation';
+import { PRESENTATION_DELAY_MS, renderedPosition, SnapshotInterpolator, type RenderSnapshot } from '../game/snapshotInterpolation';
+import { kingPresentation } from '../game/kingAnimation';
+import { cannonMuzzle } from '../game/cannonPresentation';
 import { drawBattle, type BattleEffect, type BattleHazard } from '../game/BattleRenderer';
 import { cannonPosition, predictTrajectory } from '../game/ballistics';
 import { kingFeedbackPosition } from '../game/battleFeedback';
@@ -32,6 +40,7 @@ interface GameCanvasProps {
     hazards?: BattleHazard[];
     roundScore?: { left: number; right: number };
     currentRound?: number;
+    winner?: Side | null;
 }
 
 export type HazardData = BattleHazard;
@@ -59,12 +68,13 @@ function GameCanvasInner(props: GameCanvasProps) {
     const inspectRef = useRef(false);
     const [shotPending, setShotPending] = useState(false);
     const pendingRef = useRef(false);
-    const previous = useRef(new Map<number, { x: number; y: number; angle: number }>());
-    const snapshotAt = useRef(0);
+    const snapshots = useRef(new SnapshotInterpolator());
+    const presented = useRef<RenderSnapshot | undefined>(undefined);
+    const presentationEvents = useRef<{ at: number; run: () => void }[]>([]);
     const trajectory = useRef<Vector[]>([]);
     const particles = useRef(new ParticleSystem());
     const effects = useRef<BattleEffect[]>([]);
-    const shot = useRef<{ side: Side; at: number } | undefined>(undefined);
+    const shot = useRef<{ side: Side; at: number; angle: number } | undefined>(undefined);
     const seenProjectiles = useRef(new Set<number>());
     const followedProjectile = useRef<number | null>(null);
     const lastSound = useRef(0);
@@ -74,10 +84,13 @@ function GameCanvasInner(props: GameCanvasProps) {
     const reducedMotion = useRef(false);
     const keys = useRef(new Set<string>());
 
-    useEffect(() => { void cartoon.load(); }, []);
+    useEffect(() => { void cartoon.load(); void kingReactions.load(); void battleArt.load(); void livingKings.load(); }, []);
     useEffect(() => {
         const media = matchMedia('(prefers-reduced-motion: reduce)');
-        const update = () => { reducedMotion.current = media.matches; };
+        const update = () => {
+            reducedMotion.current = media.matches;
+            if (media.matches) particles.current.reset();
+        };
         update(); media.addEventListener('change', update);
         return () => media.removeEventListener('change', update);
     }, []);
@@ -116,28 +129,18 @@ function GameCanvasInner(props: GameCanvasProps) {
         followedProjectile.current = null;
     }, [props.phase, props.turnPlayer]);
     useEffect(() => {
-        const oldState = latest.current.gameState;
-        if (oldState !== props.gameState) {
-            previous.current = new Map((oldState?.bodies ?? []).map(b => [b.id, { ...b.position, angle: b.angle }]));
-            snapshotAt.current = performance.now();
-        }
         latest.current = props;
-        for (const body of props.gameState?.bodies ?? []) {
-            if (body.label !== 'projectile' || seenProjectiles.current.has(body.id)) continue;
-            seenProjectiles.current.add(body.id);
-            followedProjectile.current = body.id;
-            const side: Side = props.turnPlayer ?? (body.position.x < WORLD_WIDTH / 2 ? 'left' : 'right');
-            shot.current = { side, at: performance.now() };
-            const pos = cannonPosition(side, props.terrain?.points ?? []);
-            if (!reducedMotion.current) particles.current.emitImpact(pos.x, pos.y);
-            playFire();
-        }
     }, [props]);
+    useEffect(() => {
+        if (props.gameState) snapshots.current.push(props.gameState, performance.now());
+    }, [props.gameState]);
     useEffect(() => {
         gesture.current = null; ghost.current = undefined; pointers.current.clear();
         camera.current.manualUntil = 0;
         if (props.phase === 'build') {
-            effects.current = []; seenProjectiles.current.clear();
+            effects.current = []; seenProjectiles.current.clear(); particles.current.reset(); shot.current = undefined;
+            snapshots.current.reset(); presented.current = undefined; presentationEvents.current = [];
+            if (props.gameState) snapshots.current.push(props.gameState, performance.now());
             focus(props.kingsHp[props.mySide].x ?? (props.mySide === 'left' ? 300 : 2100));
             camera.current.x = camera.current.target;
         } else if (props.phase === 'combat') {
@@ -177,22 +180,26 @@ function GameCanvasInner(props: GameCanvasProps) {
             if (performance.now() - lastSound.current > 80) { sound(); lastSound.current = performance.now(); }
         };
         const { setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback } = latest.current;
-        setBlockDestroyedCallback(data => {
+        const later = (run: () => void) => {
+            presentationEvents.current.push({ at: performance.now() + PRESENTATION_DELAY_MS, run });
+            if (presentationEvents.current.length > 128) presentationEvents.current.shift();
+        };
+        setBlockDestroyedCallback(data => later(() => {
             if (!reducedMotion.current) {
                 particles.current.emitMaterial(data.position.x, data.position.y, data.material, data.velocity);
                 particles.current.emitSmoke(data.position.x, data.position.y);
             }
-            addEffect({ ...data.position, at: performance.now(), kind: 'break' }, playExplosion);
-        });
-        setProjectileImpactCallback(data => {
+            addEffect({ ...data.position, at: performance.now(), kind: 'break', material: data.material }, playExplosion);
+        }));
+        setProjectileImpactCallback(data => later(() => {
             if (!reducedMotion.current) particles.current.emitImpact(data.position.x, data.position.y);
             addEffect({ ...data.position, at: performance.now(), kind: 'impact' }, playImpact);
-        });
-        setKingDamageCallback(data => {
+        }));
+        setKingDamageCallback(data => later(() => {
             const p = latest.current;
             const position = kingFeedbackPosition(data.side, p.gameState, p.kingsHp[data.side]);
-            addEffect({ ...position, at: performance.now(), kind: 'damage', damage: Math.round(data.damage) }, playImpact);
-        });
+            addEffect({ ...position, at: performance.now(), kind: 'damage', side: data.side, damage: Math.round(data.damage) }, playImpact);
+        }));
         return () => {
             setBlockDestroyedCallback(null); setProjectileImpactCallback(null); setKingDamageCallback(null);
         };
@@ -207,29 +214,48 @@ function GameCanvasInner(props: GameCanvasProps) {
             const p = latest.current;
             if (canvas && ctx) {
                 const v = view.current;
-                const dpr = Math.min(2, window.devicePixelRatio || 1);
+                const dpr = renderPixelRatio(v.width, v.height, window.devicePixelRatio);
                 const w = Math.round(v.width * dpr), h = Math.round(v.height * dpr);
                 if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.setTransform(w / v.width, 0, 0, h / v.height, 0, 0);
                 ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-                const delta = lastFrame ? Math.min(50, now - lastFrame) : 16.667;
+                const elapsed = lastFrame ? Math.max(0, now - lastFrame) : 16.667;
+                const delta = Math.min(50, elapsed);
                 lastFrame = now;
                 const cam = camera.current;
+                const sample = snapshots.current.sample(now);
+                presented.current = sample;
+                const renderState = sample?.state ?? p.gameState;
+                const transforms = sample?.transforms ?? new Map();
+                for (const body of renderState?.bodies ?? []) {
+                    if (body.label !== 'projectile' || seenProjectiles.current.has(body.id)) continue;
+                    seenProjectiles.current.add(body.id);
+                    followedProjectile.current = body.id;
+                    const side: Side = p.turnPlayer ?? (body.position.x < WORLD_WIDTH / 2 ? 'left' : 'right');
+                    const facing = side === 'left' ? 1 : -1;
+                    const angle = side === p.mySide ? aimRef.current.angle : Math.atan2(-body.velocity.y, body.velocity.x * facing);
+                    shot.current = { side, at: now, angle };
+                    const muzzle = cannonMuzzle(side, angle, p.terrain?.points ?? []);
+                    if (!reducedMotion.current) particles.current.emitMuzzle(muzzle.x, muzzle.y, angle, facing);
+                    playFire();
+                }
+                const due = presentationEvents.current.filter(event => event.at <= now);
+                presentationEvents.current = presentationEvents.current.filter(event => event.at > now);
+                due.forEach(event => event.run());
                 if (keys.current.has('a')) { cam.target -= delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
                 if (keys.current.has('d')) { cam.target += delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
                 if (p.phase === 'combat' && cam.manualUntil < now) {
-                    const projectile = p.gameState?.bodies.find(b => b.id === followedProjectile.current);
-                    if (projectile) cam.target = projectile.position.x - v.worldWidth / 2;
+                    const projectile = renderState?.bodies.find(b => b.id === followedProjectile.current);
+                    if (projectile) cam.target = renderedPosition(projectile, transforms).x - v.worldWidth / 2;
                 }
                 cam.target = clampCamera(cam.target, v);
                 const smoothing = reducedMotion.current ? 1 : 1 - Math.exp(-delta / (p.phase === 'reveal' ? 600 : 120));
                 cam.x += (cam.target - cam.x) * smoothing;
-                particles.current.update(delta);
+                particles.current.update(elapsed);
                 effects.current = effects.current.filter(e => now - e.at < (e.kind === 'damage' ? 950 : 420));
                 drawBattle(ctx, { view: v, camera: cam.x, now, reducedMotion: reducedMotion.current,
-                    state: p.gameState, terrain: p.terrain, previous: previous.current,
-                    interpolation: Math.min(1, (now - snapshotAt.current) / 50), kings: p.kingsHp,
-                    names: p.playerNames, side: p.mySide, phase: p.phase, turn: p.turnPlayer,
+                    state: renderState, terrain: p.terrain, transforms, kings: p.kingsHp,
+                    names: p.playerNames, side: p.mySide, phase: p.phase, turn: p.turnPlayer, winner: p.winner,
                     angle: aimRef.current.angle, trajectory: trajectory.current, hazards: p.hazards ?? [],
                     effects: effects.current, particles: particles.current, shot: shot.current, ghost: ghost.current,
                     projectileId: followedProjectile.current,
@@ -252,6 +278,25 @@ function GameCanvasInner(props: GameCanvasProps) {
                 side: p.mySide, turn: p.turnPlayer, mode: p.phase === 'build' ? p.gameMode : inspectRef.current ? 'inspect' : 'aim',
                 aim: { degrees: Math.round(aimRef.current.angle * 180 / Math.PI), power: aimRef.current.power, pending: pendingRef.current },
                 viewport: view.current, camera: camera.current.x, kings: p.kingsHp, artLoaded: cartoon.loaded,
+                reactionsLoaded: kingReactions.loaded,
+                livingKingsLoaded: livingKings.loaded,
+                livingKingStates: Object.fromEntries((['left', 'right'] as const).map(side => [side, livingKingState({
+                    side, now: performance.now(), reducedMotion: reducedMotion.current,
+                    shootAt: shot.current?.side === side ? shot.current.at : undefined,
+                    looking: p.turnPlayer === side ? 0.5 : 0,
+                })])),
+                battleArtLoaded: battleArt.loaded,
+                rendering: { pixelRatio: renderPixelRatio(view.current.width, view.current.height, window.devicePixelRatio), reducedMotion: reducedMotion.current },
+                presentation: { delayMs: PRESENTATION_DELAY_MS, timestamp: presented.current?.timestamp,
+                    snapshots: presented.current?.buffered ?? 0,
+                    projectiles: presented.current?.state.bodies.filter(b => b.label === 'projectile').map(b => ({ id: b.id, ...renderedPosition(b, presented.current!.transforms) })) ?? [] },
+                kingCharacters: { left: kingReactions.identity('left'), right: kingReactions.identity('right') },
+                particles: particles.current.debugCounts(),
+                shot: shot.current ? { side: shot.current.side, age: Math.round(performance.now() - shot.current.at), muzzle: cannonMuzzle(shot.current.side, shot.current.angle, p.terrain?.points ?? []) } : null,
+                kingPoses: Object.fromEntries((['left', 'right'] as const).map(side => {
+                    const hit = [...effects.current].reverse().find(e => e.kind === 'damage' && e.side === side);
+                    return [side, kingPresentation({ now: performance.now(), side, phase: p.phase, winner: p.winner, hitAt: hit?.at }).pose];
+                })),
                 bodies: p.gameState?.bodies.filter(b => !b.isStatic).map(b => ({ id: b.id, kind: b.label, x: b.position.x, y: b.position.y, hp: b.blockHp })) ?? [] });
         };
         host.render_game_to_text = read;
@@ -315,6 +360,15 @@ function GameCanvasInner(props: GameCanvasProps) {
             const all = [...pointers.current.values()];
             gesture.current = { kind: 'pan', start: { x: (all[0].x + all[1].x) / 2, y: 0 }, camera: camera.current.x, cancelled: true };
             ghost.current = undefined; camera.current.manualUntil = performance.now() + 12000; return;
+        }
+        const onHealth = (['left', 'right'] as const).some(side => {
+            const box = healthPanel(view.current.width, view.current.height, side);
+            return point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height;
+        });
+        if (onHealth) {
+            gesture.current = { kind: 'pan', start: point, camera: camera.current.x, cancelled: true };
+            ghost.current = undefined;
+            return;
         }
         const box = minimapRect(view.current);
         const onMap = point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height;

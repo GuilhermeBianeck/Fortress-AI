@@ -107,8 +107,11 @@ export const PROJECTILE_DENSITY = 0.08;
 export const PROJECTILE_RESTITUTION = 0.1;
 export const PROJECTILE_FRICTION = 0.3;
 export const PROJECTILE_LIFESPAN_MS = 5000;
-export const PROJECTILE_BLOCK_DAMAGE_MULT = 2.0;
+export const PROJECTILE_BLOCK_DAMAGE_MULT = 3.0;
 export const PROJECTILE_MIN_IMPACT = 3;
+export const PROJECTILE_MAX_BLOCK_DAMAGE = 90;
+export const PROJECTILE_KING_DAMAGE_SCALE = 1.1;
+export const PROJECTILE_MAX_KING_DAMAGE = 45;
 
 // === Physics ===
 export const PHYSICS_GRAVITY = 2.0;

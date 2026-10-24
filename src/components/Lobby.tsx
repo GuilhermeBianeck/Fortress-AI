@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { FormEvent } from 'react';
 import type { RoomState, PlayerProfile } from '../types';
-import { Check, Target, Gift, Star, Calendar, Trophy, Copy, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Target, Gift, Star, Calendar, Trophy, Copy, ChevronDown, ChevronUp, Bot, Users, Swords, KeyRound, Link2, UserRound, BookOpen, Share2, LoaderCircle, ArrowLeft, Plus, Hammer, Eye, Crosshair } from 'lucide-react';
 import { RankBadge } from './RankBadge';
-import { SpriteIcon } from './SpriteIcon';
+import { RoyalMenuStage } from './CartoonMenuScene';
+import { kingReactions } from '../sprites/kingReactions';
+import './Lobby.css';
 import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 import { track } from '../analytics/tracker';
 import { playClick, playSwitch, playBoom } from '../audio/SoundManager';
@@ -22,82 +24,6 @@ export interface LobbyProps {
     onGetProfile?: () => void;
 }
 
-/* ═══════════════════════════════════════
-   Ember Particle Component (CSS-driven)
-   ═══════════════════════════════════════ */
-
-// Module-level constant — Math.random is called once at module load time, not during render
-const EMBER_DATA = Array.from({ length: 18 }, (_, i) => ({
-    id: i,
-    left: `${Math.random() * 100}%`,
-    delay: `${Math.random() * 8}s`,
-    duration: `${6 + Math.random() * 8}s`,
-    size: 2 + Math.random() * 3,
-    opacity: 0.3 + Math.random() * 0.5,
-}));
-
-const EmberParticles = () => {
-    return (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-[1]" aria-hidden="true">
-            {EMBER_DATA.map(e => (
-                <div
-                    key={e.id}
-                    className="ember animate-ember"
-                    style={{
-                        left: e.left,
-                        bottom: '-5px',
-                        width: `${e.size}px`,
-                        height: `${e.size}px`,
-                        animationDelay: e.delay,
-                        animationDuration: e.duration,
-                        opacity: e.opacity,
-                    }}
-                />
-            ))}
-        </div>
-    );
-};
-
-const FLAG_FRAMES = ['ambient_flag_0', 'ambient_flag_1', 'ambient_flag_2', 'ambient_flag_3'] as const;
-
-const prefersReducedMotion = () =>
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-const AnimatedSprite = ({
-    frames,
-    intervalMs = 160,
-    className = '',
-    alt = '',
-}: {
-    frames: readonly string[];
-    intervalMs?: number;
-    className?: string;
-    alt?: string;
-}) => {
-    const [frameIndex, setFrameIndex] = useState(0);
-
-    useEffect(() => {
-        if (frames.length <= 1 || prefersReducedMotion()) return;
-        const timer = window.setInterval(() => {
-            setFrameIndex(index => (index + 1) % frames.length);
-        }, intervalMs);
-        return () => window.clearInterval(timer);
-    }, [frames, intervalMs]);
-
-    return (
-        <img
-            src={`/sprites/${frames[frameIndex]}.png`}
-            alt={alt}
-            aria-hidden={alt === '' ? true : undefined}
-            className={className}
-            draggable={false}
-        />
-    );
-};
-
-/* ═══════════════════════════════════════
-   Main Lobby Component
-   ═══════════════════════════════════════ */
 const TIPS = [
     '💡 Use beams as roofs to deflect projectiles!',
     '🏰 Stone blocks resist more damage than wood',
@@ -119,8 +45,6 @@ export const Lobby = ({
 }: LobbyProps) => {
     const [joinCode, setJoinCode] = useState('');
     const [isReady, setIsReady] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [tipIndex, setTipIndex] = useState(0);
     const [missionDayKey, setMissionDayKey] = useState(() => String(getUtcDayStartMs(new Date())));
     const [missionToast, setMissionToast] = useState<string | null>(null);
@@ -190,17 +114,28 @@ export const Lobby = ({
             if (claimToastTimeoutRef.current) {
                 clearTimeout(claimToastTimeoutRef.current);
             }
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
         };
     }, []);
 
-    // Parallax mouse tracking
-    const handleMouseMove = useCallback((e: React.MouseEvent) => {
-        if (!containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width - 0.5; // -0.5 to 0.5
-        const y = (e.clientY - rect.top) / rect.height - 0.5;
-        setMousePos({ x, y });
-    }, []);
+    useEffect(() => {
+        if (!battlePending) return;
+        const timeout = window.setTimeout(() => setBattlePending(false), 8000);
+        return () => window.clearTimeout(timeout);
+    }, [battlePending]);
+
+    const handleBattle = () => {
+        if (battlePending) return;
+        setBattlePending(true);
+        playBoom();
+        if (battleMode === 'solo') {
+            track('room_created', { mode: 'single' });
+            onCreateRoom(playerName, 'single');
+        } else {
+            track('queue_joined');
+            onJoinQueue(playerName);
+        }
+    };
 
     const handleJoinSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -274,487 +209,214 @@ export const Lobby = ({
         }
     };
 
-    // ─── Waiting Room View — VS Card ───
     if (roomState) {
         const isSinglePlayer = roomState.opponentName === 'Training Bot';
+        const contenderSides = [roomState.side, roomState.side === 'left' ? 'right' : 'left'] as const;
+        const contenders = contenderSides.map(side => {
+            const isLocalPlayer = side === roomState.side;
+            return {
+                side,
+                connected: isLocalPlayer || roomState.opponentConnected,
+                name: isLocalPlayer ? (playerName || 'Knight') : roomState.opponentConnected ? (roomState.opponentName || 'Challenger') : 'Awaiting...',
+            };
+        });
 
         return (
-            <div className="flex-1 w-full flex items-center justify-center p-4 sm:p-6 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #0f0e17 50%, #1a1a2e 100%)' }}>
-                {/* Subtle stars */}
-                <div className="stars-layer absolute inset-0 opacity-40" />
-                <EmberParticles />
-
-                <div className="w-full max-w-lg text-center relative z-10">
-                    {/* Title */}
-                    <div className="flex items-center justify-center gap-3 mb-6">
-                        <SpriteIcon name="ui_battle_cannons" size={32} />
-                        <h2 className="text-2xl sm:text-3xl font-bold text-[var(--gold)] font-heading text-glow-gold">
-                            {isSinglePlayer ? 'Training Grounds' : 'War Room'}
-                        </h2>
-                        <SpriteIcon name="ui_battle_cannons" size={32} className="scale-x-[-1]" />
-                    </div>
-
-                    {/* Room Code for PvP */}
-                    {!isSinglePlayer && (
-                        <>
-                            <div className="flex items-center justify-center gap-3 mb-2">
-                                <div className="text-4xl font-mono font-bold text-[var(--gold)] tracking-[0.3em] select-all text-glow-gold">
-                                    {roomState.roomId}
+            <div className="cartoon-lobby">
+                <RoyalMenuStage variant="room">
+                    <section className={`menu-controls menu-ready-room${isSinglePlayer ? ' menu-ready-room--solo' : ''}`} data-side={roomState.side} data-king-character={kingReactions.identity(roomState.side)} aria-labelledby="ready-room-title">
+                        <h2 id="ready-room-title">{isSinglePlayer ? 'Training Grounds' : 'War Room'}</h2>
+                        {!isSinglePlayer && (
+                            <div className="menu-invite">
+                                <span className="menu-field-label">Room code</span>
+                                <div className="menu-invite-code">
+                                    <strong>{roomState.roomId}</strong>
+                                    <button type="button" className="menu-icon-button" onClick={() => handleCopyCode(roomState.roomId)} title="Copy invite link" aria-label="Copy invite link">
+                                        {codeCopied ? <Check size={20} /> : <Copy size={20} />}
+                                    </button>
+                                    <button type="button" className="menu-icon-button" onClick={() => handleShare(roomState.roomId)} title="Share invite link" aria-label="Share invite link">
+                                        <Share2 size={20} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => handleCopyCode(roomState.roomId)}
-                                    title="Copy invite link"
-                                    className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg border transition-all duration-200 touch-manipulation ${
-                                        codeCopied
-                                            ? 'text-[var(--emerald)] border-[rgba(46,204,113,0.4)] bg-[rgba(46,204,113,0.1)]'
-                                            : 'text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--gold)] hover:border-[var(--border-accent)] hover:bg-[var(--bg-elevated)]'
-                                    }`}
-                                >
-                                    {codeCopied ? <Check size={16} /> : <Copy size={16} />}
-                                </button>
-                            </div>
-                            <button
-                                onClick={() => handleShare(roomState.roomId)}
-                                className="btn-blue min-h-[40px] px-4 py-2 rounded-lg text-sm mb-4 flex items-center justify-center gap-2"
-                            >
-                                <SpriteIcon name="ui_room_key" size={18} />
-                                <span>Share Invite Link</span>
-                            </button>
-                            <p className="text-xs text-[var(--text-secondary)] mb-6">
-                                {codeCopied ? '✓ Link copied!' : 'Send the link to your opponent'}
-                            </p>
-                        </>
-                    )}
-
-                    {/* VS Card */}
-                    <div className="card-dark rounded-2xl p-5 sm:p-6 mb-5" style={{ border: '1px solid rgba(255, 215, 0, 0.15)' }}>
-                        <div className="flex items-center justify-between gap-3">
-                            {/* Player Card */}
-                            <div className="flex-1 flex flex-col items-center gap-2">
-                                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl"
-                                    style={{ background: 'linear-gradient(135deg, rgba(46, 204, 113, 0.2), rgba(46, 204, 113, 0.05))', border: '2px solid rgba(46, 204, 113, 0.4)' }}>
-                                    <SpriteIcon name="avatar_king" size={54} />
-                                </div>
-                                <span className="text-sm sm:text-base font-bold text-[var(--text-primary)] font-display truncate max-w-[120px]">
-                                    {playerName || 'Knight'}
-                                </span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full font-display tracking-wider"
-                                    style={{ background: 'rgba(46, 204, 113, 0.15)', color: 'var(--emerald)', border: '1px solid rgba(46, 204, 113, 0.3)' }}>
-                                    {roomState.side.toUpperCase()}
-                                </span>
-                            </div>
-
-                            {/* VS Badge */}
-                            <div className="relative flex items-center justify-center">
-                                <div className="absolute w-16 h-16 rounded-full opacity-30 animate-pulse" style={{ background: 'radial-gradient(circle, var(--gold), transparent 70%)' }} />
-                                <div className="w-12 h-12 rounded-full flex items-center justify-center font-heading text-lg font-bold text-[var(--gold)] z-10"
-                                    style={{ background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.05))', border: '2px solid rgba(255, 215, 0, 0.4)', boxShadow: '0 0 20px rgba(255, 215, 0, 0.15)' }}>
-                                    VS
-                                </div>
-                            </div>
-
-                            {/* Opponent Card */}
-                            <div className="flex-1 flex flex-col items-center gap-2">
-                                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl ${!roomState.opponentConnected ? 'animate-pulse' : ''}`}
-                                    style={{ background: roomState.opponentConnected ? 'linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(231, 76, 60, 0.05))' : 'linear-gradient(135deg, rgba(100, 100, 100, 0.2), rgba(100, 100, 100, 0.05))', border: `2px solid ${roomState.opponentConnected ? 'rgba(231, 76, 60, 0.4)' : 'rgba(100, 100, 100, 0.3)'}` }}>
-                                    {roomState.opponentConnected
-                                        ? <SpriteIcon name={isSinglePlayer ? 'avatar_engineer' : 'avatar_opponent'} size={54} />
-                                        : <div className="w-6 h-6 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
-                                    }
-                                </div>
-                                <span className={`text-sm sm:text-base font-bold font-display truncate max-w-[120px] ${roomState.opponentConnected ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
-                                    {roomState.opponentConnected ? (roomState.opponentName || 'Challenger') : 'Awaiting...'}
-                                </span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full font-display tracking-wider"
-                                    style={{ background: 'rgba(231, 76, 60, 0.15)', color: 'var(--crimson)', border: '1px solid rgba(231, 76, 60, 0.3)' }}>
-                                    {roomState.side === 'left' ? 'RIGHT' : 'LEFT'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Tip Carousel */}
-                    <div className="text-xs sm:text-sm text-[var(--text-secondary)] mb-5 h-6 flex items-center justify-center transition-opacity duration-500"
-                        style={{ fontStyle: 'italic' }}>
-                        {TIPS[tipIndex]}
-                    </div>
-
-                    {/* Ready Button */}
-                    {roomState.opponentConnected && (
-                        <button
-                            onClick={handleReady}
-                            disabled={isReady}
-                            autoFocus
-                            className={`w-full max-w-sm mx-auto min-h-[52px] py-3.5 rounded-xl text-lg touch-manipulation
-                                transition-all duration-300
-                                ${isReady
-                                    ? 'card-dark text-[var(--emerald)] border-[var(--emerald)] cursor-default'
-                                    : 'btn-emerald cursor-pointer animate-pulse-subtle'
-                                }`}
-                        >
-                            {isReady ? (
-                                <span className="flex items-center justify-center gap-2 font-bold">
-                                    <Check size={22} /> READY FOR BATTLE
-                                </span>
-                            ) : (
-                                <span className="flex items-center justify-center gap-2 font-bold">
-                                    <SpriteIcon name="ui_ready_shield" size={24} /> READY FOR BATTLE
-                                </span>
-                            )}
-                        </button>
-                    )}
-                </div>
-            </div>
-        );
-    }
-
-    // ─── Queue View ───
-    if (queuePosition !== null) {
-        return (
-            <div className="flex-1 w-full flex items-center justify-center p-6 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #0a0a12 0%, #0f0e17 50%, #1a1a2e 100%)' }}>
-                <div className="stars-layer absolute inset-0 opacity-40" />
-
-                <div className="w-full text-center relative z-10">
-                    <div className="w-12 h-12 border-2 border-[var(--gold)] border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-                    <h2 className="text-2xl font-bold text-[var(--gold)] mb-3 font-heading text-glow-gold">Seeking Challenger...</h2>
-                    <p className="text-base text-[var(--text-secondary)]">Queue position: {queuePosition + 1}</p>
-                    <button
-                        onClick={() => { track('queue_left'); onLeaveQueue(); }}
-                        className="mt-6 btn-medieval min-h-[48px] px-8 py-3 rounded-xl text-base"
-                    >
-                        Retreat
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    // ─── Main Lobby — Royal Landing Page ───
-    return (
-        <div
-            ref={containerRef}
-            onMouseMove={handleMouseMove}
-            className="parallax-container royal-landing flex-1 w-full flex flex-col items-center"
-        >
-            {/* ═══ ROYAL ART LAYERS ═══ */}
-            <div
-                className="stars-layer parallax-layer"
-                style={{ transform: `translate(${mousePos.x * -5}px, ${mousePos.y * -5}px)` }}
-            />
-
-            <div
-                className="absolute inset-x-0 top-0 h-[50%] pointer-events-none animate-horizon-pulse"
-                style={{
-                    background: 'radial-gradient(ellipse 45% 32% at 50% 10%, rgba(255, 215, 0, 0.12) 0%, transparent 70%)',
-                    transform: `translate(${mousePos.x * -3}px, ${mousePos.y * -2}px)`,
-                }}
-            />
-
-            <div className="shooting-star shooting-star-1" />
-            <div className="shooting-star shooting-star-2" />
-            <div className="shooting-star shooting-star-3" />
-
-            <div
-                className="landing-moon"
-                aria-hidden="true"
-                style={{ transform: `translate(${mousePos.x * -4}px, ${mousePos.y * -2}px)` }}
-            />
-            <div
-                className="landing-horizon-silhouette"
-                aria-hidden="true"
-                style={{ transform: `translate(calc(-50% + ${mousePos.x * -6}px), ${mousePos.y * -3}px)` }}
-            />
-            <img
-                src="/sprites/landing_gate_arch.png"
-                alt=""
-                aria-hidden="true"
-                className="landing-art landing-gate"
-                style={{ transform: `translate(calc(-50% + ${mousePos.x * 5}px), ${mousePos.y * 3}px)` }}
-                draggable={false}
-            />
-            <img
-                src="/sprites/landing_castle_left.png"
-                alt=""
-                aria-hidden="true"
-                className="landing-art landing-castle-left"
-                style={{ transform: `translate(${mousePos.x * -12}px, ${mousePos.y * -4}px)` }}
-                draggable={false}
-            />
-            <img
-                src="/sprites/landing_castle_right.png"
-                alt=""
-                aria-hidden="true"
-                className="landing-art landing-castle-right"
-                style={{ transform: `translate(${mousePos.x * 12}px, ${mousePos.y * -4}px)` }}
-                draggable={false}
-            />
-            <img
-                src="/sprites/landing_wall_segment.png"
-                alt=""
-                aria-hidden="true"
-                className="landing-art landing-wall"
-                draggable={false}
-            />
-            <img
-                src="/sprites/landing_platform_edge.png"
-                alt=""
-                aria-hidden="true"
-                className="landing-art landing-platform"
-                draggable={false}
-            />
-            <img
-                src="/sprites/landing_fog_bank.png"
-                alt=""
-                aria-hidden="true"
-                className="landing-art landing-fog landing-fog-a"
-                draggable={false}
-            />
-            <img
-                src="/sprites/landing_fog_bank.png"
-                alt=""
-                aria-hidden="true"
-                className="landing-art landing-fog landing-fog-b"
-                draggable={false}
-            />
-
-            <AnimatedSprite frames={FLAG_FRAMES} intervalMs={320} className="landing-ambient landing-flag-left" />
-            <AnimatedSprite frames={FLAG_FRAMES} intervalMs={300} className="landing-ambient landing-flag-right" />
-            <img src="/sprites/ambient_smoke_2.png" alt="" aria-hidden="true" className="landing-ambient landing-smoke landing-smoke-left" draggable={false} />
-            <img src="/sprites/ambient_smoke_3.png" alt="" aria-hidden="true" className="landing-ambient landing-smoke landing-smoke-right" draggable={false} />
-
-            <div
-                className="absolute bottom-0 left-0 right-0 h-[30%] pointer-events-none z-[4] animate-fog-drift"
-                style={{
-                    background: 'linear-gradient(0deg, rgba(7, 7, 16, 0.96) 0%, rgba(7, 7, 16, 0.48) 42%, transparent 100%)',
-                }}
-            />
-
-            <EmberParticles />
-
-            {/* ═══ CONTENT ═══ */}
-            <div className="relative z-10 flex flex-col items-center flex-1 w-full max-w-lg px-5 py-6 sm:py-9">
-
-                {/* Logo & Branding — animated entrance */}
-                <div className="royal-title-lockup flex flex-col items-center mb-5 sm:mb-7">
-                    <div className="relative mb-2 animate-crown-drop">
-                        <div className="absolute inset-0 blur-xl bg-[var(--gold)] opacity-20 rounded-full scale-150" />
-                        <SpriteIcon name="logo_crown" size={76} className="relative" alt="" />
-                    </div>
-
-                    <div className="flex items-center justify-center gap-1.5 sm:gap-2 w-full">
-                        <SpriteIcon name="logo_flourish_left" size={76} className="hidden sm:inline-block opacity-85" />
-                        <h1
-                            className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wide font-heading text-glow-gold title-shimmer-text whitespace-nowrap"
-                            aria-label="FORTRESS AI"
-                        >
-                            {'FORTRESS AI'.split('').map((char, i) => (
-                                <span
-                                    key={i}
-                                    className="animate-letter-rise inline-block"
-                                    style={{ animationDelay: `${0.2 + i * 0.05}s` }}
-                                >
-                                    {char === ' ' ? '\u00A0' : char}
-                                </span>
-                            ))}
-                        </h1>
-                        <SpriteIcon name="logo_flourish_right" size={76} className="hidden sm:inline-block opacity-85" />
-                    </div>
-
-                    <img
-                        src="/sprites/logo_divider.png"
-                        alt=""
-                        aria-hidden="true"
-                        className="royal-title-divider my-2 animate-subtitle-fade"
-                        draggable={false}
-                    />
-
-                    <p className="text-xs sm:text-sm text-[var(--text-secondary)] font-display tracking-wider animate-subtitle-fade">
-                        CASTLE WAR · BUILD & CONQUER
-                    </p>
-                </div>
-
-                {/* Action Panel */}
-                <div className="royal-menu-panel w-full flex flex-col gap-3">
-                    {/* Player Name */}
-                    <label htmlFor="player-name-input" className="sr-only">Player name</label>
-                    <input
-                        id="player-name-input"
-                        type="text"
-                        value={playerName}
-                        onChange={(e) => onPlayerNameChange(e.target.value)}
-                        placeholder="Enter thy name..."
-                        maxLength={20}
-                        autoComplete="nickname"
-                        className="input-medieval royal-input-frame w-full rounded-xl px-4 py-3.5 text-center text-base sm:text-lg font-bold tracking-wide touch-manipulation"
-                    />
-
-                    {/* Mode Selector — segmented control */}
-                    <div className="royal-segmented flex w-full rounded-xl overflow-hidden border border-[var(--border-subtle)]" role="radiogroup" aria-label="Game mode">
-                        <button
-                            role="radio"
-                            aria-checked={battleMode === 'solo'}
-                            onClick={() => { setBattleMode('solo'); playSwitch(); }}
-                            className={`flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide transition-all duration-200 touch-manipulation
-                                ${battleMode === 'solo'
-                                    ? 'bg-[var(--gold)] text-[var(--bg-deepest)]'
-                                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
-                                }`}
-                        >
-                            <SpriteIcon name="ui_solo" size={20} />
-                            Solo
-                        </button>
-                        <button
-                            role="radio"
-                            aria-checked={battleMode === 'pvp'}
-                            onClick={() => { setBattleMode('pvp'); playSwitch(); }}
-                            className={`flex-1 min-h-[44px] py-2.5 flex items-center justify-center gap-2 text-sm font-bold tracking-wide transition-all duration-200 touch-manipulation
-                                ${battleMode === 'pvp'
-                                    ? 'bg-[var(--gold)] text-[var(--bg-deepest)]'
-                                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
-                                }`}
-                        >
-                            <SpriteIcon name="ui_pvp" size={20} />
-                            PvP
-                        </button>
-                    </div>
-
-                    {/* BATTLE Button */}
-                    <button
-                        disabled={battlePending}
-                        onClick={() => {
-                            if (battlePending) return;
-                            setBattlePending(true);
-                            playBoom();
-                            if (battleMode === 'solo') {
-                                track('room_created', { mode: 'single' });
-                                onCreateRoom(playerName, 'single');
-                            } else {
-                                track('queue_joined');
-                                onJoinQueue(playerName);
-                            }
-                        }}
-                        className="royal-primary-button group w-full min-h-[52px] py-3.5 sm:py-4 rounded-xl text-base sm:text-lg font-bold touch-manipulation
-                            flex items-center justify-center gap-2.5
-                            bg-gradient-to-b from-emerald-500 to-emerald-700 text-white
-                            border border-emerald-400/30
-                            shadow-lg shadow-emerald-900/30
-                            hover:from-emerald-400 hover:to-emerald-600
-                            active:scale-[0.98] transition-all duration-200"
-                    >
-                        <img src="/sprites/ambient_button_shine.png" alt="" aria-hidden="true" className="royal-button-shine" draggable={false} />
-                        <SpriteIcon name="ui_battle_cannons" size={24} />
-                        <span>BATTLE</span>
-                        <span className="text-xs opacity-70 font-normal ml-1">
-                            {battleMode === 'solo' ? '· vs Bot' : '· Find Opponent'}
-                        </span>
-                    </button>
-
-                    <div className="landing-preview-strip" aria-label="Gameplay loop">
-                        {[
-                            { icon: 'preview_prompt', label: 'Prompt' },
-                            { icon: 'preview_blueprint', label: 'Fortress' },
-                            { icon: 'preview_fire', label: 'Cannon' },
-                        ].map((step, index, items) => (
-                            <div className="landing-preview-item" key={step.icon}>
-                                <SpriteIcon name={step.icon} size={36} />
-                                <span>{step.label}</span>
-                                {index < items.length - 1 && <span className="landing-preview-arrow" aria-hidden="true">&gt;</span>}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Join by Room Code — always visible */}
-                    <form onSubmit={handleJoinSubmit} className="flex gap-2 w-full">
-                        <label htmlFor="room-code-input" className="sr-only">Room code</label>
-                        <input
-                            id="room-code-input"
-                            type="text"
-                            value={joinCode}
-                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                            placeholder="ROOM CODE"
-                            maxLength={6}
-                            autoComplete="off"
-                            className="input-medieval royal-input-frame min-w-0 flex-1 rounded-xl px-3 py-3 text-center text-sm font-mono font-bold uppercase tracking-[0.15em] touch-manipulation"
-                        />
-                        <button
-                            type="submit"
-                            disabled={joinCode.trim().length < 4}
-                            className="btn-medieval royal-secondary-button shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-sm touch-manipulation
-                                flex items-center gap-1.5
-                                disabled:opacity-30 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                        >
-                            <SpriteIcon name="ui_room_key" size={18} />
-                            Join
-                        </button>
-                    </form>
-
-                    {/* How to Play */}
-                    <div className="card-dark royal-accordion-panel rounded-xl overflow-hidden">
-                        <button
-                            onClick={() => setShowHowToPlay(!showHowToPlay)}
-                            aria-expanded={showHowToPlay}
-                            aria-controls="how-to-play-content"
-                            className="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors touch-manipulation"
-                        >
-                            <span className="flex items-center gap-2 font-display font-bold tracking-wider">
-                                <SpriteIcon name="ui_howto_scroll" size={18} />
-                                HOW TO PLAY
-                            </span>
-                            {showHowToPlay ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
-                        </button>
-                        {showHowToPlay && (
-                            <div id="how-to-play-content" className="px-4 pb-4 text-xs text-[var(--text-secondary)] flex flex-col gap-3 animate-scale-in">
-                                <div className="flex gap-3 items-start">
-                                    <span className="text-lg leading-none mt-0.5" aria-hidden="true">🏗️</span>
-                                    <div>
-                                        <p className="font-bold text-[var(--emerald)] mb-0.5">1. Build Phase (90s)</p>
-                                        <p>Design your fortress! Place blocks manually by clicking on your side, or describe your fortress to the AI architect using the prompt bar. Protect your King at all costs.</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-3 items-start">
-                                    <span className="text-lg leading-none mt-0.5" aria-hidden="true">👁️</span>
-                                    <div>
-                                        <p className="font-bold text-[var(--gold)] mb-0.5">2. Reveal Phase (5s)</p>
-                                        <p>The camera pans across the battlefield, revealing both fortresses and any environmental hazards.</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-3 items-start">
-                                    <span className="text-lg leading-none mt-0.5" aria-hidden="true">💥</span>
-                                    <div>
-                                        <p className="font-bold text-[var(--crimson)] mb-0.5">3. Combat Phase (25s/turn)</p>
-                                        <p>Take turns firing cannonballs! Drag to aim and release to fire. Destroy the enemy King to win the round. First to win 2 rounds wins the match.</p>
-                                    </div>
-                                </div>
-                                <div className="border-t border-[var(--border-subtle)] pt-2 mt-1">
-                                    <p className="font-bold text-[var(--text-primary)] mb-1.5">Materials</p>
-                                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                                        <span><span aria-hidden="true">🪵</span> <b>Wood</b> — 30 HP, high grip</span>
-                                        <span><span aria-hidden="true">🪨</span> <b>Stone</b> — 80 HP, heavy</span>
-                                        <span><span aria-hidden="true">🧊</span> <b>Ice</b> — 15 HP, slippery</span>
-                                        <span><span aria-hidden="true">⚫</span> <b>Rubber</b> — 40 HP, bouncy</span>
-                                        <span><span aria-hidden="true">⚙️</span> <b>Steel</b> — 200 HP, very dense</span>
-                                    </div>
-                                </div>
-                                <div className="border-t border-[var(--border-subtle)] pt-2">
-                                    <p className="font-bold text-[var(--text-primary)] mb-1.5">Controls</p>
-                                    <div className="grid grid-cols-1 gap-1 text-[10px]">
-                                        <span><span aria-hidden="true">🖱️</span> <b>Click</b> to place blocks during build phase</span>
-                                        <span><span aria-hidden="true">🎯</span> <b>Drag</b> on the cannon to aim, release to fire</span>
-                                        <span><span aria-hidden="true">⌨️</span> <b>A/D</b> to pan camera · <b>↑↓</b> to adjust power · <b>Space</b> to fire</span>
-                                        <span><span aria-hidden="true">🤖</span> <b>Set an API key</b> and type a prompt to let AI build your fortress</span>
-                                    </div>
-                                </div>
+                                <p role="status">{codeCopied ? 'Link copied!' : 'Send the link to your opponent'}</p>
                             </div>
                         )}
-                    </div>
+                        <div className="menu-versus">
+                            {contenders.map((contender, index) => (
+                                <div key={contender.side} className="menu-contender" data-side={contender.side} data-king-character={kingReactions.identity(contender.side)}>
+                                    {index === 1 && <span className="menu-vs" aria-label="versus">VS</span>}
+                                    {contender.connected
+                                        ? <img src={kingReactions.url('idle', contender.side)} alt="" data-side={contender.side} data-king-identity={kingReactions.identity(contender.side)} className="menu-portrait" draggable={false} />
+                                        : <div className="menu-portrait menu-portrait--waiting"><LoaderCircle className="menu-spinner" size={28} aria-label="Waiting for opponent" /></div>}
+                                    <strong title={contender.name}>{contender.name}</strong>
+                                    <span className="menu-side-label">{contender.side.toUpperCase()}</span>
+                                </div>
+                            ))}
+                        </div>
+                        {roomState.opponentConnected && (
+                            <button type="button" onClick={handleReady} disabled={isReady} autoFocus data-side={roomState.side} data-king-character={kingReactions.identity(roomState.side)} className="menu-battle-button menu-ready-button">
+                                {isReady ? <Check size={22} aria-hidden="true" /> : <Swords size={22} aria-hidden="true" />}
+                                READY FOR BATTLE
+                            </button>
+                        )}
+                        <p className="menu-battle-tip"><Target size={16} aria-hidden="true" /><span>{TIPS[tipIndex]}</span></p>
+                    </section>
+                </RoyalMenuStage>
+            </div>
+        );
+    }
 
+    if (queuePosition !== null) {
+        return (
+            <div className="cartoon-lobby">
+                <RoyalMenuStage variant="queue">
+                    <section className="menu-controls menu-queue" aria-labelledby="queue-title">
+                        <Users size={28} aria-hidden="true" />
+                        <h2 id="queue-title">Seeking Challenger...</h2>
+                        <div className="menu-queue-status" role="status">
+                            <LoaderCircle className="menu-spinner" size={22} aria-hidden="true" />
+                            <span>Queue position: {queuePosition + 1}</span>
+                        </div>
+                        <button type="button" onClick={() => { track('queue_left'); setBattlePending(false); onLeaveQueue(); }} className="menu-secondary-button">
+                            <ArrowLeft size={18} aria-hidden="true" /> Retreat
+                        </button>
+                    </section>
+                </RoyalMenuStage>
+            </div>
+        );
+    }
+
+    return (
+        <div className="cartoon-lobby">
+            <RoyalMenuStage>
+                <div className="menu-controls">
+                    <div className="menu-field">
+                        <label htmlFor="player-name-input">Player name</label>
+                        <div className="menu-input-wrap">
+                            <UserRound aria-hidden="true" />
+                            <input id="player-name-input" type="text" value={playerName}
+                                onChange={(e) => onPlayerNameChange(e.target.value)}
+                                placeholder="Enter your name" maxLength={20} autoComplete="nickname" />
+                        </div>
+                    </div>
+                    <div className="menu-mode-switch" role="radiogroup" aria-label="Game mode"
+                        onKeyDown={(event) => {
+                            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+                            event.preventDefault();
+                            const mode = event.key === 'Home' ? 'solo' : event.key === 'End' ? 'pvp' : battleMode === 'solo' ? 'pvp' : 'solo';
+                            setBattleMode(mode);
+                            playSwitch();
+                            event.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${mode}"]`)?.focus();
+                        }}>
+                        <button type="button" role="radio" data-mode="solo" aria-checked={battleMode === 'solo'} tabIndex={battleMode === 'solo' ? 0 : -1}
+                            onClick={() => { setBattleMode('solo'); playSwitch(); }}>
+                            <Bot size={18} aria-hidden="true" /> Solo
+                        </button>
+                        <button type="button" role="radio" data-mode="pvp" aria-checked={battleMode === 'pvp'} tabIndex={battleMode === 'pvp' ? 0 : -1}
+                            onClick={() => { setBattleMode('pvp'); playSwitch(); }}>
+                            <Users size={18} aria-hidden="true" /> PvP
+                        </button>
+                    </div>
+                    <button type="button" disabled={battlePending} onClick={handleBattle} className="menu-battle-button" aria-busy={battlePending}>
+                        {battlePending ? <LoaderCircle className="menu-spinner" size={20} aria-hidden="true" /> : <Swords size={20} aria-hidden="true" />}
+                        <span>BATTLE</span>
+                        <span className="menu-battle-detail">{battleMode === 'solo' ? 'vs Bot' : 'Find Opponent'}</span>
+                    </button>
+                    <form onSubmit={handleJoinSubmit} className="menu-field">
+                        <div className="menu-join-label">
+                            <label htmlFor="room-code-input">Room code</label>
+                            {battleMode === 'pvp' && (
+                                <button type="button" className="menu-create-room" disabled={battlePending}
+                                    onClick={() => {
+                                        if (battlePending) return;
+                                        setBattlePending(true);
+                                        playClick();
+                                        track('room_created', { mode: 'pvp' });
+                                        onCreateRoom(playerName, 'pvp');
+                                    }}>
+                                    <Plus size={14} aria-hidden="true" /> Create room
+                                </button>
+                            )}
+                        </div>
+                        <div className="menu-join-row">
+                            <div className="menu-input-wrap">
+                                <KeyRound aria-hidden="true" />
+                                <input id="room-code-input" type="text" value={joinCode}
+                                    onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                                    placeholder="ROOM CODE" maxLength={6} autoComplete="off" autoCapitalize="characters" spellCheck={false} />
+                            </div>
+                            <button type="submit" disabled={joinCode.trim().length < 4} className="menu-secondary-button">
+                                <Link2 size={22} aria-hidden="true" /> Join
+                            </button>
+                        </div>
+                    </form>
+                    <div className="menu-howto">
+                        <button type="button" onClick={() => setShowHowToPlay(!showHowToPlay)}
+                            aria-expanded={showHowToPlay} aria-controls="how-to-play-content" className="menu-howto-toggle">
+                            <BookOpen size={18} aria-hidden="true" />
+                            <span>How to Play</span>
+                            {showHowToPlay ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
+                        </button>
+                    </div>
+                </div>
+            </RoyalMenuStage>
+            {showHowToPlay && (
+                <section id="how-to-play-content" className="menu-howto-content" aria-label="How to Play">
+                    <div className="flex gap-3 items-start">
+                        <Hammer size={18} aria-hidden="true" />
+                        <div>
+                            <p className="font-bold text-[var(--emerald)] mb-0.5">1. Build Phase (90s)</p>
+                            <p>Design your fortress! Place blocks manually by clicking on your side, or describe your fortress to the AI architect using the prompt bar. Protect your King at all costs.</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                        <Eye size={18} aria-hidden="true" />
+                        <div>
+                            <p className="font-bold text-[var(--gold)] mb-0.5">2. Reveal Phase (5s)</p>
+                            <p>The camera pans across the battlefield, revealing both fortresses and any environmental hazards.</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                        <Crosshair size={18} aria-hidden="true" />
+                        <div>
+                            <p className="font-bold text-[var(--crimson)] mb-0.5">3. Combat Phase (25s/turn)</p>
+                            <p>Take turns firing cannonballs! Drag to aim and release to fire. Destroy the enemy King to win the round. First to win 2 rounds wins the match.</p>
+                        </div>
+                    </div>
+                    <div className="border-t border-[var(--border-subtle)] pt-2 mt-1">
+                        <p className="font-bold text-[var(--text-primary)] mb-1.5">Materials</p>
+                        <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                            <span><span aria-hidden="true">🪵</span> <b>Wood</b> — 30 HP, high grip</span>
+                            <span><span aria-hidden="true">🪨</span> <b>Stone</b> — 80 HP, heavy</span>
+                            <span><span aria-hidden="true">🧊</span> <b>Ice</b> — 15 HP, slippery</span>
+                            <span><span aria-hidden="true">⚫</span> <b>Rubber</b> — 40 HP, bouncy</span>
+                            <span><span aria-hidden="true">⚙️</span> <b>Steel</b> — 200 HP, very dense</span>
+                        </div>
+                    </div>
+                    <div className="border-t border-[var(--border-subtle)] pt-2">
+                        <p className="font-bold text-[var(--text-primary)] mb-1.5">Controls</p>
+                        <div className="grid grid-cols-1 gap-1 text-[10px]">
+                            <span><span aria-hidden="true">🖱️</span> <b>Click</b> to place blocks during build phase</span>
+                            <span><span aria-hidden="true">🎯</span> <b>Drag</b> on the cannon to aim, release to fire</span>
+                            <span><span aria-hidden="true">⌨️</span> <b>A/D</b> to pan camera · <b>↑↓</b> to adjust power · <b>Space</b> to fire</span>
+                            <span><span aria-hidden="true">🤖</span> <b>Set an API key</b> and type a prompt to let AI build your fortress</span>
+                        </div>
+                    </div>
+                </section>
+            )}
+            {playerProfile && (
+                <details className="menu-progression">
+                    <summary className="menu-campaign-heading">
+                        <h2 id="campaign-title"><Trophy size={20} aria-hidden="true" /> Your campaign</h2>
+                        <span><Gift size={16} aria-hidden="true" /> Rewards <ChevronDown size={16} aria-hidden="true" /></span>
+                    </summary>
                     {/* Player Profile & History */}
                     {playerProfile && (
-                        <div className="mt-2">
-                            <RankBadge profile={playerProfile} showProgress />
+                        <div className="menu-progression-grid">
+                            <div className="menu-rank-summary"><RankBadge profile={playerProfile} showProgress /></div>
 
                             {/* Daily Check-in */}
-                            <div className="mt-2 card-dark rounded-xl p-3">
+                            <div className="menu-progress-section">
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                                         <Calendar size={12} />
@@ -808,7 +470,7 @@ export const Lobby = ({
                             </div>
 
                             {gamification && (
-                                <div className="mt-2 card-dark rounded-xl p-3">
+                                <div className="menu-progress-section">
                                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Campaign Board</p>
                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                         <div className="rounded-lg p-2" style={{ background: 'rgba(255,215,0,0.06)' }}>
@@ -833,7 +495,7 @@ export const Lobby = ({
                                 </div>
                             )}
                             {dailyMissions && (
-                                <div className="mt-2 card-dark rounded-xl p-3">
+                                <div className="menu-progress-section">
                                     <div className="flex items-center justify-between mb-2">
                                         <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                                             <Target size={12} />
@@ -887,7 +549,7 @@ export const Lobby = ({
 
                             {/* Weekly Challenges */}
                             {weeklyChallenges && (
-                                <div className="mt-2 card-dark rounded-xl p-3">
+                                <div className="menu-progress-section">
                                     <div className="flex items-center justify-between mb-2">
                                         <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                                             <Trophy size={12} />
@@ -939,13 +601,13 @@ export const Lobby = ({
                             )}
 
                             {missionToast && (
-                                <div className="mt-2 rounded-lg px-3 py-2 text-xs text-center font-bold border border-[rgba(46,204,113,0.35)] text-[var(--emerald)]" style={{ background: 'rgba(46,204,113,0.12)' }}>
+                                <div role="status" className="menu-reward-toast" style={{ background: 'rgba(46,204,113,0.12)' }}>
                                     {missionToast}
                                 </div>
                             )}
 
                             {/* Achievements Panel */}
-                            <div className="mt-2 card-dark rounded-xl p-3">
+                            <div className="menu-progress-section">
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-1">
                                         <Star size={12} />
@@ -983,7 +645,7 @@ export const Lobby = ({
                             </div>
 
                             {playerProfile.history.length > 0 && (
-                                <div className="mt-2 card-dark rounded-xl p-3">
+                                <div className="menu-progress-section">
                                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Recent Battles</p>
                                     <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
                                         {playerProfile.history.slice(0, 5).map((entry, i) => (
@@ -1001,8 +663,8 @@ export const Lobby = ({
                             )}
                         </div>
                     )}
-                </div>
-            </div>
+                </details>
+            )}
         </div>
     );
 };

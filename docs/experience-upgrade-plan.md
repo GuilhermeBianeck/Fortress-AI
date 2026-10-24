@@ -1,6 +1,6 @@
 # Fortress AI: Playing Experience And Graphics Upgrade
 
-Status: original investigation below, plus a first playable cartoon integration. Current implementation and verification are tracked in `docs/cartoon-v1-verification.md`; the wider roadmap is not complete.
+Status: original investigation below, plus playable cartoon integration, two distinct royals, material-specific combat effects and the user's reference-driven illustrated menu and battlefield. V6 playtest corrections and the living-character roadmap are in `asset-workbench/living-kings-v6/verification.md`. Battle art/HUD verification is in `asset-workbench/battle-v5/verification.md`; original menu/audio checks are in `asset-workbench/royal-menu-v4/verification.md`. Earlier milestones remain in `docs/cartoon-v1-verification.md`, `asset-workbench/cartoon-v2/verification.md` and `asset-workbench/cartoon-v3/verification.md`. The wider roadmap is not complete. The latest user-provided interface supersedes the earlier minimal-menu styling recommendation below.
 Audit date: 2026-10-19. Baseline: `e127edd`.
 Chosen art direction: **bright cartoon artillery**, selected by the user during this audit.
 
@@ -249,4 +249,6 @@ DDTank's official presentation emphasizes ballistic play, a colorful character s
 
 Fortress AI should compete on precision, expressive characters, clear destruction and effortless mobile controls. Its differentiator is the player's own fortress design, with AI as a useful architect. It does not need to match a mature game's entire content catalog to prove a compelling first encounter.
 
-Recommended next implementation: **Milestone A plus the king/cannon art approval from Milestone B**. Review one real portrait and landscape encounter together before expanding the art or gameplay roster.
+Current progress: the first viewport/control/trajectory fixes are integrated, and the bright king/cannon art now appears in both menu and match. V2 adds registered reaction poses; V3 refines the centered menu, adds the distinct Ivory rival with matching poses, and improves muzzle/material feedback. Physical-device and reliability gates from Milestone A remain open.
+
+Recommended next implementation: **authoritative shot acceptance/origin contracts and a physical-phone baseline**, then a dense collapse/audio/character-animation pass. Muzzle and material feedback now have a tested first implementation; do not treat this as completion of all encounter or networking gates.

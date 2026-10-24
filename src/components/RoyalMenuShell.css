@@ -1,0 +1,100 @@
+.menu-shell {
+  position: relative;
+  background: #7ec3ec !important;
+}
+
+.menu-shell .menu-header {
+  position: absolute;
+  inset: max(12px, env(safe-area-inset-top, 0px)) 16px auto;
+  height: 58px;
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.menu-shell .menu-header > div:first-child {
+  min-height: 54px;
+  padding: 5px 17px 5px 6px;
+  gap: 9px;
+  color: #fff1bb;
+  background: #102c3d;
+  border: 2px solid #e2b14d;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 2px #4f493a, 0 3px 3px #28313d5c;
+  pointer-events: auto;
+}
+
+.menu-shell .menu-header > div:first-child > div:first-child {
+  padding: 5px !important;
+  background: #172d3b !important;
+  border: 1px solid #b59046 !important;
+  border-radius: 4px;
+}
+
+.menu-shell .menu-header .font-heading {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 19px;
+  color: #ffe39a;
+  letter-spacing: 0;
+}
+
+.menu-shell .menu-header .font-mono {
+  font-size: 10px;
+  color: #fff5dc;
+}
+
+.menu-shell .menu-header > div:last-child {
+  pointer-events: auto;
+}
+
+.menu-shell .menu-header button {
+  color: #fff4cd;
+  border-color: #b98b32 !important;
+  background: #112c3d !important;
+}
+
+.menu-shell .menu-header button[aria-label$='sounds'] {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  padding: 8px;
+  border: 2px solid #e4bc60;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 2px #4f493a, 0 3px 3px #28313d5c;
+}
+
+.menu-shell .menu-header button[aria-label$='sounds'] svg {
+  width: 26px;
+  height: 26px;
+}
+
+.menu-shell .menu-header button:hover { filter: brightness(1.15); }
+.menu-shell .menu-header button:focus-visible { outline: 3px solid #fff5b6; outline-offset: 3px; }
+
+@media (max-width: 600px), (max-height: 500px) {
+  .menu-shell .menu-header {
+    inset: max(6px, env(safe-area-inset-top, 0px)) 8px auto;
+    height: 44px;
+  }
+  .menu-shell .menu-header > div:first-child {
+    min-height: 40px;
+    padding: 3px 10px 3px 4px;
+    gap: 5px;
+  }
+  .menu-shell .menu-header > div:first-child > div:first-child { padding: 2px !important; }
+  .menu-shell .menu-header > div:first-child img { width: 22px !important; height: 22px !important; }
+  .menu-shell .menu-header .font-heading { font-size: 11px; line-height: 14px; }
+  .menu-shell .menu-header .font-mono { font-size: 8px; }
+  .menu-shell .menu-header button[aria-label$='sounds'] { width: 44px; height: 44px; }
+  .menu-shell .menu-header button[aria-label$='sounds'] svg { width: 23px; height: 23px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-shell .menu-header .animate-pulse { animation: none; }
+}

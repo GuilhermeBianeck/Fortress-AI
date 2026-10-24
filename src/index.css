@@ -96,6 +96,7 @@ body {
 .game-shell .game-header,
 .game-shell .game-build-dock,
 .game-shell .game-phase-row,
+.game-shell .game-phase-result,
 .game-shell .game-desktop-chat,
 .game-shell .game-chat-modal {
   --bg-deepest: #f4f8f4;
@@ -234,6 +235,46 @@ body {
   padding: 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  background: rgba(47, 78, 74, 0.28);
+}
+
+.battle-result .text-glow-gold,
+.battle-result .text-glow-ember { text-shadow: none; }
+
+.battle-result,
+.battle-result :is(.font-heading, .font-display, button) {
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+.battle-result .btn-primary,
+.battle-result .btn-emerald {
+  background: #247e75;
+  color: #fff;
+  border: 1px solid #1b625e;
+  text-shadow: none;
+  box-shadow: 0 2px 0 #1b625e;
+}
+
+.battle-result .btn-blue,
+.battle-result .btn-medieval {
+  background: #e2eee8;
+  color: #2a5660;
+  border: 1px solid #a7c5b8;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+.battle-result :is(.btn-primary, .btn-emerald):hover {
+  background: #1c6b64;
+  box-shadow: 0 2px 0 #174f4b;
+  transform: none;
+}
+
+.battle-result :is(.btn-blue, .btn-medieval):hover {
+  background: #d5e7de;
+  box-shadow: none;
+  transform: none;
 }
 
 .game-shell .game-phase-result > .game-phase-content {

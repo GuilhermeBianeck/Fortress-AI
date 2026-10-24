@@ -14,7 +14,13 @@
     "generate:sprites": "tsx scripts/generate-sprites.ts",
     "import:sprites": "tsx scripts/import-chatgpt-sprites.ts",
     "prepare:cartoon": "tsx scripts/prepare-cartoon-assets.ts",
-    "test:game": "tsx --test src/game/*.test.ts src/hooks/gameStateSnapshot.test.ts"
+    "prepare:reactions": "tsx scripts/prepare-king-reactions.ts",
+    "prepare:rival": "tsx scripts/prepare-rival-king.ts",
+    "prepare:royal-menu": "tsx scripts/prepare-royal-menu.ts",
+    "prepare:battle-art": "tsx scripts/prepare-battle-art.ts",
+    "prepare:living-kings": "tsx scripts/prepare-living-kings.ts",
+    "prepare:menu-audio": "tsx scripts/prepare-menu-audio.ts",
+    "test:game": "tsx --test src/game/*.test.ts src/effects/*.test.ts src/audio/*.test.ts src/hooks/gameStateSnapshot.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -81,6 +81,7 @@ export const GodTools = ({
                     type="button"
                     onClick={() => onModeChange('build')}
                     aria-pressed={gameMode === 'build'}
+                    title="Build fortress"
                 >
                     <Hammer size={16} aria-hidden="true" />
                     Build
@@ -90,6 +91,7 @@ export const GodTools = ({
                     // The existing 'fire' mode only inspects while the phase is 'build'.
                     onClick={() => onModeChange('fire')}
                     aria-pressed={gameMode === 'fire'}
+                    title="Inspect battlefield"
                 >
                     <Eye size={16} aria-hidden="true" />
                     Inspect
@@ -111,6 +113,7 @@ export const GodTools = ({
                                 aria-label={mat.label}
                                 title={MATERIAL_TIPS[mat.key]}
                                 className="game-tool-button"
+                                data-material={mat.key}
                             >
                                 <span
                                     aria-hidden="true"
@@ -136,6 +139,7 @@ export const GodTools = ({
                                 aria-label={shape.label}
                                 title={shape.label}
                                 className="game-tool-button"
+                                data-shape={shape.key}
                             >
                                 <Icon size={24} aria-hidden="true" />
                             </button>

@@ -3,10 +3,12 @@ import { Swords, Crown, Skull, RotateCcw, Wind, Eye, Hammer, Clock, Flame, Alert
 import type { MatchPhase, Side, MatchScores, PlayerProfile } from '../types';
 import { getRankTier, getNextRankProgress, getUnlockedAchievements, getPerformanceGrade, PERFORMANCE_GRADE_COLORS, ACHIEVEMENT_RARITY_COLORS, getUtcDayStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS } from '../types';
 import { track } from '../analytics/tracker';
+import { kingReactions } from '../sprites/kingReactions';
 interface PhaseOverlayProps {
     phase: MatchPhase;
     phaseEndsAt: number | null;
     turnPlayer: Side | null;
+    shotInFlight?: boolean;
     mySide: Side;
     matchResult: { winner: Side; reason: string } | null;
     playerNames?: { left: string; right: string };
@@ -22,7 +24,7 @@ interface PhaseOverlayProps {
     prevPlayerProfile?: PlayerProfile | null;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [botDots, setBotDots] = useState(1);
 
@@ -60,26 +62,26 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
     // Build phase banner
     if (phase === 'build') {
         return (
-            <div className="w-full relative pointer-events-none">
-                {/* Build Banner - Centered, inline timer */}
-                <div role="status" aria-live="polite" aria-atomic="true" className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border border-[rgba(39,174,96,0.3)] pointer-events-auto shadow-2xl text-center" style={{ background: 'var(--phase-banner-bg, rgba(22, 33, 62, 0.85))' }}>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                        <Hammer size={14} className="text-[var(--emerald)]" aria-hidden="true" />
-                        <span className="text-[var(--emerald)] font-bold text-xs sm:text-sm font-display">
-                            {currentRound ? `R${currentRound} — ` : ''}BUILD
+            <div className="battle-phase-wrap">
+                <div role="status" aria-live="polite" aria-atomic="true" className="battle-phase-banner battle-phase-build">
+                    <div className="battle-phase-heading">
+                        <Hammer size={21} aria-hidden="true" />
+                        <span className="battle-phase-title">
+                            BUILD YOUR FORTRESS
                         </span>
                         {displayTimeLeft !== null && (
                             <span
                                 aria-label={`${Math.floor(displayTimeLeft / 60)} minutes ${displayTimeLeft % 60} seconds remaining`}
-                                className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${displayTimeLeft <= 10 ? 'timer-urgent' : 'text-[var(--text-secondary)]'}`}
+                                className={`battle-phase-time ${displayTimeLeft <= 10 ? 'timer-urgent' : ''}`}
+                                aria-live="off"
                             >
                                 {Math.floor(displayTimeLeft / 60)}:{String(displayTimeLeft % 60).padStart(2, '0')}
                             </span>
                         )}
                     </div>
                     {roundScore && (
-                        <span className="text-[var(--gold-dim)] text-[10px] sm:text-xs font-medium tracking-wider" aria-label={`Score: left ${roundScore.left}, right ${roundScore.right}`}>
-                            {roundScore.left} — {roundScore.right}
+                        <span className="battle-phase-score" aria-label={`Round ${currentRound ?? 1}. Score: left ${roundScore.left}, right ${roundScore.right}`}>
+                            R{currentRound ?? 1} &middot; {roundScore.left} : {roundScore.right}
                         </span>
                     )}
                 </div>
@@ -95,15 +97,14 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
             falling_rocks: 'Falling Rocks',
         };
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-                <div role="status" aria-live="polite" className="rounded-xl px-5 sm:px-8 py-3 sm:py-4 backdrop-blur-xl text-center border border-[var(--border-accent)] pointer-events-auto shadow-2xl" style={{ background: 'var(--phase-banner-bg, rgba(22, 33, 62, 0.9))' }}>
-                    <div className="flex items-center justify-center gap-2">
-                        <Eye size={16} className="text-[var(--gold)]" aria-hidden="true" />
-                        <span className="text-[var(--gold)] font-bold text-sm sm:text-base font-display">REVEALING KINGDOMS</span>
+            <div className="battle-phase-wrap">
+                <div role="status" aria-live="polite" className="battle-phase-banner battle-phase-reveal">
+                    <div className="battle-phase-heading">
+                        <Eye size={21} aria-hidden="true" />
+                        <span className="battle-phase-title">REVEALING KINGDOMS</span>
                     </div>
-                    <p className="text-[10px] sm:text-xs text-[var(--text-muted)] mt-0.5">The scout surveys the battlefield...</p>
                     {hazards && hazards.length > 0 && (
-                        <p className="text-xs text-[var(--ember)] mt-1 flex items-center justify-center gap-1">
+                        <p className="battle-phase-hazards">
                             <AlertTriangle size={12} aria-hidden="true" />
                             Hazards: {hazards.map(h => hazardNames[h.type] || h.type).join(', ')}
                         </p>
@@ -120,27 +121,24 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const windHazard = hazards?.find(h => h.type === 'wind_zone');
         const botDotStr = '.'.repeat(botDots);
         return (
-            <div className="w-full relative pointer-events-none">
-                {/* Combat Banner - Centered, inline timer */}
-                <div role="status" aria-live="polite" aria-atomic="true" className={`absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center gap-0.5 sm:gap-1 rounded-xl px-4 sm:px-8 py-2 sm:py-2.5 backdrop-blur-xl border pointer-events-auto shadow-2xl text-center ${isMyTurn
-                    ? 'border-[rgba(192,57,43,0.4)]'
-                    : 'border-[var(--border-subtle)]'
-                    }`} style={{ background: isMyTurn ? 'var(--phase-own-bg, rgba(192,57,43,0.12))' : 'var(--phase-banner-bg, rgba(22, 33, 62, 0.85))' }}>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                        {isMyTurn ? <Flame size={14} className="text-[var(--crimson)]" /> : <Clock size={14} className="text-[var(--text-muted)]" />}
-                        <span className={`font-bold text-xs sm:text-sm font-display ${isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}>
-                            {isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? `BOT AIMING${botDotStr}` : "OPPONENT'S TURN")}
+            <div className="battle-phase-wrap">
+                <div role="status" aria-live="polite" aria-atomic="true" className={`battle-phase-banner ${isMyTurn ? 'battle-phase-own' : 'battle-phase-opponent'}`}>
+                    <div className="battle-phase-heading">
+                        {isMyTurn ? <Flame size={21} aria-hidden="true" /> : <Clock size={21} aria-hidden="true" />}
+                        <span className="battle-phase-title">
+                            {shotInFlight ? 'SHOT IN FLIGHT' : isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? <>BOT AIMING<span className="battle-bot-dots" aria-hidden="true">{botDotStr}</span></> : "OPPONENT'S TURN")}
                         </span>
                         {displayTimeLeft !== null && (
                             <span
                                 aria-label={`${displayTimeLeft} seconds remaining`}
-                                className={`font-mono font-bold text-xs sm:text-sm ml-1 transition-all duration-300 ${displayTimeLeft <= 5 ? 'timer-urgent' : isMyTurn ? 'text-[var(--crimson)]' : 'text-[var(--text-muted)]'}`}
+                                className={`battle-phase-time ${displayTimeLeft <= 5 ? 'timer-urgent' : ''}`}
+                                aria-live="off"
                             >
                                 {displayTimeLeft}s
                             </span>
                         )}
                     </div>
-                    {roundScore && <span className="text-[var(--text-secondary)] text-[10px] font-medium" aria-label={`Round ${currentRound ?? 1}. Score: left ${roundScore.left}, right ${roundScore.right}`}>
+                    {roundScore && <span className="battle-phase-score" aria-label={`Round ${currentRound ?? 1}. Score: left ${roundScore.left}, right ${roundScore.right}`}>
                         R{currentRound ?? 1} &middot; {roundScore.left} : {roundScore.right}
                     </span>}
                     {/* Wind Indicator — inline with turn banner */}
@@ -148,8 +146,8 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         const windSpeed = Math.round((windHazard.windStrength ?? 0.0003) * 20000);
                         const windLabel = windSpeed < 4 ? 'Light' : windSpeed < 8 ? 'Moderate' : 'Strong';
                         return (
-                            <div className="flex items-center gap-1 text-[10px] font-bold" style={{ color: 'rgba(52,152,219,0.9)' }}>
-                                <Wind size={11} />
+                            <div className="battle-phase-wind">
+                                <Wind size={18} aria-hidden="true" />
                                 <span>{(windHazard.windDirection ?? 1) > 0 ? '→' : '←'} {windLabel} Wind</span>
                             </div>
                         );
@@ -198,11 +196,11 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
         const isFirstWinOfDay = isWinner && prevDailyWins === 0 && currDailyWins >= 1;
 
         return (
-            <div className="flex items-center justify-center w-full">
-                <div className={`rounded-2xl px-5 sm:px-8 py-4 sm:py-6 backdrop-blur-xl border text-center shadow-2xl w-full max-w-sm ${isWinner
+            <div className="battle-result-wrap flex items-center justify-center w-full">
+                <div className={`battle-result rounded-lg px-5 sm:px-8 py-4 sm:py-6 border text-center shadow-2xl w-full max-w-sm ${isWinner
                     ? 'border-[var(--border-accent)]'
                     : 'border-[rgba(192,57,43,0.4)]'
-                    }`} style={{ background: isWinner ? 'rgba(22, 33, 62, 0.95)' : 'rgba(22, 20, 30, 0.95)' }}>
+                    }`}>
 
                     {/* Header row: Grade + Result + AI badge */}
                     <div className="flex items-center justify-between mb-2 gap-2 animate-fade-in" style={{ animationDelay: '0ms', animationFillMode: 'backwards' }}>
@@ -216,14 +214,23 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                         )}
 
                         {/* Victory / Defeat */}
-                        <div className="flex-1">
-                            <div className={`text-lg sm:text-2xl font-bold font-heading ${isWinner ? 'text-[var(--gold)] text-glow-gold' : 'text-[var(--crimson)] text-glow-ember'}`}>
+                        <div className="flex-1 min-w-0">
+                            <img
+                                src={kingReactions.url(isWinner ? 'victory' : 'defeat', mySide)}
+                                alt={isWinner ? 'Victorious king' : 'Defeated king'}
+                                data-king-pose={isWinner ? 'victory' : 'defeat'}
+                                data-king-character={kingReactions.identity(mySide)}
+                                width={64}
+                                height={80}
+                                className="mx-auto object-contain mb-1"
+                            />
+                            <h2 className={`text-lg sm:text-2xl font-bold font-heading ${isWinner ? 'text-[var(--gold)] text-glow-gold' : 'text-[var(--crimson)] text-glow-ember'}`}>
                                 <span className="flex items-center justify-center gap-1.5">
                                     {isWinner ? <Crown size={22} /> : <Skull size={22} />}
                                     {isWinner ? 'VICTORY' : 'DEFEAT'}
                                 </span>
-                            </div>
-                            <p className="text-[10px] sm:text-xs text-[var(--text-secondary)]">{winnerName} conquers!</p>
+                            </h2>
+                            <p className="text-[10px] sm:text-xs text-[var(--text-secondary)] break-words">{winnerName} conquers!</p>
                             {roundScore && (
                                 <p className="text-[10px] text-[var(--text-muted)]">Rounds: {roundScore.left}–{roundScore.right}</p>
                             )}
@@ -385,7 +392,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                     )}
 
                     {/* Actions — challenge + new game */}
-                    <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] flex flex-col gap-2 items-center">
+                    <div className="battle-result-actions mt-2 pt-2 border-t border-[var(--border-subtle)] flex flex-col gap-2 items-center">
                         <button
                             onClick={() => {
                                 track('challenge_friend');
@@ -395,14 +402,14 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, mySide, matchResu
                                     navigator.clipboard.writeText(window.location.origin).catch(() => {});
                                 }
                             }}
-                            className="btn-blue min-h-[40px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5"
+                            className="btn-blue min-h-[44px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5"
                         >
                             <Swords size={13} />
                             Challenge a Friend
                         </button>
                         <button
                             onClick={() => { track('return_to_lobby'); onReturnToLobby?.(); }}
-                            className="btn-medieval min-h-[40px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5"
+                            className="btn-medieval min-h-[44px] px-5 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5"
                         >
                             <Home size={13} />
                             New Game

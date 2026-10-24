@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import Matter from 'matter-js';
 import { MatchStateMachine, type MatchCallbacks } from '../MatchStateMachine';
 import type { KingState, Side } from '../../types';
+import { COMBAT_TURN_DURATION_MS } from '../../config/constants';
 
 // Mock Socket.io
 function createMockIo() {
@@ -146,7 +147,7 @@ describe('MatchStateMachine', () => {
         });
 
         it('auto-switches turn when timer expires', () => {
-            vi.advanceTimersByTime(15_000);
+            vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
             expect(sm.getCurrentTurn()).toBe('right');
         });
     });
@@ -166,7 +167,7 @@ describe('MatchStateMachine', () => {
 
             sm.startCombatPhase();
             // Let the turn timer expire to trigger projectile settled check
-            vi.advanceTimersByTime(15_000);
+            vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
 
             expect(callbacks.onRoundEnd).toHaveBeenCalledWith('right', 'king_destroyed');
         });
@@ -184,7 +185,7 @@ describe('MatchStateMachine', () => {
             vi.useFakeTimers();
 
             sm.startCombatPhase();
-            vi.advanceTimersByTime(15_000);
+            vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
 
             expect(callbacks.onRoundEnd).toHaveBeenCalledWith('left', 'king_destroyed');
         });
@@ -203,7 +204,7 @@ describe('MatchStateMachine', () => {
 
             sm.startCombatPhase();
             // left is attacker (first turn)
-            vi.advanceTimersByTime(15_000);
+            vi.advanceTimersByTime(COMBAT_TURN_DURATION_MS);
 
             expect(callbacks.onRoundEnd).toHaveBeenCalledWith('left', 'both_kings_destroyed');
         });
