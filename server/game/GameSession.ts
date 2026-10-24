@@ -503,10 +503,8 @@ export class GameSession {
     }
 
     handleForfeit(): void {
-        // Stop the game loop and state machine
-        this.destroyed = true;
-        this.botAI?.destroy();
-        this.stateMachine.destroy();
+        // Keep the final world readable for results, but release every ticking resource.
+        this.destroy();
     }
 
     destroy() {

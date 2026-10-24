@@ -8,6 +8,7 @@ import { canPlace } from './placement';
 import { kingPresentation } from './kingAnimation';
 import { kingReactions } from '../sprites/kingReactions';
 import { drawLivingKing } from './livingKing';
+import type { KingActionPose } from './kingActions';
 import { CANNON_ART, MUZZLE_LOCAL } from './cannonPresentation';
 import { battleArt, type BattleArtName } from '../sprites/battleArt';
 import { gradeBackgroundPixels, groundTextureColumn, healthPanel, sceneryPlacement } from './battlePresentation';
@@ -46,6 +47,7 @@ export interface BattleFrame {
     shot?: { side: Side; at: number; angle: number };
     ghost?: Vector;
     projectileId?: number | null;
+    kingActions?: Partial<Record<Side, KingActionPose>>;
     placementDimensions: readonly [number, number];
 }
 
@@ -346,7 +348,9 @@ function entities(ctx: CanvasRenderingContext2D, f: BattleFrame) {
         if (b.label === 'king') {
             const kingSide = Math.abs(x - (f.kings.left.x ?? 300)) < Math.abs(x - (f.kings.right.x ?? 2100)) ? 'left' : 'right';
             const hit = [...f.effects].reverse().find(e => e.kind === 'damage' && e.side === kingSide);
-            const presentation = kingPresentation({ now: f.now, side: kingSide, phase: f.phase, winner: f.winner, hitAt: hit?.at, reducedMotion: f.reducedMotion });
+            const action = f.kingActions?.[kingSide];
+            const presentation = kingPresentation({ now: f.now, side: kingSide, phase: f.phase, winner: f.winner,
+                hitAt: hit?.at, resultAt: action?.resultAt, reducedMotion: f.reducedMotion });
             const king = kingReactions.get(presentation.pose, kingSide);
             const facing = kingSide === 'left' ? 1 : -1;
             const radius = b.circleRadius || 16;
@@ -355,12 +359,16 @@ function entities(ctx: CanvasRenderingContext2D, f: BattleFrame) {
             ctx.save();
             ctx.translate(0, radius);
             ctx.scale(facing, 1);
-            const articulated = presentation.pose === 'idle' && drawLivingKing(ctx, {
+            const opacity = king ? presentation.reactionOpacity : 0;
+            ctx.globalAlpha = 1 - opacity;
+            const articulated = opacity < 1 && drawLivingKing(ctx, {
                 side: kingSide, now: f.now, height: 80, reducedMotion: f.reducedMotion,
                 shootAt: f.shot?.side === kingSide ? f.shot.at : undefined,
-                looking: f.turn === kingSide ? 0.5 : 0,
+                looking: action?.look ?? (f.turn === kingSide ? 0.5 : 0), action,
             });
-            if (!articulated && king) {
+            ctx.globalAlpha = 1;
+            if (king && (presentation.pose !== 'idle' || !articulated)) {
+                ctx.globalAlpha = articulated ? opacity : 1;
                 const scale = 80 / king.height;
                 const pivot = kingReactions.metadata(kingSide).pivot;
                 ctx.scale(1, presentation.scaleY);

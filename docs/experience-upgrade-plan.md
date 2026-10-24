@@ -251,4 +251,6 @@ Fortress AI should compete on precision, expressive characters, clear destructio
 
 Current progress: the first viewport/control/trajectory fixes are integrated, and the bright king/cannon art now appears in both menu and match. V2 adds registered reaction poses; V3 refines the centered menu, adds the distinct Ivory rival with matching poses, and improves muzzle/material feedback. Physical-device and reliability gates from Milestone A remain open.
 
-Recommended next implementation: **authoritative shot acceptance/origin contracts and a physical-phone baseline**, then a dense collapse/audio/character-animation pass. Muzzle and material feedback now have a tested first implementation; do not treat this as completion of all encounter or networking gates.
+V7 adds grounded ready/aim/recoil/brace/recovery blends and server-recorded projectile ownership, and fixes abandoned/forfeited physics-session cleanup. See `docs/king-actions-v7-verification.md`. Full shot acceptance/origin acknowledgments, physical-device baselines and long-session/network gates remain incomplete.
+
+Recommended next implementation: **confirm live backend deployment and establish a physical-phone baseline**, then a small registered expression/hand set and a longer instrumental soundtrack. Do not treat the current gestures as a complete character-animation or networking system.

@@ -97,3 +97,11 @@ test('cache resets do not mutate published snapshots or retain previous-session 
     assert.deepEqual(next.gameState.bodies.map(b => b.id), [3]);
     assert.deepEqual(first.gameState.bodies.map(b => b.id), [1, 2]);
 });
+
+test('projectile ownership survives delta packets after crossing the centre of the map', () => {
+    const first = reconstructGameState(new Map(), packet({ n: [{ ...body(7), label: 'projectile', side: 'right' }] }));
+    const next = reconstructGameState(first.bodyCache, packet({ t: 1050, u: [[7, 600, 400, 0, -20, 2, -1]] }));
+    assert.equal(next.gameState.bodies[0].side, 'right');
+    assert.equal(next.gameState.bodies[0].position.x, 600);
+    assert.equal(first.gameState.bodies[0].position.x, 10);
+});

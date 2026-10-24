@@ -9,6 +9,7 @@ export interface BodyState {
     angle: number;
     velocity: Vector;
     label: string;
+    side?: Side;
     blockHp: number | null;
     blockMaxHp: number | null;
 }

@@ -9,6 +9,7 @@ export interface BodyState {
     angle: number;
     velocity: Vector;
     label: string;
+    side?: Side;
     isStatic: boolean;
     width: number;
     height: number;

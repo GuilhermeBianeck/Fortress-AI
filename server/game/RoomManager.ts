@@ -158,6 +158,13 @@ export class RoomManager {
         // Clear rematch requests on disconnect
         room.rematchRequests.delete(socketId);
 
+        // A bot is not a connected player. Stop abandoned solo simulations immediately.
+        if (![...room.players.keys()].some(id => !id.startsWith('bot-'))) {
+            this.disposeRoom(room);
+            this.socketUuids.delete(socketId);
+            return;
+        }
+
         // If match was in progress, opponent wins by forfeit
         if (room.session && room.phase !== 'lobby' && room.phase !== 'result') {
             const remainingPlayer = Array.from(room.players.values())[0];
@@ -179,12 +186,6 @@ export class RoomManager {
                 side: playerInfo.side,
                 reason: 'disconnected',
             });
-        }
-
-        // Clean up empty rooms
-        if (room.players.size === 0) {
-            room.session?.destroy();
-            this.rooms.delete(roomId);
         }
 
         this.socketUuids.delete(socketId);
@@ -422,12 +423,20 @@ export class RoomManager {
         }
     }
 
+    private disposeRoom(room: Room): void {
+        room.session?.destroy();
+        for (const id of room.players.keys()) {
+            if (this.playerRoomMap.get(id) === room.id) this.playerRoomMap.delete(id);
+            this.socketUuids.delete(id);
+        }
+        room.players.clear();
+        room.rematchRequests.clear();
+        this.rooms.delete(room.id);
+    }
+
     private cleanupStaleRooms(): void {
-        for (const [roomId, room] of this.rooms.entries()) {
-            if (room.players.size === 0) {
-                room.session?.destroy();
-                this.rooms.delete(roomId);
-            }
+        for (const room of this.rooms.values()) {
+            if (![...room.players.keys()].some(id => !id.startsWith('bot-'))) this.disposeRoom(room);
         }
     }
 

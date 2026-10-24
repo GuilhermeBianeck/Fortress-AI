@@ -6,6 +6,24 @@ import { GameLoop } from '../loop';
 describe('snapshot pacing', () => {
     afterEach(() => vi.useRealTimers());
 
+    it('sends authoritative projectile ownership in initial and full-sync metadata', () => {
+        vi.useFakeTimers();
+        const engine = Matter.Engine.create();
+        engine.gravity.scale = 0;
+        const ball = Matter.Bodies.circle(2100, 400, 9, { label: 'projectile' }) as Matter.Body & { side: 'right' };
+        ball.side = 'right';
+        Matter.Composite.add(engine.world, ball);
+        const emit = vi.fn();
+        const loop = new GameLoop(engine, { to: () => ({ emit }) } as unknown as Server, 'owner-room');
+        try {
+            loop.start(); vi.advanceTimersByTime(3200);
+            const packets = emit.mock.calls.filter(call => call[0] === 'gameState').map(call => call[1]);
+            expect(packets[0].n.find((body: { id: number }) => body.id === ball.id).side).toBe('right');
+            const full = packets.find(packet => packet.f === 1);
+            expect(full.n.find((body: { id: number }) => body.id === ball.id).side).toBe('right');
+        } finally { loop.stop(); Matter.Engine.clear(engine); }
+    });
+
     it('keeps a 20Hz deadline on 16ms simulation intervals instead of drifting to 15Hz', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-10-19T12:00:00Z'));

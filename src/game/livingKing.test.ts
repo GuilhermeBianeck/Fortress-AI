@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import manifest from '../../asset-workbench/living-kings-v6/manifest.json';
 import { livingKingState, livingKingAttachments, drawLivingKing, registerLivingKingImage, type LivingKingPart } from './livingKing';
+import { KingActionDirector, type KingActionPose } from './kingActions';
 
 test('elapsed time is deterministic, finite and phase-offset between the two characters', () => {
     const left = livingKingState({ side: 'left', now: 1600 });
@@ -97,4 +98,35 @@ test('shot cue moves the arm briefly without shifting boots or producing future 
     assert.deepEqual(livingKingState({ side: 'left', now: 1000, shootAt: 1100 }), base);
     assert.notEqual(livingKingState({ side: 'left', now: 1000, shootAt: 800 }).armAngle, base.armAngle);
     assert.deepEqual(livingKingState({ side: 'left', now: 1000, shootAt: 500 }), base);
+});
+
+test('action clips change upper-body joints without moving feet or separating registered blink heads', () => {
+    for (const side of ['left', 'right'] as const) {
+        const director = new KingActionDirector();
+        director.update({ now: 0, side, phase: 'combat', turn: side, king: { x: 600, y: 480 }, projectiles: [], aimAngle: Math.PI / 3, reducedMotion: false });
+        const action = director.update({ now: 300, side, phase: 'combat', turn: side, king: { x: 600, y: 480 }, projectiles: [], aimAngle: Math.PI / 3, reducedMotion: false });
+        const active = livingKingAttachments({ side, now: 300, action });
+        const idle = livingKingAttachments({ side, now: 300 });
+        assert.deepEqual(active.find(part => part.part === 'body'), idle.find(part => part.part === 'body'));
+        assert.ok(Math.abs(active.find(part => part.part === 'arm')!.angle - idle.find(part => part.part === 'arm')!.angle) > .2);
+        const open = active.find(part => part.part === 'head_open')!;
+        const closed = active.find(part => part.part === 'head_closed')!;
+        assert.deepEqual({ ...open, part: '' }, { ...closed, part: '' });
+        assert.deepEqual(livingKingState({ side, now: 300, reducedMotion: true, action }), livingKingState({ side, now: 0, reducedMotion: true }));
+    }
+});
+
+test('joint clips stay within modest rotations and chest/neck/shoulder bounds', () => {
+    for (const mode of ['ready', 'aim', 'recoil', 'brace', 'recover'] as const) for (const side of ['left', 'right'] as const) {
+        const action: KingActionPose = { mode, ready: 0, aim: 0, recoil: 0, brace: 0, recover: 0, look: 1, aimPitch: 1, threat: 0, [mode]: 1 };
+        for (const now of [0, 1600, 2750, 6100, 11400]) {
+            const state = livingKingState({ side, now, action, looking: action.look });
+            assert.ok(Math.abs(state.armAngle) < .3);
+            assert.ok(Math.abs(state.headTilt) < .1);
+            assert.ok(Math.abs(state.capeAngle) < .08);
+            assert.ok(state.chestScaleY > .96 && state.chestScaleY < 1.03);
+            assert.ok(state.headY > -1 && state.headY < 4.2);
+            assert.ok(state.shoulderY > -.6 && state.shoulderY < 3.1);
+        }
+    }
 });

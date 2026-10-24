@@ -19,5 +19,12 @@ test('reduced motion keeps all key poses but freezes their transforms', () => {
         const state = kingPresentation({ now: 1200, side: 'left', winner, phase: 'result', reducedMotion: true });
         assert.equal(state.scaleY, 1); assert.equal(state.tilt, 0);
     }
-    assert.deepEqual(kingPresentation({ now: 1200, side: 'left', phase: 'combat', hitAt: 1000, reducedMotion: true }), { pose: 'hit', scaleY: 1, tilt: 0 });
+    assert.deepEqual(kingPresentation({ now: 1200, side: 'left', phase: 'combat', hitAt: 1000, reducedMotion: true }), { pose: 'hit', scaleY: 1, tilt: 0, reactionOpacity: 1 });
+});
+test('reaction artwork blends in and out at the same grounded pivot', () => {
+    const at = (now: number) => kingPresentation({ now, side: 'left', phase: 'combat', hitAt: 1000 }).reactionOpacity;
+    assert.equal(at(1000), 0); assert.equal(at(1090), 1);
+    assert.ok(at(1450) > 0 && at(1450) < 1); assert.equal(at(1480), 0);
+    assert.equal(kingPresentation({ now: 1000, side: 'left', phase: 'result', winner: 'left', resultAt: 1000 }).reactionOpacity, 0);
+    assert.equal(kingPresentation({ now: 1160, side: 'left', phase: 'result', winner: 'left', resultAt: 1000 }).reactionOpacity, 1);
 });

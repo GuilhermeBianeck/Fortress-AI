@@ -1,6 +1,6 @@
 import Matter from 'matter-js';
 import { Server } from 'socket.io';
-import type { KingState } from '../types';
+import type { KingState, Side } from '../types';
 import { MATERIAL_COLORS } from '../config/constants';
 
 /** Matter.js Body with custom game properties used in loop snapshots */
@@ -10,6 +10,7 @@ interface LoopBody extends Matter.Body {
     originalWidth?: number;
     originalHeight?: number;
     circleRadius?: number;
+    side?: Side;
 }
 
 const TICK_RATE = 60;
@@ -119,6 +120,7 @@ export class GameLoop {
                 newBodies.push({
                     id: body.id,
                     label: body.label,
+                    side: (body as LoopBody).side,
                     isStatic: body.isStatic,
                     width,
                     height,

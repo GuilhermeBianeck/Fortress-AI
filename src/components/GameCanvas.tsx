@@ -10,6 +10,7 @@ import { cartoon } from '../sprites/cartoon';
 import { kingReactions } from '../sprites/kingReactions';
 import { livingKings } from '../sprites/livingKings';
 import { livingKingState } from '../game/livingKing';
+import { KingActionDirector, type KingActionPose } from '../game/kingActions';
 import { battleArt } from '../sprites/battleArt';
 import { healthPanel, renderPixelRatio } from '../game/battlePresentation';
 import { PRESENTATION_DELAY_MS, renderedPosition, SnapshotInterpolator, type RenderSnapshot } from '../game/snapshotInterpolation';
@@ -17,7 +18,7 @@ import { kingPresentation } from '../game/kingAnimation';
 import { cannonMuzzle } from '../game/cannonPresentation';
 import { drawBattle, type BattleEffect, type BattleHazard } from '../game/BattleRenderer';
 import { cannonPosition, predictTrajectory } from '../game/ballistics';
-import { kingFeedbackPosition } from '../game/battleFeedback';
+import { kingFeedbackPosition, projectileOwner } from '../game/battleFeedback';
 import { canPlace, PLACEMENT_DIMENSIONS } from '../game/placement';
 import { clampCamera, createViewport, minimapRect, screenToWorld } from '../game/viewport';
 import './GameCanvas.css';
@@ -74,7 +75,9 @@ function GameCanvasInner(props: GameCanvasProps) {
     const trajectory = useRef<Vector[]>([]);
     const particles = useRef(new ParticleSystem());
     const effects = useRef<BattleEffect[]>([]);
-    const shot = useRef<{ side: Side; at: number; angle: number } | undefined>(undefined);
+    const shot = useRef<{ id: number; side: Side; at: number; angle: number } | undefined>(undefined);
+    const kingDirectors = useRef({ left: new KingActionDirector(), right: new KingActionDirector() });
+    const kingActions = useRef<Partial<Record<Side, KingActionPose>>>({});
     const seenProjectiles = useRef(new Set<number>());
     const followedProjectile = useRef<number | null>(null);
     const lastSound = useRef(0);
@@ -140,6 +143,7 @@ function GameCanvasInner(props: GameCanvasProps) {
         if (props.phase === 'build') {
             effects.current = []; seenProjectiles.current.clear(); particles.current.reset(); shot.current = undefined;
             snapshots.current.reset(); presented.current = undefined; presentationEvents.current = [];
+            kingDirectors.current.left.reset(); kingDirectors.current.right.reset(); kingActions.current = {};
             if (props.gameState) snapshots.current.push(props.gameState, performance.now());
             focus(props.kingsHp[props.mySide].x ?? (props.mySide === 'left' ? 300 : 2100));
             camera.current.x = camera.current.target;
@@ -231,10 +235,10 @@ function GameCanvasInner(props: GameCanvasProps) {
                     if (body.label !== 'projectile' || seenProjectiles.current.has(body.id)) continue;
                     seenProjectiles.current.add(body.id);
                     followedProjectile.current = body.id;
-                    const side: Side = p.turnPlayer ?? (body.position.x < WORLD_WIDTH / 2 ? 'left' : 'right');
+                    const side = projectileOwner(body);
                     const facing = side === 'left' ? 1 : -1;
                     const angle = side === p.mySide ? aimRef.current.angle : Math.atan2(-body.velocity.y, body.velocity.x * facing);
-                    shot.current = { side, at: now, angle };
+                    shot.current = { id: body.id, side, at: now, angle };
                     const muzzle = cannonMuzzle(side, angle, p.terrain?.points ?? []);
                     if (!reducedMotion.current) particles.current.emitMuzzle(muzzle.x, muzzle.y, angle, facing);
                     playFire();
@@ -253,12 +257,27 @@ function GameCanvasInner(props: GameCanvasProps) {
                 cam.x += (cam.target - cam.x) * smoothing;
                 particles.current.update(elapsed);
                 effects.current = effects.current.filter(e => now - e.at < (e.kind === 'damage' ? 950 : 420));
+                const balls = renderState?.bodies.filter(body => body.label === 'projectile').map(body => ({
+                    id: body.id, position: renderedPosition(body, transforms), velocity: body.velocity,
+                })) ?? [];
+                for (const side of ['left', 'right'] as const) {
+                    const hp = p.kingsHp[side];
+                    const reference = { x: hp.x ?? (side === 'left' ? 600 : 1800), y: hp.y ?? 480 };
+                    const body = renderState?.bodies.filter(body => body.label === 'king').sort((a, b) =>
+                        Math.hypot(a.position.x - reference.x, a.position.y - reference.y) - Math.hypot(b.position.x - reference.x, b.position.y - reference.y))[0];
+                    const hit = [...effects.current].reverse().find(effect => effect.kind === 'damage' && effect.side === side);
+                    kingActions.current[side] = kingDirectors.current[side].update({ now, side, phase: p.phase, turn: p.turnPlayer,
+                        winner: p.winner, king: body ? renderedPosition(body, transforms) : reference, projectiles: balls,
+                        shot: shot.current, hitAt: hit?.at, reducedMotion: reducedMotion.current,
+                        aimAngle: side === p.mySide ? aimRef.current.angle : shot.current?.side === side ? shot.current.angle : Math.PI / 4 });
+                }
                 drawBattle(ctx, { view: v, camera: cam.x, now, reducedMotion: reducedMotion.current,
                     state: renderState, terrain: p.terrain, transforms, kings: p.kingsHp,
                     names: p.playerNames, side: p.mySide, phase: p.phase, turn: p.turnPlayer, winner: p.winner,
                     angle: aimRef.current.angle, trajectory: trajectory.current, hazards: p.hazards ?? [],
                     effects: effects.current, particles: particles.current, shot: shot.current, ghost: ghost.current,
                     projectileId: followedProjectile.current,
+                    kingActions: kingActions.current,
                     placementDimensions: PLACEMENT_DIMENSIONS[p.selectedShape ?? 'rectangle'] });
                 if (debugVisible) {
                     debugStats.updateFrame(now); debugStats.totalBodies = p.gameState?.bodies.length ?? 0;
@@ -280,10 +299,12 @@ function GameCanvasInner(props: GameCanvasProps) {
                 viewport: view.current, camera: camera.current.x, kings: p.kingsHp, artLoaded: cartoon.loaded,
                 reactionsLoaded: kingReactions.loaded,
                 livingKingsLoaded: livingKings.loaded,
+                kingActions: kingActions.current,
                 livingKingStates: Object.fromEntries((['left', 'right'] as const).map(side => [side, livingKingState({
                     side, now: performance.now(), reducedMotion: reducedMotion.current,
                     shootAt: shot.current?.side === side ? shot.current.at : undefined,
-                    looking: p.turnPlayer === side ? 0.5 : 0,
+                    looking: kingActions.current[side]?.look ?? 0,
+                    action: kingActions.current[side],
                 })])),
                 battleArtLoaded: battleArt.loaded,
                 rendering: { pixelRatio: renderPixelRatio(view.current.width, view.current.height, window.devicePixelRatio), reducedMotion: reducedMotion.current },

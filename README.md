@@ -45,10 +45,10 @@
 
 - **AI Fortress Builder** — Describe any structure in plain English. Gemini 2.5 Flash generates up to 50 physics blocks with material-aware placement.
 - **5 Materials** — Wood, stone, ice, rubber, steel. Each with unique density, friction, bounce, and HP.
-- **Pixel Art** — 39 procedurally generated sprites. Block textures, king character, cannons, explosions, terrain tiles.
+- **Illustrated Battlefield** — Layered scenery, continuous textured terrain, distinct royal characters, articulated king gestures and material-specific effects.
 - **Environmental Hazards** — Wind zones push projectiles. Lava pools deal continuous damage. Falling rocks threaten both sides.
 - **Multiplayer** — Private rooms with shareable invite links, matchmaking queue, or solo vs bot.
-- **Procedural Sound** — All audio synthesized via Web Audio API. Zero audio files in the bundle.
+- **Sound** — Synthesized combat effects, a once-per-visit menu welcome and a lazy-loaded instrumental loop, all following the global mute control.
 - **Mobile Ready** — Touch aiming, responsive layout, works in portrait and landscape.
 
 ## Quick Start
@@ -74,7 +74,7 @@ Open [localhost:5173](http://localhost:5173). Both servers must run simultaneous
 | | Technology |
 |---|---|
 | **Frontend** | React 19, Vite, TypeScript, Tailwind CSS 4, Zustand |
-| **Rendering** | Canvas 2D, pixel art sprites, particle system, animated effects |
+| **Rendering** | Canvas 2D, layered illustrated art, registered cutout rigs, pooled particles |
 | **Backend** | Express 5, Socket.io, TypeScript |
 | **Physics** | Matter.js — server-authoritative, 60Hz simulation, 20Hz delta-encoded broadcast |
 | **AI** | Google Gemini 2.5 Flash — structured JSON output, Zod schema validation |
@@ -138,6 +138,7 @@ scripts/
 | `PORT` | Server port | `3001` |
 | `ALLOWED_ORIGINS` | CORS whitelist (comma-separated) | `localhost` |
 | `ADMIN_KEY` | Auth for `/api/stats` | Optional |
+| `VITE_SERVER_URL` | Frontend build: public Socket.io backend origin | Current hostname on port `3001`; configure for hosted frontend/backend separation |
 
 ## Commands
 
@@ -149,6 +150,8 @@ scripts/
 | `npm run generate:sprites` | Regenerate all 39 pixel art sprites |
 | `npm run test:e2e` | Playwright E2E tests |
 | `npm run test:e2e:headed` | Tests with visible browser |
+| `npm run test:game` | Focused rendering, animation, audio and snapshot tests |
+| `npm run prepare:king-action-qa` | Render registered king action clips at full and runtime sizes |
 
 ## Security
 

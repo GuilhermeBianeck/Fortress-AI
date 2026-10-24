@@ -31,3 +31,9 @@ Run `npx tsx scripts/prepare-living-kings.ts`. The importer checks real alpha, u
 Review `qa/assembly.png`: both kings, three independent time samples, 300px plus 48/72/112px views, aligned foot baselines. This was visually inspected for attachment, complete crowns and complete boots. Browser and actual game integration are performed by Main; no servers or browser were started for this asset task.
 
 This is bounded idle cutout animation, not a walk cycle, facial lip-sync, or a replacement for physical collision bodies. Keep full-body reaction poses and fallbacks.
+
+## V7 Action Integration
+
+The same parts now support blended ready, aim, recoil, brace and recovery gestures through `src/game/kingActions.ts`. Recoil follows the accepted projectile's server-recorded owner. Nearby approaching projectiles prompt independent bracing; damage/result art blends at the same boot anchor. No additional runtime image payload is added.
+
+Run `npm run prepare:king-action-qa` to render `qa/action-clips.png`. Verification and remaining animation work are recorded in `docs/king-actions-v7-verification.md`.
