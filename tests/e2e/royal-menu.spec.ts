@@ -1,8 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-type Voice = { loop: boolean; duration: number; loopStart: number; loopEnd: number; offset: number; start: number; stop: number | null; peak: number };
-type AudioProbe = Window & { menuVoices: Voice[] };
-
 test('royal layers fit the reference stage and freeze with reduced motion', async ({ page }, testInfo) => {
     const failures: string[] = [];
     page.on('pageerror', error => failures.push(error.message));
@@ -41,65 +38,4 @@ test('royal layers fit the reference stage and freeze with reduced motion', asyn
     await page.emulateMedia({ reducedMotion: 'reduce' });
     expect(await page.locator('.menu-viewport *').evaluateAll(elements => elements.every(element => getComputedStyle(element).animationName === 'none'))).toBe(true);
     expect(failures).toEqual([]);
-});
-
-test('welcome plays once, only instrumental music loops, mute never replays the greeting', async ({ page }) => {
-    const requests: string[] = [];
-    page.on('request', request => { if (/royal-menu-(intro|loop)/.test(request.url())) requests.push(request.url()); });
-    await page.addInitScript(() => {
-        localStorage.setItem('fortress_muted', '0');
-        localStorage.setItem('fortress_has_played', '1');
-        const voices: Voice[] = [];
-        (window as AudioProbe).menuVoices = voices;
-        const createSource = AudioContext.prototype.createBufferSource;
-        AudioContext.prototype.createBufferSource = function () {
-            const source = createSource.call(this);
-            const start = source.start.bind(source), stop = source.stop.bind(source);
-            let entry: Voice | undefined;
-            source.start = (...args: Parameters<typeof start>) => {
-                if (source.loop && source.buffer) {
-                    const samples = source.buffer.getChannelData(0);
-                    let peak = 0;
-                    for (let i = 0; i < samples.length; i++) peak = Math.max(peak, Math.abs(samples[i]));
-                    entry = { loop: source.loop, duration: source.buffer.duration, loopStart: source.loopStart, loopEnd: source.loopEnd,
-                        offset: args[1] ?? 0, start: performance.now(), stop: null, peak };
-                    voices.push(entry);
-                }
-                start(...args);
-            };
-            source.stop = (...args: Parameters<typeof stop>) => {
-                if (entry) entry.stop = performance.now();
-                stop(...args);
-            };
-            return source;
-        };
-    });
-    await page.goto('/');
-    await page.waitForTimeout(350);
-    expect(requests).toHaveLength(0);
-    expect(await page.evaluate(() => (window as AudioProbe).menuVoices)).toEqual([]);
-    await page.getByRole('textbox', { name: 'Player name' }).click();
-    const voices = () => page.evaluate(() => (window as AudioProbe).menuVoices);
-    await expect.poll(async () => (await voices()).length).toBe(1);
-    expect((await voices())[0]).toMatchObject({ loop: true, duration: 7.6, loopStart: 6, loopEnd: 7.6, offset: 0, stop: null });
-    expect((await voices())[0].peak).toBeGreaterThan(0.01);
-    // Cross two real loop boundaries; a looping source must not create duplicate voices.
-    await page.waitForTimeout(9600);
-    expect(await voices()).toHaveLength(1);
-    expect((await voices())[0].stop).toBeNull();
-    await page.getByRole('button', { name: 'Mute sounds', exact: true }).click();
-    await expect.poll(async () => (await voices())[0].stop).not.toBeNull();
-    await page.getByRole('button', { name: 'Unmute sounds', exact: true }).click();
-    await expect.poll(async () => (await voices()).length).toBe(2);
-    expect((await voices())[1]).toMatchObject({ duration: 1.6, loopStart: 0, loopEnd: 1.6, stop: null });
-    await page.waitForTimeout(3400);
-    expect(await voices()).toHaveLength(2);
-    await page.getByRole('button', { name: /BATTLE/ }).click();
-    await expect(page.getByRole('button', { name: /READY FOR BATTLE/ })).toBeVisible();
-    expect(await voices()).toHaveLength(2);
-    await page.getByRole('button', { name: /READY FOR BATTLE/ }).click();
-    await expect(page.locator('.battle-canvas')).toBeVisible();
-    await expect.poll(async () => (await voices())[1].stop).not.toBeNull();
-    expect(requests.filter(url => url.includes('royal-menu-intro'))).toHaveLength(1);
-    expect(requests.filter(url => url.includes('royal-menu-loop'))).toHaveLength(1);
 });

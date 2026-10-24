@@ -21,6 +21,7 @@
     "prepare:living-kings": "tsx scripts/prepare-living-kings.ts",
     "prepare:king-action-qa": "tsx scripts/prepare-king-action-qa.ts",
     "prepare:menu-audio": "tsx scripts/prepare-menu-audio.ts",
+    "prepare:theme-audio": "tsx scripts/prepare-theme-audio.ts",
     "test:game": "tsx --test src/game/*.test.ts src/effects/*.test.ts src/audio/*.test.ts src/hooks/gameStateSnapshot.test.ts"
   },
   "dependencies": {

@@ -4,7 +4,7 @@ import { useGameState } from './hooks/useGameState';
 import { GameCanvas } from './components/GameCanvas';
 import { GodTools } from './components/GodTools';
 import { toggleMute, isMuted } from './audio/SoundManager';
-import { setMenuAmbience, disposeMenuAmbience } from './audio/menuAmbience';
+import { setThemeMusic, disposeThemeMusic } from './audio/themeMusic';
 import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
@@ -65,8 +65,8 @@ function App() {
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
 
-  useEffect(() => { setMenuAmbience(!inGame, muted); }, [inGame, muted]);
-  useEffect(() => () => disposeMenuAmbience(), []);
+  useEffect(() => { setThemeMusic(inGame, muted); }, [inGame, muted]);
+  useEffect(() => () => disposeThemeMusic(), []);
 
   // SpriteIcon images load on demand; the battlefield loads its own small art bundle.
   useEffect(() => {
@@ -207,8 +207,11 @@ function App() {
           )}
           {/* Mute toggle */}
           <button
+            type="button"
             onClick={() => setMuted(toggleMute())}
             aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
+            aria-pressed={muted}
+            title={muted ? 'Unmute sounds' : 'Mute sounds'}
             className="min-w-[44px] min-h-[44px] px-1.5 py-1.5 text-xs rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center
               text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]"
           >

@@ -1,34 +1,57 @@
 /**
  * Procedural sound manager using Web Audio API.
- * All sounds are synthesized — zero external audio files.
+ * Effects are synthesized; the shared context also carries streamed theme music.
  * Respects user mute preference (persisted to localStorage).
  */
 
 let ctx: AudioContext | null = null;
-let _muted = localStorage.getItem('fortress_muted') === '1';
+let _muted = false;
+try { _muted = localStorage.getItem('fortress_muted') === '1'; } catch { /* Storage can be unavailable in private browsing. */ }
+const combatListeners = new Set<() => void>();
+const activeEffects = new Set<AudioScheduledSourceNode>();
+function tracked<T extends AudioScheduledSourceNode>(source: T): T {
+    activeEffects.add(source);
+    source.onended = () => { activeEffects.delete(source); };
+    return source;
+}
+export function stopSoundEffects() {
+    for (const source of activeEffects) {
+        try { source.stop(); } catch { /* A scheduled effect may already have ended. */ }
+    }
+    activeEffects.clear();
+}
+export function subscribeCombatSound(listener: () => void) {
+    combatListeners.add(listener);
+    return () => { combatListeners.delete(listener); };
+}
+function combatSound() { for (const listener of combatListeners) listener(); }
 
-function getCtx(): AudioContext | null {
+export function getAudioContext(): AudioContext | null {
     if (_muted) return null;
     if (!ctx) {
         try { ctx = new AudioContext(); } catch { return null; }
     }
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
     return ctx;
 }
+function getCtx() { return typeof document !== 'undefined' && document.visibilityState === 'hidden' ? null : getAudioContext(); }
 
 export function isMuted(): boolean { return _muted; }
 
 export function toggleMute(): boolean {
     _muted = !_muted;
-    localStorage.setItem('fortress_muted', _muted ? '1' : '0');
-    if (_muted && ctx) { ctx.close(); ctx = null; }
+    try { localStorage.setItem('fortress_muted', _muted ? '1' : '0'); } catch { /* Keep session controls usable without storage. */ }
+    if (_muted) {
+        stopSoundEffects();
+        if (ctx) void ctx.suspend().catch(() => {});
+    }
     return _muted;
 }
 
 /** Short sine blip — UI click */
 export function playClick() {
     const c = getCtx(); if (!c) return;
-    const osc = c.createOscillator();
+    const osc = tracked(c.createOscillator());
     const gain = c.createGain();
     osc.type = 'sine';
     osc.frequency.value = 660;
@@ -42,7 +65,7 @@ export function playClick() {
 /** Subtle high tick — UI hover */
 export function playHover() {
     const c = getCtx(); if (!c) return;
-    const osc = c.createOscillator();
+    const osc = tracked(c.createOscillator());
     const gain = c.createGain();
     osc.type = 'sine';
     osc.frequency.value = 1800;
@@ -56,7 +79,7 @@ export function playHover() {
 /** Dual tone switch — mode toggle */
 export function playSwitch() {
     const c = getCtx(); if (!c) return;
-    const osc = c.createOscillator();
+    const osc = tracked(c.createOscillator());
     const gain = c.createGain();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(440, c.currentTime);
@@ -71,8 +94,9 @@ export function playSwitch() {
 /** Dramatic low boom — battle button press */
 export function playBoom() {
     const c = getCtx(); if (!c) return;
+    combatSound();
     // Low sine boom
-    const osc = c.createOscillator();
+    const osc = tracked(c.createOscillator());
     const gain = c.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(80, c.currentTime);
@@ -90,7 +114,7 @@ export function playBoom() {
     for (let i = 0; i < bufSize; i++) {
         data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
     }
-    const noise = c.createBufferSource();
+    const noise = tracked(c.createBufferSource());
     noise.buffer = buf;
     const noiseGain = c.createGain();
     noiseGain.gain.setValueAtTime(0.08, c.currentTime);
@@ -107,7 +131,8 @@ export function playBoom() {
 /** Cannon fire whoosh */
 export function playFire() {
     const c = getCtx(); if (!c) return;
-    const osc = c.createOscillator();
+    combatSound();
+    const osc = tracked(c.createOscillator());
     const gain = c.createGain();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(150, c.currentTime);
@@ -125,13 +150,14 @@ export function playFire() {
 /** Explosion crunch — block destruction */
 export function playExplosion() {
     const c = getCtx(); if (!c) return;
+    combatSound();
     const bufSize = c.sampleRate * 0.25;
     const buf = c.createBuffer(1, bufSize, c.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < bufSize; i++) {
         data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 2);
     }
-    const noise = c.createBufferSource();
+    const noise = tracked(c.createBufferSource());
     noise.buffer = buf;
     const gain = c.createGain();
     gain.gain.setValueAtTime(0.12, c.currentTime);
@@ -148,7 +174,8 @@ export function playExplosion() {
 /** Impact hit — projectile lands */
 export function playImpact() {
     const c = getCtx(); if (!c) return;
-    const osc = c.createOscillator();
+    combatSound();
+    const osc = tracked(c.createOscillator());
     const gain = c.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(200, c.currentTime);

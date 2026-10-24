@@ -1,0 +1,48 @@
+[
+  {
+    "source": "Fortress AI Main Theme.mp3",
+    "sourceSha256": "d8c087eae72ad7f77969cd74ae5154c756985b825fc240ebf9e4b6682da28a3c",
+    "output": "public/audio/fortress-theme-1.mp3",
+    "sha256": "5b4a3c81f9f9bf15a77d1f0f7581c37a0b4608f2b18a10cdf2f114875b10ea93",
+    "bytes": 2833965,
+    "duration": 177.066667,
+    "sampleRate": 48000,
+    "channels": 2,
+    "audioStreams": 1,
+    "processing": "MP3 stream copy; cover and metadata stripped; runtime gain matching, no lossy re-encode",
+    "integratedLufs": -14.47,
+    "truePeakDb": -0.46,
+    "loudnessRangeLu": 7.8,
+    "decodedPcmSha256": "SHA256=e47a5345efe258c92f9a6bf60b974d5f382c5bd1e6d0eba70434b93a94c252a7",
+    "sourcePcmIdentical": true,
+    "silentRegions": [
+      {
+        "start": 174.83775,
+        "end": 177.066667
+      }
+    ]
+  },
+  {
+    "source": "Fortress AI Main Theme (Take 2).mp3",
+    "sourceSha256": "69c0361a86d327a53adc694c0645db984a65246165fa45443970da4e04388996",
+    "output": "public/audio/fortress-theme-2.mp3",
+    "sha256": "a93cfd02fb1784be7cfaea1dae62cacf8916884266f919d24b78d2f9d0e08613",
+    "bytes": 2852397,
+    "duration": 178.218667,
+    "sampleRate": 48000,
+    "channels": 2,
+    "audioStreams": 1,
+    "processing": "MP3 stream copy; cover and metadata stripped; runtime gain matching, no lossy re-encode",
+    "integratedLufs": -15.84,
+    "truePeakDb": -0.5,
+    "loudnessRangeLu": 13.8,
+    "decodedPcmSha256": "SHA256=8e4a25cf85a189186bce78cb4cd29903716bbac1914e09cd4a50d0411d109efb",
+    "sourcePcmIdentical": true,
+    "silentRegions": [
+      {
+        "start": 176.511292,
+        "end": 178.218667
+      }
+    ]
+  }
+]
