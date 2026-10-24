@@ -39,3 +39,14 @@ For a backend release, use verified SSH host-key checking and the existing appli
 The current environment uses Node/npm and PM2 from `/home/linuxbrew/.linuxbrew/bin` and `/home/claw/.npm-global/bin`; keep that runtime explicit when using `sudo -u claw`. Preserve the PM2 process environment when restarting. Do not print environment dumps or private certificate/account material into logs.
 
 Future automatic backend deployment should use a dedicated limited deploy account/key and protected repository secrets, not a root password. No new deployment credential or recurring automation was configured during this recovery.
+
+## Live Acceptance Check
+
+The patched runtime release `22fab47` was deployed to the VPS and verified on the public website, not just localhost. The VPS build and all 159 server tests passed again with the patched lockfile, and its production-only dependency audit reported zero findings. Vercel also reported a successful frontend deployment for that release.
+
+- HTTPS responds with a valid renewed API certificate through 2027-01-22; HTTP redirects to HTTPS. Frontend-origin preflight returns204 and the correct allow-origin header. Direct public access to port3001 times out as intended.
+- A private solo room progressed through build, reveal, real player fire, multiple bot turns, king damage/death and automatic next-round build. No matchmaking or other players were involved. The browser observed one successful WebSocket connection, no disconnects, more than5100 snapshots, a real player shot and four owner-stamped bot shots with changing launch velocities. Observed projectile damage included20.83 and25.23 HP, plus the final remaining-HP-capped hit.
+- All expected assets loaded:4 retained images,7 reaction images,8 battlefield layers and12 rig parts. Desktop and390x844 responsive screenshots were inspected; no page overflow or browser console errors were reported. The test browser was closed afterward to release its room.
+- Operational backups and the existing production event log were preserved; other application containers were not restarted. Docker/PM2 startup and the proxy's restart policy remain enabled, while the conflicting Nginx startup remains disabled.
+
+This is a deployment smoke test, not physical-phone, audio-listening or sustained performance certification. Network snapshot gaps reached about315ms in this external session; continue latency/performance validation separately. The screenshot review also leaves material art for accumulated falling-rock hazards as a future graphics refinement.
