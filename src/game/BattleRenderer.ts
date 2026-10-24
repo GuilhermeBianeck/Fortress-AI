@@ -344,16 +344,16 @@ function entities(ctx: CanvasRenderingContext2D, f: BattleFrame) {
         const angle = f.transforms.get(b.id)?.angle ?? b.angle;
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate(angle);
+        if (b.label !== 'king') ctx.rotate(angle);
         if (b.label === 'king') {
-            const kingSide = Math.abs(x - (f.kings.left.x ?? 300)) < Math.abs(x - (f.kings.right.x ?? 2100)) ? 'left' : 'right';
+            const kingSide = b.side ?? (Math.abs(x - (f.kings.left.x ?? 300)) < Math.abs(x - (f.kings.right.x ?? 2100)) ? 'left' : 'right');
             const hit = [...f.effects].reverse().find(e => e.kind === 'damage' && e.side === kingSide);
             const action = f.kingActions?.[kingSide];
             const presentation = kingPresentation({ now: f.now, side: kingSide, phase: f.phase, winner: f.winner,
-                hitAt: hit?.at, resultAt: action?.resultAt, reducedMotion: f.reducedMotion });
+                hp: f.kings[kingSide].hp, hitAt: hit?.at, resultAt: action?.resultAt, reducedMotion: f.reducedMotion });
             const king = kingReactions.get(presentation.pose, kingSide);
             const facing = kingSide === 'left' ? 1 : -1;
-            const radius = b.circleRadius || 16;
+            const radius = b.circleRadius || b.height / 2 || 16;
             ctx.fillStyle = 'rgba(39,59,54,0.14)';
             ctx.beginPath(); ctx.ellipse(0, radius + 1, 19, 4, 0, 0, Math.PI * 2); ctx.fill();
             ctx.save();
@@ -402,6 +402,17 @@ function entities(ctx: CanvasRenderingContext2D, f: BattleFrame) {
             ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
             ctx.fillStyle = '#c4dde5';
             ctx.beginPath(); ctx.arc(-radius * 0.28, -radius * 0.3, radius * 0.25, 0, Math.PI * 2); ctx.fill();
+        } else if (b.label === 'foundation') {
+            // Bury the support along the real terrain contour instead of leaving a floating slab.
+            ctx.beginPath();
+            ctx.moveTo(-b.width / 2, -b.height / 2);
+            ctx.lineTo(b.width / 2, -b.height / 2);
+            for (let column = b.width / 2; column >= -b.width / 2; column -= 5) {
+                ctx.lineTo(column, terrainHeight(f.terrain?.points ?? [], x + column) - y + 5);
+            }
+            ctx.lineTo(-b.width / 2, terrainHeight(f.terrain?.points ?? [], x - b.width / 2) - y + 5);
+            ctx.closePath(); ctx.clip();
+            block(ctx, b);
         } else block(ctx, b);
         ctx.restore();
     }
@@ -470,7 +481,7 @@ function minimap(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     for (const b of f.state?.bodies ?? []) {
         if (b.isStatic) continue;
         ctx.fillStyle = b.label === 'king'
-            ? (Math.abs(b.position.x - (f.kings.left.x ?? 600)) < Math.abs(b.position.x - (f.kings.right.x ?? 1800)) ? '#bb5948' : '#167f7a')
+            ? ((b.side ?? (Math.abs(b.position.x - (f.kings.left.x ?? 600)) < Math.abs(b.position.x - (f.kings.right.x ?? 1800)) ? 'left' : 'right')) === 'left' ? '#bb5948' : '#167f7a')
             : b.label === 'projectile' ? '#d64c48' : '#51748b';
         const position = renderedPosition(b, f.transforms);
         ctx.fillRect(box.x + position.x * sx - 1, box.y + position.y * sy - 2, b.label === 'king' ? 4 : 2, 3);

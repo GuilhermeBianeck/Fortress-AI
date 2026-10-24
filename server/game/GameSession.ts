@@ -14,7 +14,8 @@ import { closestOnSegment } from './botBallistics';
 import { closingSpeed, kingImpactDamage, projectileBlockDamage } from './impactDamage';
 import {
     MATERIAL_PROPS, MATERIAL_BLOCK_HP,
-    KING_MAX_HP,
+    KING_MAX_HP, KING_WIDTH, KING_HEIGHT, KING_MASS,
+    KING_FOUNDATION_WIDTH, KING_FOUNDATION_HEIGHT, KING_FOUNDATION_RISE,
     PROJECTILE_RADIUS, PROJECTILE_DENSITY, PROJECTILE_RESTITUTION,
     PROJECTILE_FRICTION, PROJECTILE_LIFESPAN_MS,
     WORLD_WIDTH, CANVAS_HEIGHT,
@@ -71,6 +72,8 @@ export class GameSession {
     }>();
     private destroyed = false;
     private kingsMap: Map<Side, KingState> = new Map();
+    private foundations = new Map<Side, Matter.Body>();
+    private buildSupports: Matter.Constraint[] = [];
     private stateMachine: MatchStateMachine;
     private onPhaseChangeCallback?: (phase: MatchPhase) => void;
     private onRoundEndCallback?: (winner: Side, reason: string) => 'continue' | 'match_over';
@@ -133,6 +136,7 @@ export class GameSession {
             this.checkProjectileBounds();
             this.tickHazards();
         });
+        this.gameLoop.setAfterTick(() => this.updateKings());
         this.gameLoop.start();
 
         // Create state machine
@@ -140,6 +144,8 @@ export class GameSession {
             onPhaseChange: (phase) => {
                 this.onPhaseChangeCallback?.(phase);
                 if (phase === 'combat') {
+                    for (const support of this.buildSupports) Matter.Composite.remove(this.world, support);
+                    this.buildSupports = [];
                     this.scoreManager.startCombatTimer();
                     this.startFallingRocks();
                 }
@@ -154,6 +160,8 @@ export class GameSession {
             },
             onMatchResult: () => { /* Room manager handles result */ },
             onRoundEnd: (winner, reason) => {
+                // Freeze the resolved scene and release bot/hazard/physics timers during results.
+                this.destroy();
                 return this.onRoundEndCallback?.(winner, reason) ?? 'match_over';
             },
             getKingState: (side: Side) => this.getKingStateBySide(side),
@@ -173,7 +181,7 @@ export class GameSession {
                 getFoundationTopY: () => {
                     const ps = this.getPlayerBySide(botSide);
                     if (!ps) return 0;
-                    return this.getFoundationTopY(ps.kingBody.position.x);
+                    return this.foundations.get(ps.side)?.bounds.min.y ?? this.interpolateTerrainY(ps.kingBody.position.x);
                 },
                 getBallisticsScene: () => {
                     const opponent = this.getPlayerBySide(opponentSide)!;
@@ -585,30 +593,32 @@ export class GameSession {
 
     // --- Private ---
 
+    private updateKings(): void {
+        for (const ps of this.players.values()) {
+            const body = ps.kingBody;
+            ps.kingState.position = { ...body.position };
+            if (ps.kingState.hp <= 0) continue;
+            // Kings can be knocked back and fall, but are characters, not rolling balls.
+            if (body.angle !== 0) Matter.Body.setAngle(body, 0);
+            if (body.angularVelocity !== 0) Matter.Body.setAngularVelocity(body, 0);
+            const vx = Math.max(-8, Math.min(8, body.velocity.x));
+            const vy = Math.max(-10, Math.min(20, body.velocity.y));
+            if (vx !== body.velocity.x || vy !== body.velocity.y) Matter.Body.setVelocity(body, { x: vx, y: vy });
+            if (this.stateMachine.getPhase() === 'combat' && (body.position.y > CANVAS_HEIGHT + KING_HEIGHT || body.position.x < -KING_WIDTH || body.position.x > WORLD_WIDTH + KING_WIDTH)) {
+                const damage = ps.kingState.hp;
+                ps.kingState.hp = 0;
+                this.io.to(this.roomId).emit('king_damage', { side: ps.side, hp: 0, maxHp: ps.kingState.maxHp, damage, source: 'fall' });
+                this.io.to(this.roomId).emit('king_dead', { side: ps.side });
+            }
+        }
+        this.stateMachine.checkKingDefeat();
+    }
+
     private getBotPlayer(): PlayerState | undefined {
         for (const ps of this.players.values()) {
             if (ps.socketId.startsWith('bot-')) return ps;
         }
         return undefined;
-    }
-
-    private getFoundationTopY(kingX: number): number {
-        // Replicate the foundation top calculation from spawnKing
-        const foundationWidth = 360;
-        const halfWidth = foundationWidth / 2;
-        const scanStart = Math.floor(kingX - halfWidth);
-        const scanEnd = Math.ceil(kingX + halfWidth);
-
-        let highestY = Infinity;
-        for (const pt of this.terrain.points) {
-            if (pt.x >= scanStart && pt.x <= scanEnd) {
-                if (pt.y < highestY) highestY = pt.y;
-            }
-        }
-        if (highestY === Infinity) highestY = this.interpolateTerrainY(kingX);
-
-        const foundationVisibleHeight = 20;
-        return highestY - foundationVisibleHeight;
     }
 
     private getKingStateBySide(side: Side): KingState {
@@ -620,7 +630,6 @@ export class GameSession {
     }
 
     private spawnKing(side: Side, sideBounds: { min: number; max: number }): { body: Matter.Body; state: KingState } {
-        const kingRadius = 12;
         const gap = 2;
 
         // Find a build zone within this side
@@ -629,22 +638,31 @@ export class GameSession {
         );
 
         let spawnX: number;
-        if (sideZones.length > 0) {
-            const zone = sideZones[0];
+        const center = (sideBounds.min + sideBounds.max) / 2;
+        const suitableZones = sideZones.filter(zone => zone.width >= KING_FOUNDATION_WIDTH + 20 && zone.x > sideBounds.min + 100 && zone.x + zone.width < sideBounds.max - 100)
+            .sort((a, b) => Math.abs(a.x + a.width / 2 - center) - Math.abs(b.x + b.width / 2 - center));
+        if (suitableZones.length > 0) {
+            const zone = suitableZones[0];
             spawnX = zone.x + zone.width / 2;
         } else {
             // Fallback: center of side
             spawnX = (sideBounds.min + sideBounds.max) / 2;
         }
 
-        const spawnY = this.interpolateTerrainY(spawnX) - kingRadius - gap;
+        const spawnY = this.interpolateTerrainY(spawnX) - KING_HEIGHT / 2 - gap;
 
-        const body = Matter.Bodies.circle(spawnX, spawnY, kingRadius, {
-            density: 0.003,
-            restitution: 0.5,
-            friction: 0.5,
+        const body = Matter.Bodies.rectangle(spawnX, spawnY, KING_WIDTH, KING_HEIGHT, {
+            chamfer: { radius: 5 },
+            restitution: 0.02,
+            friction: 1,
+            frictionStatic: 4,
+            frictionAir: 0.025,
             label: 'king',
         });
+        Matter.Body.setMass(body, KING_MASS);
+        Matter.Body.setInertia(body, Infinity);
+        (body as GameBody).originalWidth = KING_WIDTH;
+        (body as GameBody).originalHeight = KING_HEIGHT;
 
         // Tag with side for collision identification
         (body as GameBody).side = side;
@@ -655,26 +673,27 @@ export class GameSession {
         // A small, clean plinth: wide enough to give the king a stable seat,
         // narrow enough not to dominate the view. The body is static so
         // Matter.js never moves it — no need for a huge underground anchor.
-        const foundationWidth = 180;
-        const foundationHeight = 48;
+        const foundationWidth = KING_FOUNDATION_WIDTH;
         const halfWidth = foundationWidth / 2;
         const scanStart = Math.floor(spawnX - halfWidth);
         const scanEnd = Math.ceil(spawnX + halfWidth);
 
         // Find the highest terrain point under the platform footprint so
         // the platform rests on the peak rather than floating on an average.
-        let highestY = Infinity;
+        const edgeHeights = [this.interpolateTerrainY(scanStart), this.interpolateTerrainY(scanEnd)];
+        let highestY = Math.min(...edgeHeights), lowestY = Math.max(...edgeHeights);
         for (const pt of this.terrain.points) {
-            if (pt.x >= scanStart && pt.x <= scanEnd && pt.y < highestY) {
-                highestY = pt.y;
+            if (pt.x >= scanStart && pt.x <= scanEnd) {
+                highestY = Math.min(highestY, pt.y);
+                lowestY = Math.max(lowestY, pt.y);
             }
         }
-        if (highestY === Infinity) highestY = spawnY;
 
         // Expose ~34px above terrain so the platform reads as a plinth,
         // with the remainder below terrain so it visually grounds into the hill.
-        const foundationVisibleHeight = 34;
+        const foundationVisibleHeight = KING_FOUNDATION_RISE;
         const foundationTop = highestY - foundationVisibleHeight;
+        const foundationHeight = Math.max(KING_FOUNDATION_HEIGHT, lowestY + 12 - foundationTop);
         const foundationCenterY = foundationTop + foundationHeight / 2;
 
         const foundation = Matter.Bodies.rectangle(spawnX, foundationCenterY, foundationWidth, foundationHeight, {
@@ -689,17 +708,16 @@ export class GameSession {
         (foundation as GameBody).blockMaxHp = 10000;
 
         Matter.World.add(this.world, foundation);
+        this.foundations.set(side, foundation);
 
-        // Adjust King Position
-        // King should sit exactly on top of the foundation
-        // Foundation Top is at `foundationTop`
-        // King Y = foundationTop - kingRadius - epsilon
-        const correctedKingY = foundationTop - kingRadius - 1;
+        // Place the feet on the platform without an initial interpenetration.
+        const correctedKingY = foundationTop - KING_HEIGHT / 2 - 1;
 
         Matter.Body.setPosition(body, { x: spawnX, y: correctedKingY });
-
-        // Update King State to match new position
-        // ----------------------------------
+        // Construction is a safe staging phase; release the support when combat begins.
+        const support = Matter.Constraint.create({ bodyB: body, pointA: { ...body.position }, length: 0, stiffness: 1, damping: 0.2 });
+        this.buildSupports.push(support);
+        Matter.Composite.add(this.world, support);
 
         const state: KingState = {
             bodyId: body.id,
@@ -756,6 +774,16 @@ export class GameSession {
         Matter.Body.setAngle(body, angle ?? 0);
         Matter.Body.setInertia(body, body.inertia * 200);
 
+        // Building around a king must not place a block through the visible character.
+        for (const player of this.players.values()) {
+            const king = player.kingBody;
+            const feet = king.position.y + KING_HEIGHT / 2;
+            if (body.bounds.max.x > king.position.x - 26 && body.bounds.min.x < king.position.x + 26 &&
+                body.bounds.max.y > feet - 84 && body.bounds.min.y < feet) {
+                Matter.Body.translate(body, { x: 0, y: feet - 88 - body.bounds.max.y });
+            }
+        }
+
         Matter.World.add(this.world, body);
         return body;
     }
@@ -796,7 +824,7 @@ export class GameSession {
                     if (bodyA.id === ps.kingState.bodyId) { kingBody = bodyA; otherBody = bodyB; kingHit = true; }
                     else if (bodyB.id === ps.kingState.bodyId) { kingBody = bodyB; otherBody = bodyA; kingHit = true; }
 
-                    if (kingHit && kingBody && otherBody && ps.kingState.hp > 0) {
+                    if (kingHit && kingBody && otherBody && ps.kingState.hp > 0 && this.stateMachine.getPhase() === 'combat') {
                         const damage = Math.min(ps.kingState.hp, kingImpactDamage(kingBody, otherBody, speed));
                         if (damage > 0) {
                             ps.kingState.hp = Math.max(0, ps.kingState.hp - damage);
@@ -828,12 +856,9 @@ export class GameSession {
                 const block = projectile && hitBody.label !== 'projectile' ? hitBody : null;
 
                 if (projectile && block) {
-                    // Emit impact for any non-terrain hit
-                    if (block.label !== 'Terrain') {
-                        this.io.to(this.roomId).emit('projectile_impact', {
-                            position: { x: projectile.position.x, y: projectile.position.y },
-                        });
-                    }
+                    this.io.to(this.roomId).emit('projectile_impact', {
+                        position: { x: projectile.position.x, y: projectile.position.y },
+                    });
 
                     // Block HP damage (skip terrain, king, other projectiles)
                     const blockHp = (block as GameBody).blockHp;

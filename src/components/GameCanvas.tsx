@@ -21,6 +21,7 @@ import { cannonPosition, predictTrajectory } from '../game/ballistics';
 import { kingFeedbackPosition, projectileOwner } from '../game/battleFeedback';
 import { canPlace, PLACEMENT_DIMENSIONS } from '../game/placement';
 import { clampCamera, createViewport, minimapRect, screenToWorld } from '../game/viewport';
+import { advanceBattleCamera, projectileCameraTarget, type BattleCameraState } from '../game/battleCamera';
 import './GameCanvas.css';
 
 interface GameCanvasProps {
@@ -59,7 +60,10 @@ function GameCanvasInner(props: GameCanvasProps) {
     const latest = useRef(props);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const stageRef = useRef<HTMLDivElement>(null);
-    const camera = useRef({ x: 0, target: 0, manualUntil: 0 });
+    const camera = useRef<BattleCameraState>({ x: 0, target: 0, velocity: 0, manualUntil: 0, initialized: false });
+    const cameraDissolve = useRef<{ frame: HTMLCanvasElement; at: number } | null>(null);
+    const cameraHandoff = useRef<number | null>(null);
+    const lastResize = useRef(0);
     const [size, setSize] = useState({ width: 800, height: 560 });
     const [overview, setOverview] = useState(false);
     const view = useRef(createViewport(800, 560));
@@ -114,16 +118,18 @@ function GameCanvasInner(props: GameCanvasProps) {
         aimRef.current = next; setAimState(next);
     }, []);
     const focus = useCallback((x: number, manual = false) => {
+        if (manual) cameraHandoff.current = null;
         camera.current.manualUntil = manual ? performance.now() + 12000 : 0;
         camera.current.target = clampCamera(x - view.current.worldWidth / 2, view.current);
     }, []);
     const recenter = useCallback(() => {
         const p = latest.current;
-        focus(p.phase === 'combat' ? cannonPosition(p.mySide, p.terrain?.points ?? []).x : p.kingsHp[p.mySide].x ?? 300);
+        focus(p.phase === 'combat' ? cannonPosition(p.mySide, p.terrain?.points ?? []).x : p.kingsHp[p.mySide].x ?? 300, true);
     }, [focus]);
 
     useEffect(() => {
         view.current = createViewport(size.width, size.height, overview);
+        lastResize.current = performance.now();
         camera.current.x = clampCamera(camera.current.x, view.current);
         camera.current.target = clampCamera(camera.current.target, view.current);
     }, [size, overview]);
@@ -141,21 +147,23 @@ function GameCanvasInner(props: GameCanvasProps) {
         gesture.current = null; ghost.current = undefined; pointers.current.clear();
         camera.current.manualUntil = 0;
         if (props.phase === 'build') {
+            cameraHandoff.current = null; cameraDissolve.current = null;
             effects.current = []; seenProjectiles.current.clear(); particles.current.reset(); shot.current = undefined;
             snapshots.current.reset(); presented.current = undefined; presentationEvents.current = [];
             kingDirectors.current.left.reset(); kingDirectors.current.right.reset(); kingActions.current = {};
             if (props.gameState) snapshots.current.push(props.gameState, performance.now());
             focus(props.kingsHp[props.mySide].x ?? (props.mySide === 'left' ? 300 : 2100));
-            camera.current.x = camera.current.target;
+            if (!camera.current.initialized) { camera.current.x = camera.current.target; camera.current.initialized = true; }
         } else if (props.phase === 'combat') {
             focus(cannonPosition(props.turnPlayer ?? props.mySide, props.terrain?.points ?? []).x);
-            camera.current.x = camera.current.target;
+            cameraHandoff.current = performance.now();
         }
-        // Reframe on phase/turn/viewport changes, not every moving king snapshot.
+        // A resize must not reset interpolation, reactions or camera motion mid-shot.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [props.phase, props.turnPlayer, props.mySide, size.width, size.height, overview]);
+    }, [props.phase, props.turnPlayer, props.mySide]);
     useEffect(() => {
         if (props.phase !== 'reveal') return;
+        if (reducedMotion.current) return;
         focus(props.kingsHp[props.mySide].x ?? 300);
         const timer = setTimeout(() => focus(latest.current.kingsHp[props.mySide === 'left' ? 'right' : 'left'].x ?? 2100), 2200);
         return () => clearTimeout(timer);
@@ -196,6 +204,7 @@ function GameCanvasInner(props: GameCanvasProps) {
             addEffect({ ...data.position, at: performance.now(), kind: 'break', material: data.material }, playExplosion);
         }));
         setProjectileImpactCallback(data => later(() => {
+            followedProjectile.current = null;
             if (!reducedMotion.current) particles.current.emitImpact(data.position.x, data.position.y);
             addEffect({ ...data.position, at: performance.now(), kind: 'impact' }, playImpact);
         }));
@@ -234,8 +243,8 @@ function GameCanvasInner(props: GameCanvasProps) {
                 for (const body of renderState?.bodies ?? []) {
                     if (body.label !== 'projectile' || seenProjectiles.current.has(body.id)) continue;
                     seenProjectiles.current.add(body.id);
-                    followedProjectile.current = body.id;
                     const side = projectileOwner(body);
+                    if (p.phase === 'combat' && side === p.turnPlayer) followedProjectile.current = body.id;
                     const facing = side === 'left' ? 1 : -1;
                     const angle = side === p.mySide ? aimRef.current.angle : Math.atan2(-body.velocity.y, body.velocity.x * facing);
                     shot.current = { id: body.id, side, at: now, angle };
@@ -248,13 +257,19 @@ function GameCanvasInner(props: GameCanvasProps) {
                 due.forEach(event => event.run());
                 if (keys.current.has('a')) { cam.target -= delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
                 if (keys.current.has('d')) { cam.target += delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
-                if (p.phase === 'combat' && cam.manualUntil < now) {
+                if (p.phase === 'combat' && !reducedMotion.current && cam.manualUntil < now) {
                     const projectile = renderState?.bodies.find(b => b.id === followedProjectile.current);
-                    if (projectile) cam.target = renderedPosition(projectile, transforms).x - v.worldWidth / 2;
+                    if (projectile) {
+                        const direction = shot.current?.angle === undefined ? 1 : Math.cos(shot.current.angle) * (projectileOwner(projectile) === 'left' ? 1 : -1);
+                        if (Math.hypot(projectile.velocity.x, projectile.velocity.y) < 3 || projectile.velocity.x * direction < 0) followedProjectile.current = null;
+                        else cam.target = projectileCameraTarget(renderedPosition(projectile, transforms).x, cam, v);
+                    }
                 }
-                cam.target = clampCamera(cam.target, v);
-                const smoothing = reducedMotion.current ? 1 : 1 - Math.exp(-delta / (p.phase === 'reveal' ? 600 : 120));
-                cam.x += (cam.target - cam.x) * smoothing;
+                const pendingHandoff = cameraHandoff.current !== null;
+                const handoffReady = pendingHandoff && now - Math.max(cameraHandoff.current!, lastResize.current) > 60;
+                const distantHandoff = handoffReady && Math.abs(cam.target - cam.x) > v.worldWidth * 0.8 && !reducedMotion.current;
+                if (handoffReady) cameraHandoff.current = null;
+                if (!distantHandoff && (!pendingHandoff || handoffReady)) advanceBattleCamera(cam, v, delta, p.phase === 'reveal', reducedMotion.current, cam.manualUntil > now);
                 particles.current.update(elapsed);
                 effects.current = effects.current.filter(e => now - e.at < (e.kind === 'damage' ? 950 : 420));
                 const balls = renderState?.bodies.filter(body => body.label === 'projectile').map(body => ({
@@ -263,22 +278,41 @@ function GameCanvasInner(props: GameCanvasProps) {
                 for (const side of ['left', 'right'] as const) {
                     const hp = p.kingsHp[side];
                     const reference = { x: hp.x ?? (side === 'left' ? 600 : 1800), y: hp.y ?? 480 };
-                    const body = renderState?.bodies.filter(body => body.label === 'king').sort((a, b) =>
-                        Math.hypot(a.position.x - reference.x, a.position.y - reference.y) - Math.hypot(b.position.x - reference.x, b.position.y - reference.y))[0];
+                    const body = renderState?.bodies.find(body => body.label === 'king' && body.side === side)
+                        ?? renderState?.bodies.filter(body => body.label === 'king' && !body.side).sort((a, b) =>
+                            Math.hypot(a.position.x - reference.x, a.position.y - reference.y) - Math.hypot(b.position.x - reference.x, b.position.y - reference.y))[0];
                     const hit = [...effects.current].reverse().find(effect => effect.kind === 'damage' && effect.side === side);
                     kingActions.current[side] = kingDirectors.current[side].update({ now, side, phase: p.phase, turn: p.turnPlayer,
                         winner: p.winner, king: body ? renderedPosition(body, transforms) : reference, projectiles: balls,
+                        velocity: body?.velocity, hp: hp.hp,
                         shot: shot.current, hitAt: hit?.at, reducedMotion: reducedMotion.current,
                         aimAngle: side === p.mySide ? aimRef.current.angle : shot.current?.side === side ? shot.current.angle : Math.PI / 4 });
                 }
-                drawBattle(ctx, { view: v, camera: cam.x, now, reducedMotion: reducedMotion.current,
+                const frame = { view: v, camera: cam.x, now, reducedMotion: reducedMotion.current,
                     state: renderState, terrain: p.terrain, transforms, kings: p.kingsHp,
                     names: p.playerNames, side: p.mySide, phase: p.phase, turn: p.turnPlayer, winner: p.winner,
                     angle: aimRef.current.angle, trajectory: trajectory.current, hazards: p.hazards ?? [],
                     effects: effects.current, particles: particles.current, shot: shot.current, ghost: ghost.current,
                     projectileId: followedProjectile.current,
                     kingActions: kingActions.current,
-                    placementDimensions: PLACEMENT_DIMENSIONS[p.selectedShape ?? 'rectangle'] });
+                    placementDimensions: PLACEMENT_DIMENSIONS[p.selectedShape ?? 'rectangle'] };
+                drawBattle(ctx, frame);
+                if (distantHandoff) {
+                    const previous = document.createElement('canvas'); previous.width = w; previous.height = h;
+                    previous.getContext('2d')!.drawImage(canvas, 0, 0);
+                    cameraDissolve.current = { frame: previous, at: now };
+                    cam.x = clampCamera(cam.target, v); cam.velocity = 0;
+                    drawBattle(ctx, { ...frame, camera: cam.x });
+                }
+                const dissolve = cameraDissolve.current;
+                if (dissolve) {
+                    const t = Math.min(1, Math.max(0, (now - dissolve.at) / 360));
+                    if (t >= 1 || reducedMotion.current || dissolve.frame.width !== w || dissolve.frame.height !== h) cameraDissolve.current = null;
+                    else {
+                        ctx.save(); ctx.globalAlpha = 1 - t * t * (3 - 2 * t);
+                        ctx.drawImage(dissolve.frame, 0, 0, v.width, v.height); ctx.restore();
+                    }
+                }
                 if (debugVisible) {
                     debugStats.updateFrame(now); debugStats.totalBodies = p.gameState?.bodies.length ?? 0;
                     debugStats.particlesActive = particles.current.count; debugStats.phase = p.phase;
@@ -296,7 +330,10 @@ function GameCanvasInner(props: GameCanvasProps) {
             return JSON.stringify({ coordinates: 'world origin top-left; x right, y down; 2400x600', phase: p.phase,
                 side: p.mySide, turn: p.turnPlayer, mode: p.phase === 'build' ? p.gameMode : inspectRef.current ? 'inspect' : 'aim',
                 aim: { degrees: Math.round(aimRef.current.angle * 180 / Math.PI), power: aimRef.current.power, pending: pendingRef.current },
-                viewport: view.current, camera: camera.current.x, kings: p.kingsHp, artLoaded: cartoon.loaded,
+                viewport: view.current, camera: camera.current.x,
+                cameraMotion: { target: camera.current.target, velocity: camera.current.velocity, following: followedProjectile.current,
+                    handoff: cameraDissolve.current ? { type: 'dissolve', age: performance.now() - cameraDissolve.current.at, duration: 360 } : null },
+                kings: p.kingsHp, artLoaded: cartoon.loaded,
                 reactionsLoaded: kingReactions.loaded,
                 livingKingsLoaded: livingKings.loaded,
                 kingActions: kingActions.current,
@@ -316,9 +353,10 @@ function GameCanvasInner(props: GameCanvasProps) {
                 shot: shot.current ? { side: shot.current.side, age: Math.round(performance.now() - shot.current.at), muzzle: cannonMuzzle(shot.current.side, shot.current.angle, p.terrain?.points ?? []) } : null,
                 kingPoses: Object.fromEntries((['left', 'right'] as const).map(side => {
                     const hit = [...effects.current].reverse().find(e => e.kind === 'damage' && e.side === side);
-                    return [side, kingPresentation({ now: performance.now(), side, phase: p.phase, winner: p.winner, hitAt: hit?.at }).pose];
+                    return [side, kingPresentation({ now: performance.now(), side, phase: p.phase, winner: p.winner, hp: p.kingsHp[side].hp, hitAt: hit?.at }).pose];
                 })),
-                bodies: p.gameState?.bodies.filter(b => !b.isStatic).map(b => ({ id: b.id, kind: b.label, x: b.position.x, y: b.position.y, hp: b.blockHp })) ?? [] });
+                bodies: p.gameState?.bodies.filter(b => !b.isStatic).map(b => ({ id: b.id, kind: b.label, side: b.side,
+                    x: b.position.x, y: b.position.y, angle: b.angle, velocity: b.velocity, width: b.width, height: b.height, hp: b.blockHp })) ?? [] });
         };
         host.render_game_to_text = read;
         return () => { if (host.render_game_to_text === read) delete host.render_game_to_text; };
@@ -361,7 +399,6 @@ function GameCanvasInner(props: GameCanvasProps) {
     const panMap = (x: number) => {
         const box = minimapRect(view.current);
         focus(clamp((x - box.x) / box.width, 0, 1) * WORLD_WIDTH, true);
-        camera.current.x = camera.current.target;
     };
     const aimAt = (point: Vector) => {
         const p = latest.current;
@@ -408,10 +445,11 @@ function GameCanvasInner(props: GameCanvasProps) {
         if (!action) return;
         if (action.cancelled && pointers.current.size < 2) return;
         if (action.kind === 'pan') {
+            cameraHandoff.current = null;
             const all = [...pointers.current.values()];
             const x = all.length > 1 ? (all[0].x + all[1].x) / 2 : point.x;
             camera.current.target = clampCamera(action.camera + (action.start.x - x) / view.current.scale, view.current);
-            camera.current.x = camera.current.target; camera.current.manualUntil = performance.now() + 12000;
+            camera.current.x = camera.current.target; camera.current.velocity = 0; camera.current.manualUntil = performance.now() + 12000;
         } else if (action.kind === 'minimap') panMap(point.x);
         else if (action.kind === 'aim') aimAt(point);
         else if (action.kind === 'place') ghost.current = screenToWorld(point, camera.current.x, view.current);
@@ -434,6 +472,7 @@ function GameCanvasInner(props: GameCanvasProps) {
     const isMyTurn = props.phase === 'combat' && props.turnPlayer === props.mySide;
     const toggleInspect = () => { inspectRef.current = !inspectRef.current; setInspect(inspectRef.current); gesture.current = null; };
     const nudge = (direction: number) => {
+        cameraHandoff.current = null;
         camera.current.manualUntil = performance.now() + 12000;
         camera.current.target = clampCamera(camera.current.target + direction * view.current.worldWidth * 0.45, view.current);
     };

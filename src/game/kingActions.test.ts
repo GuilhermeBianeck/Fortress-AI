@@ -73,3 +73,15 @@ test('reduced motion neutralizes all joints, and resuming motion blends from res
     assert.equal(d.update(cue(1000)).aim, 1);
     assert.equal(d.update(cue(10, { phase: 'build' })).aim, 0, 'clock rewind starts a new animation epoch');
 });
+test('falling blends into a bounded landing recovery and never overrides lethal HP', () => {
+    const d = new KingActionDirector();
+    assert.equal(d.update(cue(0, { velocity: { x: 3, y: 5 } })).mode, 'airborne');
+    const fall = d.update(cue(200, { velocity: { x: 2, y: 7 } }));
+    assert.equal(fall.airborne, 1);
+    assert.equal(d.update(cue(300, { velocity: { x: 0, y: 0.2 } })).mode, 'landing');
+    assert.equal(d.update(cue(500, { velocity: { x: 0, y: 0 } })).landing, 1);
+    assert.equal(d.update(cue(800, { velocity: { x: 0, y: 0 } })).mode, 'aim');
+    assert.equal(d.update(cue(900, { hp: 0, velocity: { x: 8, y: 10 } })).mode, 'defeat');
+    const still = d.update(cue(1000, { reducedMotion: true, velocity: { x: 8, y: 10 } }));
+    assert.equal(still.airborne, 0); assert.equal(still.landing, 0);
+});

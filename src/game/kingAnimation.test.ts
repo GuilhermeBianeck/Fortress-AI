@@ -28,3 +28,6 @@ test('reaction artwork blends in and out at the same grounded pivot', () => {
     assert.equal(kingPresentation({ now: 1000, side: 'left', phase: 'result', winner: 'left', resultAt: 1000 }).reactionOpacity, 0);
     assert.equal(kingPresentation({ now: 1160, side: 'left', phase: 'result', winner: 'left', resultAt: 1000 }).reactionOpacity, 1);
 });
+test('a zero-HP king is visibly defeated before the result phase, not idle on the ground', () => {
+    assert.equal(kingPresentation({ now: 1000, side: 'left', phase: 'combat', hp: 0, hitAt: 999 }).pose, 'defeat');
+});

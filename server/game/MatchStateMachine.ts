@@ -168,7 +168,16 @@ export class MatchStateMachine {
     }
 
     private onProjectileSettled(): void {
-        // Check win conditions
+        if (this.matchEnded || this.checkKingDefeat()) return;
+
+        // Switch turns
+        const nextTurn: Side = this.currentTurn === 'left' ? 'right' : 'left';
+        this.startTurn(nextTurn);
+    }
+
+    /** Resolve lethal damage after a physics step, not seconds later after every block settles. */
+    checkKingDefeat(): boolean {
+        if (this.matchEnded || this.phase !== 'combat') return false;
         const leftKing = this.callbacks.getKingState('left');
         const rightKing = this.callbacks.getKingState('right');
 
@@ -176,22 +185,20 @@ export class MatchStateMachine {
             // Both dead — attacker (who fired the shot) wins, since they caused the destruction
             const attacker = this.currentTurn;
             this.endMatch(attacker, 'both_kings_destroyed');
-            return;
+            return true;
         }
 
         if (leftKing.hp <= 0) {
             this.endMatch('right', 'king_destroyed');
-            return;
+            return true;
         }
 
         if (rightKing.hp <= 0) {
             this.endMatch('left', 'king_destroyed');
-            return;
+            return true;
         }
 
-        // Switch turns
-        const nextTurn: Side = this.currentTurn === 'left' ? 'right' : 'left';
-        this.startTurn(nextTurn);
+        return false;
     }
 
     private endMatch(winner: Side, reason: string): void {

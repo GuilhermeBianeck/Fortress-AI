@@ -3,11 +3,12 @@ import type { MatchPhase, Side } from '../types';
 export type KingPose = 'idle' | 'hit' | 'victory' | 'defeat';
 export const KING_HIT_MS = 480;
 
-export function kingPresentation({ now, side, phase, winner, hitAt, resultAt, reducedMotion = false }: {
-    now: number; side: Side; phase: MatchPhase; winner?: Side | null; hitAt?: number; resultAt?: number; reducedMotion?: boolean;
+export function kingPresentation({ now, side, phase, winner, hp, hitAt, resultAt, reducedMotion = false }: {
+    now: number; side: Side; phase: MatchPhase; winner?: Side | null; hp?: number; hitAt?: number; resultAt?: number; reducedMotion?: boolean;
 }) {
     let pose: KingPose = 'idle';
-    if (phase === 'result' && winner) pose = winner === side ? 'victory' : 'defeat';
+    if (hp === 0) pose = 'defeat';
+    else if (phase === 'result' && winner) pose = winner === side ? 'victory' : 'defeat';
     else if (hitAt !== undefined && now >= hitAt && now - hitAt < KING_HIT_MS) pose = 'hit';
     if (reducedMotion) return { pose, scaleY: 1, tilt: 0, reactionOpacity: pose === 'idle' ? 0 : 1 };
     const smooth = (n: number) => { const x = Math.max(0, Math.min(1, n)); return x * x * (3 - 2 * x); };

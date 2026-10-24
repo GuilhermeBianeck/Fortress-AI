@@ -57,6 +57,12 @@ export const MATERIAL_BLOCK_HP: Record<string, number> = {
 
 // === King ===
 export const KING_MAX_HP = 100;
+export const KING_WIDTH = 32;
+export const KING_HEIGHT = 64;
+export const KING_MASS = 2;
+export const KING_FOUNDATION_WIDTH = 180;
+export const KING_FOUNDATION_HEIGHT = 48;
+export const KING_FOUNDATION_RISE = 34;
 export const IMPACT_THRESHOLD = 5;
 export const DAMAGE_SCALE = 0.3;
 
@@ -110,8 +116,8 @@ export const PROJECTILE_LIFESPAN_MS = 5000;
 export const PROJECTILE_BLOCK_DAMAGE_MULT = 3.0;
 export const PROJECTILE_MIN_IMPACT = 3;
 export const PROJECTILE_MAX_BLOCK_DAMAGE = 90;
-export const PROJECTILE_KING_DAMAGE_SCALE = 1.1;
-export const PROJECTILE_MAX_KING_DAMAGE = 45;
+export const PROJECTILE_KING_DAMAGE_SCALE = 2.4;
+export const PROJECTILE_MAX_KING_DAMAGE = 75;
 
 // === Physics ===
 export const PHYSICS_GRAVITY = 2.0;

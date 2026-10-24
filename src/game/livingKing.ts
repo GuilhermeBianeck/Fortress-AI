@@ -24,8 +24,8 @@ export function livingKingState({ now, side, reducedMotion = false, shootAt, loo
     if (reducedMotion) return { headTilt: 0, headX: 0, headY: 0, chestScaleX: 1, chestScaleY: 1, shoulderY: 0, armAngle: 0, capeAngle: 0, capeScaleX: 1, blink: false, gesture: 0, breath: 0 };
     const offset = side === 'left' ? 0 : 1730;
     const breath = Math.sin((t + offset) * .00175);
-    const { ready = 0, aim = 0, brace = 0, recoil = 0, recover = 0, aimPitch = 0 } = action ?? {};
-    const gesture = pulse((t + offset) % 11400, 5200, 1800) * (1 - Math.max(aim, brace, recoil, recover));
+    const { ready = 0, aim = 0, brace = 0, recoil = 0, recover = 0, airborne = 0, landing = 0, aimPitch = 0 } = action ?? {};
+    const gesture = pulse((t + offset) % 11400, 5200, 1800) * (1 - Math.max(aim, brace, recoil, recover, airborne, landing));
     const shotAge = shootAt === undefined ? -1 : t - shootAt;
     const shot = !action && shotAge >= 0 && shotAge < 400 ? Math.sin(shotAge / 400 * Math.PI) : 0;
     const blinkTime = (t + offset) % 5300;
@@ -33,13 +33,13 @@ export function livingKingState({ now, side, reducedMotion = false, shootAt, loo
         headTilt: Math.sin((t + offset) * .00063) * .018 + clamp(looking, -1, 1) * .025 - shot * .025
             + aim * (-.018 - aimPitch * .025) + brace * .045 + recoil * .03,
         headX: Math.sin((t + offset) * .00041) * .45 - brace * 1.5 - recoil,
-        headY: -breath * .65 + brace * 3.5 + recover,
+        headY: -breath * .65 + brace * 3.5 + recover + landing * 4 - airborne,
         chestScaleX: 1 + breath * .004,
-        chestScaleY: 1 + breath * .016 - brace * .018 - recoil * .01,
-        shoulderY: -breath * .5 + brace * 2.5 + recover * .5,
+        chestScaleY: 1 + breath * .016 - brace * .018 - recoil * .01 - landing * .04,
+        shoulderY: -breath * .5 + brace * 2.5 + recover * .5 + landing * 3,
         armAngle: Math.sin((t + offset) * .0012) * .018 - gesture * .18 - shot * .09
-            - ready * .035 - aim * (.22 + aimPitch * .05) + brace * .18 + recoil * .16 - recover * .06,
-        capeAngle: Math.sin((t + offset) * .0011) * .032 + Math.sin((t + offset) * .0023) * .008 - recoil * .035 + brace * .02,
+            - ready * .035 - aim * (.22 + aimPitch * .05) + brace * .18 + recoil * .16 - recover * .06 - airborne * .55 + landing * .2,
+        capeAngle: Math.sin((t + offset) * .0011) * .032 + Math.sin((t + offset) * .0023) * .008 - recoil * .035 + brace * .02 + airborne * .15,
         capeScaleX: 1 + Math.sin((t + offset) * .0015) * .025,
         blink: blinkTime >= 2700 && blinkTime < 2820,
         gesture, breath,

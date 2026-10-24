@@ -28,7 +28,7 @@ test('living kings draw independent parts and shots advance smoothly between ser
         const state = await read();
         if (state.kings.right.x > state.camera + 40 && state.kings.right.x < state.camera + state.viewport.worldWidth - 40) break;
         await page.getByRole('button', { name: 'Pan right', exact: true }).click();
-        await page.waitForTimeout(150);
+        await expect.poll(async () => { const view = await read(); return Math.abs(view.camera - view.cameraMotion.target); }).toBeLessThan(2);
     }
     await expect.poll(() => page.evaluate(() => [...(window as Window & { livingPartsDrawn: Set<string> }).livingPartsDrawn]),
         { timeout: 8000 }).toEqual(expect.arrayContaining(['ivory_body', 'ivory_chest', 'ivory_arm', 'ivory_cape', 'ivory_head_open', 'ivory_head_closed']));

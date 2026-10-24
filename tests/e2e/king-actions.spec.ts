@@ -10,7 +10,7 @@ async function frameKing(page: Page, side: Side) {
         if (x > state.camera + 50 && x < state.camera + state.viewport.worldWidth - 50) return;
         const direction = x < state.camera + state.viewport.worldWidth / 2 ? 'left' : 'right';
         await page.getByRole('button', { name: `Pan ${direction}`, exact: true }).click();
-        await page.waitForTimeout(150);
+        await expect.poll(async () => { const view = await read(page); return Math.abs(view.camera - view.cameraMotion.target); }).toBeLessThan(2);
     }
     throw new Error(`Could not frame ${side} king`);
 }

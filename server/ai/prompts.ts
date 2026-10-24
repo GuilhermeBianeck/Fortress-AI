@@ -91,7 +91,7 @@ ${sideSection}${terrainSection}${kingSection}
 
 ### BLOCK SIZES
 - Default block size is 30x30 pixels. Valid range is 10-60 pixels per dimension.
-- The King is a circle with radius 12. A 30x30 block is slightly larger than the King.
+- The King has an upright 32x64 collision body. The visible crowned character is about 52x80 pixels, with feet 32 pixels below its center. Leave a 56x88 clear space above its feet; build walls to the sides and a roof above the crown, never through the character.
 - Use smaller blocks (10-20) for detail work, larger blocks (40-60) for foundations.
 
 ### OUTPUT FORMAT

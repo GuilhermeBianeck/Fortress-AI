@@ -118,7 +118,7 @@ test('action clips change upper-body joints without moving feet or separating re
 
 test('joint clips stay within modest rotations and chest/neck/shoulder bounds', () => {
     for (const mode of ['ready', 'aim', 'recoil', 'brace', 'recover'] as const) for (const side of ['left', 'right'] as const) {
-        const action: KingActionPose = { mode, ready: 0, aim: 0, recoil: 0, brace: 0, recover: 0, look: 1, aimPitch: 1, threat: 0, [mode]: 1 };
+        const action: KingActionPose = { mode, ready: 0, aim: 0, recoil: 0, brace: 0, recover: 0, airborne: 0, landing: 0, look: 1, aimPitch: 1, threat: 0, [mode]: 1 };
         for (const now of [0, 1600, 2750, 6100, 11400]) {
             const state = livingKingState({ side, now, action, looking: action.look });
             assert.ok(Math.abs(state.armAngle) < .3);

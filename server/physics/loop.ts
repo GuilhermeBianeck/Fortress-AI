@@ -39,6 +39,7 @@ export class GameLoop {
     private lastSnapshotTime = 0;
     private kingStates: Map<string, KingState> = new Map(); // side → KingState
     private onTickCallback: (() => void) | null = null;
+    private afterTickCallback: (() => void) | null = null;
 
     // Delta encoding state
     private knownBodyIds: Set<number> = new Set();
@@ -57,6 +58,7 @@ export class GameLoop {
     setOnTick(cb: () => void) {
         this.onTickCallback = cb;
     }
+    setAfterTick(cb: () => void) { this.afterTickCallback = cb; }
 
     start() {
         if (this.interval) return;
@@ -84,6 +86,7 @@ export class GameLoop {
         Matter.Engine.update(this.engine, TICK_DT / 2);
         this.onTickCallback?.();
         Matter.Engine.update(this.engine, TICK_DT / 2);
+        this.afterTickCallback?.();
 
         // Snapshot broadcast
         const now = Date.now();

@@ -59,13 +59,13 @@ describe('Authoritative impact balance', () => {
         Matter.Engine.update(engine, 1000 / 120);
     });
 
-    it('deals a meaningful 25-45 HP direct king hit at typical incoming speed', () => {
+    it('deals a decisive 50-75 HP direct king hit at typical incoming speed', () => {
         const { session, engine, target, emit } = fixture();
         fireAt(session, 866, 250, 32);
         for (let i = 0; i < 6; i++) Matter.Engine.update(engine, 1000 / 120);
         const damage = 100 - target.kingState.hp;
-        expect(damage).toBeGreaterThanOrEqual(25);
-        expect(damage).toBeLessThanOrEqual(45);
+        expect(damage).toBeGreaterThanOrEqual(50);
+        expect(damage).toBeLessThanOrEqual(75);
         const damageEvents = emit.mock.calls.filter(call => call[0] === 'king_damage');
         expect(damageEvents).toHaveLength(1);
         expect(damageEvents[0][1].damage).toBeCloseTo(damage);
@@ -112,7 +112,7 @@ describe('Authoritative impact balance', () => {
     it('does not turn a largely tangential contact into a direct hit', () => {
         const { session, engine, target } = fixture();
         // Almost vertically skims the king's left edge: mostly tangent, not normal speed.
-        fireAt(session, 880, 220, 0, 35);
+        fireAt(session, 877, 210, 0, 35);
         for (let i = 0; i < 4; i++) Matter.Engine.update(engine, 1000 / 120);
         expect(100 - target.kingState.hp).toBeLessThan(15);
     });
@@ -135,7 +135,7 @@ describe('Authoritative impact balance', () => {
     it('resting kings do not accumulate terrain jitter damage', () => {
         const { engine, target } = fixture();
         engine.gravity.scale = 0.001;
-        const floor = Matter.Bodies.rectangle(900, 282, 200, 40, { isStatic: true, label: 'foundation' });
+        const floor = Matter.Bodies.rectangle(900, 302, 200, 40, { isStatic: true, label: 'foundation' });
         Matter.Composite.add(engine.world, floor);
         for (let i = 0; i < 720; i++) Matter.Engine.update(engine, 1000 / 120);
         expect(target.kingState.hp).toBe(100);
