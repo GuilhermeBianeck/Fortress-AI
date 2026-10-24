@@ -16,7 +16,7 @@ Viewport resizing preserves the viewed world center rather than a stale left edg
 
 ## Adaptive Network Presentation
 
-The renderer measures snapshot arrivals, transit variation and delivery gaps. It chooses a visual jitter budget between 100ms and240ms rather than always using 100ms. The budget increases gently and recovers more slowly after a bad stretch; the presentation clock never rewinds. Routine catch-up is capped at 1.15x real time.
+The renderer measures snapshot arrivals, transit variation and delivery gaps. It chooses a visual jitter budget between 100ms and 240ms rather than always using 100ms. The budget increases gently and recovers more slowly after a bad stretch; the presentation clock never rewinds. Routine catch-up is capped at 1.15x real time.
 
 This is not client physics prediction. Bodies are rendered only from received authoritative states. A pair of snapshots separated by more than 300ms does not create an invented straight-line trajectory through unknown collisions. Severe backlog over 400ms rebases to the current authoritative range rather than replaying seconds of old movement. Long outages can still produce holds or resynchronization; interpolation cannot repair a missing connection.
 
@@ -49,3 +49,5 @@ Physical iPhone/Safari, subjective motion comfort, phone speaker balance and sus
 ## Release
 
 The server change is backward compatible, but matching timestamps and rich target cues require the backend update as well as Vercel deployment. Preserve the existing server environment/data, check for active games and restart only the game process after its build/tests pass. No dependency, infrastructure, firewall, credential or operating-system changes are part of this release.
+
+Published gameplay commit `0d87ae7` to main on 2026-10-24. Vercel reports success; the matching VPS backend passed its build and 167 tests before a zero-connection restart. Its production dependency audit reports zero vulnerabilities, and the environment file matches its protected backup. All six public-site private-game acceptance scenarios passed without retries across desktop and mobile-sized Chromium (1.2 minutes). Live settings and hit-feedback screenshots were inspected. These results do not replace physical-device or subjective comfort testing.
