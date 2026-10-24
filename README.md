@@ -132,6 +132,8 @@ scripts/
 
 ## Environment Variables
 
+Production frontend and backend deploy separately. See [production backend operations](docs/production-backend.md) before updating the VPS or its shared HTTPS proxy.
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GEMINI_API_KEY` | Google Gemini API key | Required |
