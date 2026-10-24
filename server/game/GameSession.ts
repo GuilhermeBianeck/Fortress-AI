@@ -586,6 +586,7 @@ export class GameSession {
                     maxHp: ps.kingState.maxHp,
                     damage,
                     source: 'lava',
+                    timestamp: Date.now(), position: { ...ps.kingBody.position },
                 });
             }
         });
@@ -607,7 +608,7 @@ export class GameSession {
             if (this.stateMachine.getPhase() === 'combat' && (body.position.y > CANVAS_HEIGHT + KING_HEIGHT || body.position.x < -KING_WIDTH || body.position.x > WORLD_WIDTH + KING_WIDTH)) {
                 const damage = ps.kingState.hp;
                 ps.kingState.hp = 0;
-                this.io.to(this.roomId).emit('king_damage', { side: ps.side, hp: 0, maxHp: ps.kingState.maxHp, damage, source: 'fall' });
+                this.io.to(this.roomId).emit('king_damage', { side: ps.side, hp: 0, maxHp: ps.kingState.maxHp, damage, source: 'fall', timestamp: Date.now(), position: { ...body.position } });
                 this.io.to(this.roomId).emit('king_dead', { side: ps.side });
             }
         }
@@ -801,6 +802,8 @@ export class GameSession {
             const processedPairs = new Set<string>();
             for (const pair of event.pairs) {
                 const { bodyA, bodyB } = pair;
+                const timestamp = Date.now();
+                let kingDamage = 0;
                 const pairId = [bodyA.id, bodyB.id].sort((a, b) => a - b).join(':');
                 if (processedPairs.has(pairId)) continue;
                 processedPairs.add(pairId);
@@ -827,6 +830,7 @@ export class GameSession {
                     if (kingHit && kingBody && otherBody && ps.kingState.hp > 0 && this.stateMachine.getPhase() === 'combat') {
                         const damage = Math.min(ps.kingState.hp, kingImpactDamage(kingBody, otherBody, speed));
                         if (damage > 0) {
+                            kingDamage = damage;
                             ps.kingState.hp = Math.max(0, ps.kingState.hp - damage);
                             ps.kingState.position = { x: ps.kingBody.position.x, y: ps.kingBody.position.y };
 
@@ -842,6 +846,7 @@ export class GameSession {
                                 maxHp: ps.kingState.maxHp,
                                 damage,
                                 source: otherBody.label,
+                                timestamp, position: { ...kingBody.position }, projectileId: projectile?.id,
                             });
 
                             if (ps.kingState.hp <= 0) {
@@ -856,28 +861,34 @@ export class GameSession {
                 const block = projectile && hitBody.label !== 'projectile' ? hitBody : null;
 
                 if (projectile && block) {
-                    this.io.to(this.roomId).emit('projectile_impact', {
-                        position: { x: projectile.position.x, y: projectile.position.y },
-                    });
+                    let appliedDamage = kingDamage, destroyed = false;
 
                     // Block HP damage (skip terrain, king, other projectiles)
                     const blockHp = (block as GameBody).blockHp;
                     if (blockHp != null && blockHp > 0 && block.label !== 'Terrain' && block.label !== 'king') {
                         const blockDamage = projectileBlockDamage(projectile, block, speed);
                         if (blockDamage > 0) {
+                            appliedDamage = Math.min(blockHp!, blockDamage);
                             (block as GameBody).blockHp = Math.max(0, blockHp - blockDamage);
 
                             if (((block as GameBody).blockHp ?? 0) <= 0) {
+                                destroyed = true;
                                 this.io.to(this.roomId).emit('block_destroyed', {
                                     bodyId: block.id,
                                     position: { x: block.position.x, y: block.position.y },
                                     material: block.label,
                                     velocity: { x: block.velocity.x, y: block.velocity.y },
+                                    timestamp,
                                 });
                                 Matter.Composite.remove(this.world, block);
                             }
                         }
                     }
+                    this.io.to(this.roomId).emit('projectile_impact', {
+                        position: { ...projectile.position }, timestamp, projectileId: projectile.id, targetId: block.id,
+                        target: block.label === 'king' ? 'king' : ['Terrain', 'Boundary', 'foundation'].includes(block.label) ? 'terrain' : 'block',
+                        material: block.label, damage: appliedDamage, destroyed,
+                    });
                 }
             }
         });

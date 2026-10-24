@@ -21,10 +21,13 @@ import { cannonPosition, predictTrajectory } from '../game/ballistics';
 import { kingFeedbackPosition, projectileOwner } from '../game/battleFeedback';
 import { canPlace, PLACEMENT_DIMENSIONS } from '../game/placement';
 import { clampCamera, createViewport, minimapRect, screenToWorld } from '../game/viewport';
-import { advanceBattleCamera, projectileCameraTarget, type BattleCameraState } from '../game/battleCamera';
+import { advanceBattleCamera, projectileCameraTarget, resizeBattleCamera, type BattleCameraState } from '../game/battleCamera';
+import type { BattlePreferences } from '../game/battlePreferences';
+import type { KingDamageEvent, ProjectileImpactEvent, BlockDestroyedEvent } from '../types';
 import './GameCanvas.css';
 
 interface GameCanvasProps {
+    preferences: BattlePreferences;
     gameState: GameState | null;
     terrain: TerrainData | null;
     onSpawn: (x: number, y: number) => void;
@@ -35,9 +38,9 @@ interface GameCanvasProps {
     phase: MatchPhase;
     turnPlayer: Side | null;
     onFire: (angle: number, power: number) => void;
-    setBlockDestroyedCallback: (cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => void;
-    setProjectileImpactCallback: (cb: ((data: { position: Vector }) => void) | null) => void;
-    setKingDamageCallback: (cb: ((data: { side: Side; damage: number }) => void) | null) => void;
+    setBlockDestroyedCallback: (cb: ((data: BlockDestroyedEvent) => void) | null) => void;
+    setProjectileImpactCallback: (cb: ((data: ProjectileImpactEvent) => void) | null) => void;
+    setKingDamageCallback: (cb: ((data: KingDamageEvent) => void) | null) => void;
     playerNames?: { left: string; right: string };
     hazards?: BattleHazard[];
     roundScore?: { left: number; right: number };
@@ -75,7 +78,7 @@ function GameCanvasInner(props: GameCanvasProps) {
     const pendingRef = useRef(false);
     const snapshots = useRef(new SnapshotInterpolator());
     const presented = useRef<RenderSnapshot | undefined>(undefined);
-    const presentationEvents = useRef<{ at: number; run: () => void }[]>([]);
+    const presentationEvents = useRef<{ at: number; timestamp?: number; run: () => void }[]>([]);
     const trajectory = useRef<Vector[]>([]);
     const particles = useRef(new ParticleSystem());
     const effects = useRef<BattleEffect[]>([]);
@@ -95,12 +98,12 @@ function GameCanvasInner(props: GameCanvasProps) {
     useEffect(() => {
         const media = matchMedia('(prefers-reduced-motion: reduce)');
         const update = () => {
-            reducedMotion.current = media.matches;
-            if (media.matches) particles.current.reset();
+            reducedMotion.current = media.matches || props.preferences.motion === 'reduced';
+            if (reducedMotion.current) { particles.current.reset(); cameraDissolve.current = null; }
         };
         update(); media.addEventListener('change', update);
         return () => media.removeEventListener('change', update);
-    }, []);
+    }, [props.preferences.motion]);
     useEffect(() => {
         const stage = stageRef.current;
         if (!stage) return;
@@ -128,11 +131,16 @@ function GameCanvasInner(props: GameCanvasProps) {
     }, [focus]);
 
     useEffect(() => {
+        const previous = view.current;
         view.current = createViewport(size.width, size.height, overview);
         lastResize.current = performance.now();
-        camera.current.x = clampCamera(camera.current.x, view.current);
-        camera.current.target = clampCamera(camera.current.target, view.current);
-    }, [size, overview]);
+        resizeBattleCamera(camera.current, previous, view.current);
+        gesture.current = null; ghost.current = undefined; pointers.current.clear();
+        const p = latest.current;
+        if (cameraHandoff.current !== null && p.phase === 'combat' && p.preferences.camera !== 'manual') {
+            focus(cannonPosition(p.turnPlayer ?? p.mySide, p.terrain?.points ?? []).x);
+        }
+    }, [size, overview, focus]);
     useEffect(() => {
         pendingRef.current = false; setShotPending(false);
         followedProjectile.current = null;
@@ -152,9 +160,9 @@ function GameCanvasInner(props: GameCanvasProps) {
             snapshots.current.reset(); presented.current = undefined; presentationEvents.current = [];
             kingDirectors.current.left.reset(); kingDirectors.current.right.reset(); kingActions.current = {};
             if (props.gameState) snapshots.current.push(props.gameState, performance.now());
-            focus(props.kingsHp[props.mySide].x ?? (props.mySide === 'left' ? 300 : 2100));
+            if (!camera.current.initialized || props.preferences.camera !== 'manual') focus(props.kingsHp[props.mySide].x ?? (props.mySide === 'left' ? 300 : 2100));
             if (!camera.current.initialized) { camera.current.x = camera.current.target; camera.current.initialized = true; }
-        } else if (props.phase === 'combat') {
+        } else if (props.phase === 'combat' && props.preferences.camera !== 'manual') {
             focus(cannonPosition(props.turnPlayer ?? props.mySide, props.terrain?.points ?? []).x);
             cameraHandoff.current = performance.now();
         }
@@ -162,13 +170,25 @@ function GameCanvasInner(props: GameCanvasProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [props.phase, props.turnPlayer, props.mySide]);
     useEffect(() => {
-        if (props.phase !== 'reveal') return;
+        if (props.phase !== 'reveal' || props.preferences.camera !== 'follow') return;
         if (reducedMotion.current) return;
         focus(props.kingsHp[props.mySide].x ?? 300);
-        const timer = setTimeout(() => focus(latest.current.kingsHp[props.mySide === 'left' ? 'right' : 'left'].x ?? 2100), 2200);
+        const timer = setTimeout(() => {
+            if (!reducedMotion.current && latest.current.preferences.camera === 'follow') focus(latest.current.kingsHp[props.mySide === 'left' ? 'right' : 'left'].x ?? 2100);
+        }, 2200);
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [props.phase, props.mySide, focus]);
+    }, [props.phase, props.mySide, props.preferences.camera, focus]);
+    useEffect(() => {
+        followedProjectile.current = null; cameraHandoff.current = null; cameraDissolve.current = null;
+        camera.current.target = camera.current.x; camera.current.velocity = 0;
+        const p = latest.current;
+        if (p.preferences.camera !== 'manual' && p.phase === 'combat') {
+            focus(cannonPosition(p.turnPlayer ?? p.mySide, p.terrain?.points ?? []).x);
+            cameraHandoff.current = performance.now();
+            if (p.preferences.camera === 'follow') followedProjectile.current = p.gameState?.bodies.find(body => body.label === 'projectile' && projectileOwner(body) === p.turnPlayer)?.id ?? null;
+        }
+    }, [props.preferences.camera, focus]);
     useEffect(() => {
         if (props.phase !== 'combat' || props.turnPlayer !== props.mySide || shotPending || inspect) {
             trajectory.current = []; return;
@@ -192,8 +212,8 @@ function GameCanvasInner(props: GameCanvasProps) {
             if (performance.now() - lastSound.current > 80) { sound(); lastSound.current = performance.now(); }
         };
         const { setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback } = latest.current;
-        const later = (run: () => void) => {
-            presentationEvents.current.push({ at: performance.now() + PRESENTATION_DELAY_MS, run });
+        const later = (run: () => void, timestamp?: number) => {
+            presentationEvents.current.push({ at: performance.now() + snapshots.current.delay, timestamp: Number.isFinite(timestamp) ? timestamp : undefined, run });
             if (presentationEvents.current.length > 128) presentationEvents.current.shift();
         };
         setBlockDestroyedCallback(data => later(() => {
@@ -202,17 +222,17 @@ function GameCanvasInner(props: GameCanvasProps) {
                 particles.current.emitSmoke(data.position.x, data.position.y);
             }
             addEffect({ ...data.position, at: performance.now(), kind: 'break', material: data.material }, playExplosion);
-        }));
+        }, data.timestamp));
         setProjectileImpactCallback(data => later(() => {
             followedProjectile.current = null;
             if (!reducedMotion.current) particles.current.emitImpact(data.position.x, data.position.y);
-            addEffect({ ...data.position, at: performance.now(), kind: 'impact' }, playImpact);
-        }));
+            addEffect({ ...data, ...data.position, at: performance.now(), kind: 'impact' }, () => playImpact(data.material));
+        }, data.timestamp));
         setKingDamageCallback(data => later(() => {
             const p = latest.current;
-            const position = kingFeedbackPosition(data.side, p.gameState, p.kingsHp[data.side]);
-            addEffect({ ...position, at: performance.now(), kind: 'damage', side: data.side, damage: Math.round(data.damage) }, playImpact);
-        }));
+            const position = data.position ?? kingFeedbackPosition(data.side, p.gameState, p.kingsHp[data.side]);
+            addEffect({ ...data, ...position, at: performance.now(), kind: 'damage' }, playImpact);
+        }, data.timestamp));
         return () => {
             setBlockDestroyedCallback(null); setProjectileImpactCallback(null); setKingDamageCallback(null);
         };
@@ -244,7 +264,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                     if (body.label !== 'projectile' || seenProjectiles.current.has(body.id)) continue;
                     seenProjectiles.current.add(body.id);
                     const side = projectileOwner(body);
-                    if (p.phase === 'combat' && side === p.turnPlayer) followedProjectile.current = body.id;
+                    if (p.phase === 'combat' && side === p.turnPlayer && p.preferences.camera === 'follow') followedProjectile.current = body.id;
                     const facing = side === 'left' ? 1 : -1;
                     const angle = side === p.mySide ? aimRef.current.angle : Math.atan2(-body.velocity.y, body.velocity.x * facing);
                     shot.current = { id: body.id, side, at: now, angle };
@@ -252,12 +272,14 @@ function GameCanvasInner(props: GameCanvasProps) {
                     if (!reducedMotion.current) particles.current.emitMuzzle(muzzle.x, muzzle.y, angle, facing);
                     playFire();
                 }
-                const due = presentationEvents.current.filter(event => event.at <= now);
-                presentationEvents.current = presentationEvents.current.filter(event => event.at > now);
-                due.forEach(event => event.run());
+                const ready = (event: (typeof presentationEvents.current)[number]) => event.timestamp === undefined
+                    ? event.at <= now : sample !== undefined && event.timestamp <= sample.timestamp;
+                const due = presentationEvents.current.filter(ready);
+                presentationEvents.current = presentationEvents.current.filter(event => !ready(event));
+                due.forEach(event => { if (event.timestamp === undefined || !sample || sample.timestamp - event.timestamp < 800) event.run(); });
                 if (keys.current.has('a')) { cam.target -= delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
                 if (keys.current.has('d')) { cam.target += delta * 0.55 / v.scale; cam.manualUntil = now + 12000; }
-                if (p.phase === 'combat' && !reducedMotion.current && cam.manualUntil < now) {
+                if (p.phase === 'combat' && p.preferences.camera === 'follow' && !reducedMotion.current && cam.manualUntil < now) {
                     const projectile = renderState?.bodies.find(b => b.id === followedProjectile.current);
                     if (projectile) {
                         const direction = shot.current?.angle === undefined ? 1 : Math.cos(shot.current.angle) * (projectileOwner(projectile) === 'left' ? 1 : -1);
@@ -271,7 +293,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                 if (handoffReady) cameraHandoff.current = null;
                 if (!distantHandoff && (!pendingHandoff || handoffReady)) advanceBattleCamera(cam, v, delta, p.phase === 'reveal', reducedMotion.current, cam.manualUntil > now);
                 particles.current.update(elapsed);
-                effects.current = effects.current.filter(e => now - e.at < (e.kind === 'damage' ? 950 : 420));
+                effects.current = effects.current.filter(e => now - e.at < (e.kind === 'damage' || e.target === 'block' ? 950 : 420));
                 const balls = renderState?.bodies.filter(body => body.label === 'projectile').map(body => ({
                     id: body.id, position: renderedPosition(body, transforms), velocity: body.velocity,
                 })) ?? [];
@@ -294,7 +316,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                     angle: aimRef.current.angle, trajectory: trajectory.current, hazards: p.hazards ?? [],
                     effects: effects.current, particles: particles.current, shot: shot.current, ghost: ghost.current,
                     projectileId: followedProjectile.current,
-                    kingActions: kingActions.current,
+                    kingActions: kingActions.current, hitLabels: p.preferences.hitLabels,
                     placementDimensions: PLACEMENT_DIMENSIONS[p.selectedShape ?? 'rectangle'] };
                 drawBattle(ctx, frame);
                 if (distantHandoff) {
@@ -332,6 +354,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                 aim: { degrees: Math.round(aimRef.current.angle * 180 / Math.PI), power: aimRef.current.power, pending: pendingRef.current },
                 viewport: view.current, camera: camera.current.x,
                 cameraMotion: { target: camera.current.target, velocity: camera.current.velocity, following: followedProjectile.current,
+                    mode: p.preferences.camera, motion: p.preferences.motion, hitLabels: p.preferences.hitLabels,
                     handoff: cameraDissolve.current ? { type: 'dissolve', age: performance.now() - cameraDissolve.current.at, duration: 360 } : null },
                 kings: p.kingsHp, artLoaded: cartoon.loaded,
                 reactionsLoaded: kingReactions.loaded,
@@ -345,7 +368,8 @@ function GameCanvasInner(props: GameCanvasProps) {
                 })])),
                 battleArtLoaded: battleArt.loaded,
                 rendering: { pixelRatio: renderPixelRatio(view.current.width, view.current.height, window.devicePixelRatio), reducedMotion: reducedMotion.current },
-                presentation: { delayMs: PRESENTATION_DELAY_MS, timestamp: presented.current?.timestamp,
+                presentation: { delayMs: presented.current?.delayMs ?? PRESENTATION_DELAY_MS, targetDelayMs: presented.current?.targetDelayMs,
+                    held: presented.current?.held, resynced: presented.current?.resynced, timestamp: presented.current?.timestamp,
                     snapshots: presented.current?.buffered ?? 0,
                     projectiles: presented.current?.state.bodies.filter(b => b.label === 'projectile').map(b => ({ id: b.id, ...renderedPosition(b, presented.current!.transforms) })) ?? [] },
                 kingCharacters: { left: kingReactions.identity('left'), right: kingReactions.identity('right') },
@@ -368,7 +392,8 @@ function GameCanvasInner(props: GameCanvasProps) {
             if (['a', 'd'].includes(e.key.toLowerCase())) keys.current.add(e.key.toLowerCase());
             const p = latest.current;
             if (e.key.toLowerCase() === 'f' && !e.repeat) {
-                if (document.fullscreenElement) void document.exitFullscreen(); else void stageRef.current?.parentElement?.requestFullscreen();
+                if (document.fullscreenElement) void document.exitFullscreen();
+                else void (stageRef.current?.closest<HTMLElement>('.game-container') ?? stageRef.current?.parentElement)?.requestFullscreen();
             }
             if (p.phase !== 'combat' || p.turnPlayer !== p.mySide || pendingRef.current || inspectRef.current) return;
             const { angle, power } = aimRef.current;

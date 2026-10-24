@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Vector, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile, CompactGameState, BodyState } from '../types';
+import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile, CompactGameState, BodyState } from '../types';
 import { debugStats, debugVisible } from '../debug/debugStats';
 import { track } from '../analytics/tracker';
 import { reconstructGameState } from './gameStateSnapshot';
+import type { KingDamageEvent, ProjectileImpactEvent, BlockDestroyedEvent } from '../types';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
@@ -86,9 +87,9 @@ export const useGameState = () => {
     }, []);
 
     // Callback refs for canvas effects
-    const blockDestroyedCbRef = useRef<((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null>(null);
-    const projectileImpactCbRef = useRef<((data: { position: Vector }) => void) | null>(null);
-    const kingDamageCbRef = useRef<((data: { side: Side; damage: number }) => void) | null>(null);
+    const blockDestroyedCbRef = useRef<((data: BlockDestroyedEvent) => void) | null>(null);
+    const projectileImpactCbRef = useRef<((data: ProjectileImpactEvent) => void) | null>(null);
+    const kingDamageCbRef = useRef<((data: KingDamageEvent) => void) | null>(null);
 
     useEffect(() => {
         const playerUuid = getOrCreateUuid();
@@ -163,12 +164,12 @@ export const useGameState = () => {
 
         // --- King events ---
 
-        socketRef.current.on('king_damage', (data: { side: Side; hp: number; maxHp: number; damage: number; source: string }) => {
+        socketRef.current.on('king_damage', (data: KingDamageEvent) => {
             setKingsHp(prev => ({
                 ...prev,
                 [data.side]: { ...prev[data.side], hp: data.hp, maxHp: data.maxHp },
             }));
-            kingDamageCbRef.current?.({ side: data.side, damage: data.damage });
+            kingDamageCbRef.current?.(data);
         });
 
         socketRef.current.on('king_dead', () => {
@@ -265,11 +266,11 @@ export const useGameState = () => {
 
         // --- Visual effects ---
 
-        socketRef.current.on('block_destroyed', (data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => {
+        socketRef.current.on('block_destroyed', (data: BlockDestroyedEvent) => {
             blockDestroyedCbRef.current?.(data);
         });
 
-        socketRef.current.on('projectile_impact', (data: { position: Vector }) => {
+        socketRef.current.on('projectile_impact', (data: ProjectileImpactEvent) => {
             projectileImpactCbRef.current?.(data);
         });
 
@@ -415,15 +416,15 @@ export const useGameState = () => {
         setMatchScores(null);
     }, []);
 
-    const setBlockDestroyedCallback = useCallback((cb: ((data: { bodyId: number; position: Vector; material: string; velocity: Vector }) => void) | null) => {
+    const setBlockDestroyedCallback = useCallback((cb: ((data: BlockDestroyedEvent) => void) | null) => {
         blockDestroyedCbRef.current = cb;
     }, []);
 
-    const setProjectileImpactCallback = useCallback((cb: ((data: { position: Vector }) => void) | null) => {
+    const setProjectileImpactCallback = useCallback((cb: ((data: ProjectileImpactEvent) => void) | null) => {
         projectileImpactCbRef.current = cb;
     }, []);
 
-    const setKingDamageCallback = useCallback((cb: ((data: { side: Side; damage: number }) => void) | null) => {
+    const setKingDamageCallback = useCallback((cb: ((data: KingDamageEvent) => void) | null) => {
         kingDamageCbRef.current = cb;
     }, []);
 

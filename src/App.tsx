@@ -9,7 +9,9 @@ import { Lobby } from './components/Lobby';
 import { PhaseOverlay } from './components/PhaseOverlay';
 import { ChatPanel } from './components/ChatPanel';
 import { RankBadge } from './components/RankBadge';
-import { KeyRound, Send, Loader2, CheckCircle2, AlertCircle, WifiOff, Volume2, VolumeX, MessageCircle, X } from 'lucide-react';
+import { KeyRound, Send, Loader2, CheckCircle2, AlertCircle, WifiOff, Volume2, VolumeX, MessageCircle, SlidersHorizontal, X } from 'lucide-react';
+import { BattleSettings } from './components/BattleSettings';
+import { readBattlePreferences, saveBattlePreferences, type BattlePreferences } from './game/battlePreferences';
 import { SpriteIcon } from './components/SpriteIcon';
 import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
@@ -60,6 +62,9 @@ function App() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showRankPanel, setShowRankPanel] = useState(false);
   const [muted, setMuted] = useState(isMuted());
+  const [battlePreferences, setBattlePreferences] = useState(readBattlePreferences);
+  const [showBattleSettings, setShowBattleSettings] = useState(false);
+  const changeBattlePreferences = (value: BattlePreferences) => { setBattlePreferences(value); saveBattlePreferences(value); };
   const apiDialogRef = useRef<HTMLDivElement>(null);
 
   // Determine screen: lobby or game
@@ -97,7 +102,7 @@ function App() {
       setSpawnCount(0);
       setGameMode('build');
     }
-    if (phase === 'lobby') setShowChat(false);
+    if (phase === 'lobby') { setShowChat(false); setShowBattleSettings(false); }
   }
 
   useEffect(() => {
@@ -360,6 +365,7 @@ function App() {
                   </div>
                   {phase !== 'result' && (
                     <div className="game-phase-actions">
+                      <button type="button" onClick={() => setShowBattleSettings(true)} aria-label="Game settings" title="Game settings" aria-haspopup="dialog" aria-expanded={showBattleSettings}><SlidersHorizontal size={18} aria-hidden="true" /></button>
                       <button
                         type="button"
                         onClick={() => setMuted(toggleMute())}
@@ -392,9 +398,12 @@ function App() {
                   )}
                 </div>
 
+                {showBattleSettings && <BattleSettings preferences={battlePreferences} onChange={changeBattlePreferences} onClose={() => setShowBattleSettings(false)} />}
+
                 {/* GameCanvas measures this flex slot, including its own combat dock. */}
                 <div className="game-canvas-slot">
                   <GameCanvas
+                    preferences={battlePreferences}
                     gameState={gameState}
                     terrain={terrain}
                     onSpawn={handleSpawn}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { advanceBattleCamera, projectileCameraTarget, type BattleCameraState } from './battleCamera';
+import { advanceBattleCamera, projectileCameraTarget, resizeBattleCamera, type BattleCameraState } from './battleCamera';
 import { createViewport } from './viewport';
 
 const state = (x = 0, target = 2000): BattleCameraState => ({ x, target, velocity: 0, manualUntil: 0, initialized: true });
@@ -36,4 +36,11 @@ test('tracking leaves the central band steady; invalid deltas and background gap
     assert.ok(cam.x - 400 < view.worldWidth * 1.65 * 0.05);
     const x = cam.x; advanceBattleCamera(cam, view, -10); assert.equal(cam.x, x);
     advanceBattleCamera(cam, view, 16, false, true); assert.equal(cam.x, cam.target); assert.equal(cam.velocity, 0);
+});
+test('resizing preserves the viewed world center instead of leaving the king at an old viewport edge', () => {
+    const before = createViewport(800, 560), after = createViewport(390, 600), cam = state(700, 900);
+    const center = cam.x + before.worldWidth / 2, target = cam.target + before.worldWidth / 2;
+    resizeBattleCamera(cam, before, after);
+    assert.equal(cam.x + after.worldWidth / 2, center);
+    assert.equal(cam.target + after.worldWidth / 2, target);
 });

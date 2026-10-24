@@ -13,6 +13,8 @@ import { CANNON_ART, MUZZLE_LOCAL } from './cannonPresentation';
 import { battleArt, type BattleArtName } from '../sprites/battleArt';
 import { gradeBackgroundPixels, groundTextureColumn, healthPanel, sceneryPlacement } from './battlePresentation';
 import { renderedPosition, type RenderTransform } from './snapshotInterpolation';
+import { hitFeedback, layoutHitFeedback, type BattleEffect } from './combatFeedback';
+export type { BattleEffect } from './combatFeedback';
 
 export interface BattleHazard {
     type: string;
@@ -24,7 +26,6 @@ export interface BattleHazard {
     windStrength?: number;
 }
 
-export interface BattleEffect { x: number; y: number; at: number; kind: 'impact' | 'break' | 'damage'; damage?: number; side?: Side; material?: string }
 export interface BattleFrame {
     view: Viewport;
     camera: number;
@@ -49,6 +50,7 @@ export interface BattleFrame {
     projectileId?: number | null;
     kingActions?: Partial<Record<Side, KingActionPose>>;
     placementDimensions: readonly [number, number];
+    hitLabels?: boolean;
 }
 
 const MATERIALS: Record<string, [string, string, string]> = {
@@ -529,15 +531,12 @@ export function drawBattle(ctx: CanvasRenderingContext2D, f: BattleFrame) {
         ctx.save();
         ctx.globalAlpha = 1 - age;
         if (effect.kind === 'damage') {
-            ctx.font = 'bold 21px system-ui'; ctx.textAlign = 'center';
-            ctx.lineWidth = 4; ctx.strokeStyle = '#fffaf0'; ctx.fillStyle = '#bb4445';
-            const text = `-${effect.damage}`;
-            const y = effect.y - 35 - age * (f.reducedMotion ? 0 : 30);
-            ctx.strokeText(text, effect.x, y); ctx.fillText(text, effect.x, y);
+            // Numbers are laid out in screen space below, independent of camera zoom.
         } else if (effect.kind === 'impact') {
-            ctx.strokeStyle = '#fff7cb';
-            ctx.lineWidth = 4 * (1 - age);
-            ctx.beginPath(); ctx.arc(effect.x, effect.y, 7 + age * (f.reducedMotion ? 3 : 35), 0, Math.PI * 2); ctx.stroke();
+            const ground = effect.target === 'terrain';
+            ctx.strokeStyle = ground ? '#d3c3a1' : effect.material === 'steel' ? '#b8e8fb' : '#fff0ae';
+            ctx.lineWidth = (ground ? 2 : 4) * (1 - age);
+            ctx.beginPath(); ctx.arc(effect.x, effect.y, 7 + age * (f.reducedMotion ? 3 : ground ? 19 : 35), 0, Math.PI * 2); ctx.stroke();
             if (!f.reducedMotion && age < 0.24) {
                 ctx.fillStyle = '#fff4c5';
                 ctx.beginPath(); ctx.ellipse(effect.x, effect.y, 12 * (1 - age), 9 * (1 - age), 0, 0, Math.PI * 2); ctx.fill();
@@ -553,6 +552,29 @@ export function drawBattle(ctx: CanvasRenderingContext2D, f: BattleFrame) {
     }
     ctx.restore();
     health(ctx, f, 'left'); health(ctx, f, 'right'); minimap(ctx, f);
+    const excluded = [{ x: 0, y: 0, width: f.view.width, height: 68 }, healthPanel(f.view.width, f.view.height, 'left'),
+        healthPanel(f.view.width, f.view.height, 'right'), minimapRect(f.view)];
+    const cues = f.effects.flatMap(effect => {
+        const cue = hitFeedback(effect, f.hitLabels !== false);
+        if (!cue || f.now - effect.at >= 950) return [];
+        const point = worldToScreen(effect, f.camera, f.view);
+        if (point.x < -50 || point.x > f.view.width + 50 || point.y < 0 || point.y > f.view.height + 50) return [];
+        return [{ ...cue, x: point.x, y: point.y - 56 - (f.reducedMotion ? 0 : (f.now - effect.at) / 950 * 20), at: effect.at }];
+    });
+    for (const cue of layoutHitFeedback(cues, f.view.width, f.view.height, excluded)) {
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - (f.now - cue.at) / 950);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#092339'; ctx.fillStyle = cue.color; ctx.lineWidth = 4;
+        const x = cue.box.x + cue.box.width / 2, y = cue.box.y;
+        if (cue.caption) {
+            ctx.font = '800 11px system-ui'; ctx.strokeText(cue.caption, x, y); ctx.fillText(cue.caption, x, y);
+        }
+        if (cue.amount) {
+            ctx.font = `800 ${cue.priority >= 90 ? 23 : 18}px system-ui`;
+            ctx.strokeText(cue.amount, x, y + (cue.caption ? 17 : 0)); ctx.fillText(cue.amount, x, y + (cue.caption ? 17 : 0));
+        }
+        ctx.restore();
+    }
     const projectile = f.state?.bodies.find(b => b.id === f.projectileId);
     if (projectile) {
         const point = worldToScreen(renderedPosition(projectile, f.transforms), f.camera, f.view);

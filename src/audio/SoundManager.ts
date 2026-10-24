@@ -172,15 +172,17 @@ export function playExplosion() {
 }
 
 /** Impact hit — projectile lands */
-export function playImpact() {
+export function playImpact(material?: string) {
     const c = getCtx(); if (!c) return;
     combatSound();
     const osc = tracked(c.createOscillator());
     const gain = c.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(200, c.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(50, c.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.15, c.currentTime);
+    const metal = material === 'steel', ice = material === 'ice';
+    const ground = material === 'Terrain' || material === 'Boundary' || material === 'foundation';
+    osc.type = metal ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(metal ? 900 : ice ? 750 : ground ? 90 : 200, c.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(metal ? 260 : ice ? 400 : ground ? 40 : 50, c.currentTime + 0.1);
+    gain.gain.setValueAtTime(metal ? .07 : ice ? .05 : ground ? .07 : .15, c.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.15);
     osc.connect(gain).connect(c.destination);
     osc.start();

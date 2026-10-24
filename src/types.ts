@@ -31,6 +31,18 @@ export interface KingHpState {
     y?: number;
 }
 
+export interface KingDamageEvent {
+    side: Side; hp: number; maxHp: number; damage: number; source: string;
+    timestamp?: number; position?: Vector; projectileId?: number;
+}
+export interface ProjectileImpactEvent {
+    position: Vector; timestamp?: number; projectileId?: number; targetId?: number;
+    target?: 'king' | 'block' | 'terrain'; material?: string; damage?: number; destroyed?: boolean;
+}
+export interface BlockDestroyedEvent {
+    bodyId: number; position: Vector; material: string; velocity: Vector; timestamp?: number;
+}
+
 export interface GameState {
     bodies: BodyState[];
     timestamp: number;

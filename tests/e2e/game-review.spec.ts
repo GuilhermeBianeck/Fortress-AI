@@ -44,7 +44,7 @@ test('reveal, turn handoffs and real shots have bounded continuous camera moveme
     for (let i = 1; i < samples.length; i++) {
         const previous = samples[i - 1], current = samples[i], seconds = (current.t - previous.t) / 1000;
         if (seconds <= 0 || seconds > .1) continue;
-        const speed = Math.abs(current.x - previous.x) / current.width / seconds;
+        const speed = Math.abs((current.x + current.width / 2) - (previous.x + previous.width / 2)) / current.width / seconds;
         if (speed > 1.85) {
             expect(current.handoff?.type).toBe('dissolve');
             expect(current.handoff!.age).toBeLessThan(40);

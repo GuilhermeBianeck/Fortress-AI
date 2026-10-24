@@ -4,6 +4,12 @@ import { clampCamera } from './viewport';
 export interface BattleCameraState { x: number; target: number; velocity: number; manualUntil: number; initialized: boolean }
 const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
 
+export function resizeBattleCamera(camera: BattleCameraState, before: Viewport, after: Viewport) {
+    const shift = (before.worldWidth - after.worldWidth) / 2;
+    camera.x = clampCamera(camera.x + shift, after);
+    camera.target = clampCamera(camera.target + shift, after);
+}
+
 /** Critically damped, speed-bounded travel in viewport units; no frame-rate-specific lerp. */
 export function advanceBattleCamera(camera: BattleCameraState, view: Viewport, deltaMs: number, reveal = false, reduced = false, manual = false) {
     camera.target = clampCamera(camera.target, view);

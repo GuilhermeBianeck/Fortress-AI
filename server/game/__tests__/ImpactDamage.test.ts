@@ -69,6 +69,11 @@ describe('Authoritative impact balance', () => {
         const damageEvents = emit.mock.calls.filter(call => call[0] === 'king_damage');
         expect(damageEvents).toHaveLength(1);
         expect(damageEvents[0][1].damage).toBeCloseTo(damage);
+        const impact = emit.mock.calls.find(call => call[0] === 'projectile_impact')![1];
+        expect(impact.target).toBe('king'); expect(impact.targetId).toBe(target.kingBody.id);
+        expect(impact.damage).toBeCloseTo(damage); expect(impact.timestamp).toBeTypeOf('number');
+        expect(damageEvents[0][1].timestamp).toBe(impact.timestamp);
+        expect(damageEvents[0][1].position.x).toBeTypeOf('number');
         expect(session.computeMatchScores('left').left.damageDealt).toBeCloseTo(damage, 0);
     });
 
@@ -87,7 +92,7 @@ describe('Authoritative impact balance', () => {
     });
 
     it.each(['wood', 'stone', 'steel'])('keeps %s durability distinct under the stronger block impact', material => {
-        const { session, engine, target } = fixture();
+        const { session, engine, target, emit } = fixture();
         Matter.Composite.remove(engine.world, target.kingBody);
         const block = Matter.Bodies.rectangle(900, 250, 30, 30, { ...MATERIAL_PROPS[material], label: material }) as Block;
         block.blockHp = block.blockMaxHp = MATERIAL_BLOCK_HP[material];
@@ -96,6 +101,10 @@ describe('Authoritative impact balance', () => {
         for (let i = 0; i < 6; i++) Matter.Engine.update(engine, 1000 / 120);
         if (material === 'steel') expect(block.blockHp).toBe(110);
         else expect(block.blockHp).toBe(0);
+        const impact = emit.mock.calls.find(call => call[0] === 'projectile_impact')![1];
+        expect(impact.target).toBe('block'); expect(impact.material).toBe(material);
+        expect(impact.damage).toBe(Math.min(MATERIAL_BLOCK_HP[material], 90));
+        expect(impact.destroyed).toBe(material !== 'steel');
         expect(PROJECTILE_BLOCK_DAMAGE_MULT).toBe(3);
     });
 

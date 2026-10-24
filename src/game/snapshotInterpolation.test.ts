@@ -59,3 +59,60 @@ test('rotations use the short arc and published endpoints stay immutable', () =>
     assert.ok(Math.abs(buffer.sample(150)!.transforms.get(1)!.angle - Math.PI) < 0.00001);
     assert.equal(a.bodies[0].position.x, 0); assert.equal(b.bodies[0].position.x, 100);
 });
+test('adaptive delay responds to a burst, recovers slowly, stays bounded and never rewinds the presentation clock', () => {
+    const buffer = new SnapshotInterpolator();
+    let last = -Infinity, peak = 100;
+    for (let now = 0; now < 8000; now += 10) {
+        // A transport burst: packets150-350 arrive together at400ms, then normal delivery returns.
+        if (now % 50 === 0 && (now < 150 || now >= 400)) {
+            if (now === 400) for (let timestamp = 150; timestamp < 400; timestamp += 50) buffer.push(state(timestamp), now);
+            buffer.push(state(now), now);
+        }
+        const frame = buffer.sample(now)!;
+        assert.ok(frame.timestamp >= last); last = frame.timestamp;
+        assert.ok(frame.delayMs >= 100 && frame.delayMs <= 240);
+        assert.ok(frame.timestamp <= now);
+        peak = Math.max(peak, frame.delayMs);
+    }
+    assert.ok(peak > 140);
+    assert.ok(buffer.delay < peak - 40);
+});
+test('a jitter-buffered stream never predicts past authority or interpolates a fabricated path through a long outage', () => {
+    const buffer = new SnapshotInterpolator(); buffer.push(state(0), 0); buffer.push(state(50), 50);
+    buffer.sample(150);
+    buffer.push(state(1000), 1000);
+    const recovery = buffer.sample(1000)!;
+    assert.equal(recovery.transforms.get(1)!.position.x, 50);
+    assert.ok(recovery.resynced);
+    buffer.push(state(1050, []), 1050);
+    const removed = buffer.sample(1300)!;
+    assert.equal(removed.state.bodies.length, 0);
+    assert.ok(removed.timestamp <= 1050);
+    buffer.reset(); assert.equal(buffer.delay, 100);
+});
+test('packet reordering, malformed clocks and repeated render calls do not corrupt the buffer', () => {
+    const buffer = new SnapshotInterpolator(); buffer.push(state(0), 0); buffer.push(state(50), 50);
+    buffer.push(state(NaN), 60); buffer.push(state(25), 70); buffer.push(state(100), 40);
+    const frame = buffer.sample(150)!;
+    assert.equal(frame.timestamp, 50);
+    assert.equal(buffer.sample(150)!.timestamp, 50);
+    assert.equal(buffer.sample(NaN), undefined);
+});
+test('adaptive buffering materially reduces held frames on a repeatable batched connection versus a fixed100ms buffer', () => {
+    const buffer = new SnapshotInterpolator();
+    let fixedHeld = 0, adaptiveHeld = 0, previousFixed = -Infinity, previousAdaptive = -Infinity, newest = 0;
+    for (let now = 0; now <= 6000; now += 10) {
+        if (now % 250 === 0) {
+            for (let timestamp = Math.max(0, now - 200); timestamp <= now; timestamp += 50) buffer.push(state(timestamp), now);
+            newest = now;
+        }
+        const fixed = Math.min(newest, now - 100), adaptive = buffer.sample(now)!;
+        if (now > 2000) {
+            if (fixed === previousFixed) fixedHeld++;
+            if (adaptive.timestamp === previousAdaptive) adaptiveHeld++;
+        }
+        assert.ok(adaptive.timestamp <= newest);
+        previousFixed = fixed; previousAdaptive = adaptive.timestamp;
+    }
+    assert.ok(adaptiveHeld < fixedHeld * .4, `${adaptiveHeld} adaptive holds vs ${fixedHeld} fixed holds`);
+});
