@@ -1,6 +1,6 @@
 # V12 Verification Receipt
 
-25 October 2026. Local implementation and automated verification completed; **physical-device sign-off and production publication remain pending**. Requirements were written first in `match-continuity-v12-requirements.md`.
+25 October 2026. V12 shipped together with the V13 mobile/camera release in `535eafe`; matching Vercel and VPS publication is verified. **Physical-device sign-off remains pending.** The local measurements below are the original V12 evidence; current counts and live acceptance are in `mobile-camera-v13.md`. Requirements were written first in `match-continuity-v12-requirements.md`.
 
 ## Delivered
 

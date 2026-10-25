@@ -1,6 +1,6 @@
 # Production Backend
 
-Last verified: 2026-10-24.
+Last verified: 2026-10-25.
 
 ## Layout
 
@@ -31,6 +31,8 @@ Updates include `proxy-addr` 2.0.8, `engine.io` 6.6.11, `socket.io-parser` 4.2.7
 Six development-dependency audit findings remain outside this production-only patch. Zero production audit findings is not a complete security assessment. The VPS login banner also reports an unsupported OS; schedule a supported OS/Node runtime upgrade separately rather than rebooting or replacing the shared host during game recovery.
 
 ## Future Backend Releases
+
+Runtime `535eafe` now includes authenticated reconnect and SQLite progression. Its deployment passed198 server tests on Node25.5.0. The service has an explicit persistent `FORTRESS_DB_PATH=/var/lib/fortress-ai/progression.sqlite` saved in PM2; keep that database and its WAL/SHM outside source deployments. See `progression-operations.md` for consistent backups/restoration and `mobile-camera-v13.md` for the latest public-site acceptance receipt. Pre-release environment/data/PM2 rollback material is protected in `/root/fortress-v13-20261025/`; a verified online snapshot is in `/var/backups/fortress-ai/`. Same-host backups do not replace offsite recovery.
 
 Pushing main deploys the frontend through Vercel. It does not, by itself, restart the VPS backend.
 

@@ -12,7 +12,7 @@
 
 ## Verification Receipt
 
-25 October 2026. Local implementation complete. Publication receipt will be added after the matching browser/server release.
+25 October 2026. Runtime release `535eafe` is on main and deployed to the matching Vercel website and VPS game server. Physical-device acceptance remains pending.
 
 ### Changes
 
@@ -38,3 +38,12 @@ The independent Matter benchmark was rerun with the new 760/1640 canonical canno
 ### Remaining Acceptance
 
 Physical iPhone 17 Pro listening, heat/battery and subjective motion comfort still need the user's device. Browser emulation is not hardware certification. The V12 20-minute soak is historical evidence for that implementation, not a new soak of V13. Legacy scores that were already lost in old in-memory server restarts cannot be reconstructed; new V12 results persist, but active physics worlds do not survive a server restart.
+
+### Publication And Live Acceptance
+
+- Pushed `535eafe` directly to main. GitHub's Vercel status reports success; verified the actual public website in a browser, not only a preview build.
+- Fast-forwarded `/home/claw/Fortress-AI` under the existing service owner. The VPS TypeScript build and all 198 backend tests passed on its Node25.5.0 runtime before restart. No dependencies or shared proxy services were changed.
+- Made a protected environment/data/PM2 rollback backup, repeatedly observed zero game-port connections, and restarted only `fortress-backend`. The production environment file is byte-identical to its backup and the pre-existing analytics log is preserved.
+- Progression now lives at `/var/lib/fortress-ai/progression.sqlite`, outside the checkout, under `claw`, directory0700/file0600. PM2's saved environment includes that absolute path. SQLite schema2 and `quick_check=ok` are verified. A consistent online backup also passed its independent integrity check under `/var/backups/fortress-ai/`; this is a same-host operational backup, not offsite disaster recovery.
+- Public-site seven-size menu/camera check passes: complete enemy reveal, nearby cannon, shot following after manual inspection, 27 captured flight frames with no offscreen samples, and impact retained through the next turn. Real private PvP records left/right king hits of55/54 HP, with130/131 flight samples in the two viewers and none offscreen. Right-side Manual resume, result reload and saved Victory history after another menu reload pass, with no page exceptions. The result in this persistence check came from a deliberate private-room exit, not a claimed full lethal match.
+- Inspected live menu/combat/hit screenshots. All QA browser contexts were closed after the checks. Physical hardware and sustained V13 comfort checks remain the limits described above.

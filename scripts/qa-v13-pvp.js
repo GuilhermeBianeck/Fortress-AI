@@ -66,8 +66,19 @@ async (page) => {
         await a.getByRole('button', { name: 'Leave battle', exact: true }).click();
         await a.getByRole('button', { name: 'Leave battle', exact: true }).click();
         await b.locator('.battle-result').waitFor({ state: 'visible' });
+        await b.reload(); await b.locator('.battle-result').waitFor({ state: 'visible' });
+        await b.getByRole('button', { name: 'New Game', exact: true }).click();
+        await b.locator('.menu-progression > summary').click();
+        await b.locator('.campaign-history > summary').click();
+        await b.locator('.campaign-history li').first().waitFor();
+        assert((await b.locator('.campaign-history li').first().innerText()).includes('Victory'), 'Committed result not in history');
+        await b.reload();
+        await b.locator('.menu-progression > summary').click();
+        await b.locator('.campaign-history > summary').click();
+        await b.locator('.campaign-history li').first().waitFor();
+        assert((await b.locator('.campaign-history li').first().innerText()).includes('Victory'), 'History lost after menu reload');
         assert(!errors.length, errors.join('; '));
-        reports.push({ check: 'right-side Manual resume and final result visible after delay', errors });
+        reports.push({ check: 'right-side Manual resume, result reload, committed history survives another menu reload', errors });
         return reports;
     } finally { await aContext.close(); await bContext.close(); }
 }
