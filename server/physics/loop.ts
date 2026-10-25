@@ -99,9 +99,16 @@ export class GameLoop {
     }
 
     private broadcastState() {
+        this.io.to(this.roomId).emit('gameState', this.snapshot());
+    }
+
+    getFullState() { return this.snapshot(true); }
+    publishFullState(): void { this.io.to(this.roomId).emit('gameState', this.getFullState()); }
+
+    private snapshot(full = false) {
         const allBodies = Matter.Composite.allBodies(this.engine.world);
-        this.snapshotCount++;
-        const isFullSync = this.snapshotCount % FULL_SYNC_INTERVAL === 0;
+        if (!full) this.snapshotCount++;
+        const isFullSync = full || this.snapshotCount % FULL_SYNC_INTERVAL === 0;
 
         // New bodies: full metadata (sent once per body, or on full-sync)
         const newBodies: object[] = [];
@@ -137,7 +144,7 @@ export class GameLoop {
                     velocity: { x: body.velocity.x, y: body.velocity.y },
                     blockHp: (body as LoopBody).blockHp ?? null,
                 });
-                this.knownBodyIds.add(body.id);
+                if (!full) this.knownBodyIds.add(body.id);
             } else if (!body.isStatic) {
                 // Known dynamic body: send only compact positional data
                 // Rounding reduces JSON size and avoids false precision
@@ -159,14 +166,14 @@ export class GameLoop {
         for (const id of this.knownBodyIds) {
             if (!currentIds.has(id)) {
                 removed.push(id);
-                this.knownBodyIds.delete(id);
+                if (!full) this.knownBodyIds.delete(id);
             }
         }
 
         const leftKing = this.kingStates.get('left');
         const rightKing = this.kingStates.get('right');
 
-        this.io.to(this.roomId).emit('gameState', {
+        return {
             // Compact delta-encoded payload
             u: updates,       // dynamic body updates (array tuples)
             n: newBodies,      // new/full-sync body metadata
@@ -177,6 +184,6 @@ export class GameLoop {
                 r: { hp: rightKing?.hp ?? 0, maxHp: rightKing?.maxHp ?? 0, x: rightKing?.position.x, y: rightKing?.position.y },
             },
             f: isFullSync ? 1 : 0,  // full sync flag
-        });
+        };
     }
 }

@@ -19,6 +19,16 @@ function fixture(bot = false) {
 afterEach(() => { for (const session of sessions.splice(0)) session.destroy(); vi.useRealTimers(); });
 
 describe('king placement, survivability and defeat', () => {
+    it('places both authoritative cannons in front of and close to their own kings', () => {
+        const { session } = fixture();
+        const cannons = session.getTerrainData().cannons;
+        for (const side of ['left', 'right'] as const) {
+            const player = session.getPlayerBySide(side)!;
+            expect(player.cannonX - player.kingBody.position.x).toBe(side === 'left' ? 160 : -160);
+            expect(cannons[side]?.x).toBe(player.cannonX);
+            expect(cannons[side]?.y).toBeLessThan(600);
+        }
+    });
     it('uses an upright character body and safe construction support that releases in combat', () => {
         const { session } = fixture();
         const king = session.getPlayerBySide('left')!.kingBody;
@@ -124,6 +134,8 @@ describe('king placement, survivability and defeat', () => {
         vi.advanceTimersByTime(6000); expect(roundEnd).toHaveBeenCalledTimes(1);
         expect(king.position.x).toBe(defeatedX);
         expect(emit.mock.calls.filter(call => call[0] === 'king_dead')).toHaveLength(1);
+        const snapshots = emit.mock.calls.filter(call => call[0] === 'gameState');
+        expect(snapshots[snapshots.length - 1]?.[1].k.r.hp).toBe(0);
         expect(session.computeMatchScores('left').left.damageDealt).toBeCloseTo(100);
     });
     it('an out-of-world king is defeated instead of leaving an unwinnable round running', () => {

@@ -1,5 +1,7 @@
 import type { Side } from '../types';
-import { BOT_FIRE_DELAY_MS, BOT_BUILD_DELAY_MS } from '../config/constants';
+import { BOT_BUILD_DELAY_MS } from '../config/constants';
+import { BOT_SKILL, type BotDifficulty } from '../shared/difficulty';
+import { PausableTimers, type TimerId } from './PausableTimers';
 import { findBotShot, type BallisticsScene, type BotShotPlan } from './botBallistics';
 import type Matter from 'matter-js';
 
@@ -57,8 +59,8 @@ export interface BotShotObservation {
 export class BotAI {
     private side: Side;
     private deps: BotAIDeps;
-    private fireTimer?: ReturnType<typeof setTimeout>;
-    private buildTimer?: ReturnType<typeof setTimeout>;
+    private fireTimer?: TimerId;
+    private buildTimer?: TimerId;
     private destroyed = false;
     private aimOffsetX = 0;
     private observations = 0;
@@ -67,7 +69,7 @@ export class BotAI {
     private lastWind = '';
     private random: () => number;
 
-    constructor(side: Side, deps: BotAIDeps) {
+    constructor(side: Side, deps: BotAIDeps, private difficulty: BotDifficulty = 'normal', private timers = new PausableTimers()) {
         this.side = side;
         this.deps = deps;
         this.random = deps.random ?? Math.random;
@@ -75,7 +77,8 @@ export class BotAI {
     }
 
     resetRound(): void {
-        this.aimOffsetX = (this.random() < 0.5 ? -1 : 1) * (140 + this.random() * 40);
+        const skill = BOT_SKILL[this.difficulty];
+        this.aimOffsetX = (this.random() < 0.5 ? -1 : 1) * (skill.initialOffset + this.random() * skill.offsetRange);
         this.observations = 0;
         this.pendingShot = undefined;
         this.lastTarget = undefined;
@@ -84,10 +87,10 @@ export class BotAI {
 
     buildFortress(): void {
         if (this.destroyed) return;
-        clearTimeout(this.buildTimer);
-        clearTimeout(this.fireTimer);
+        this.timers.clear(this.buildTimer);
+        this.timers.clear(this.fireTimer);
         this.resetRound();
-        this.buildTimer = setTimeout(() => {
+        this.buildTimer = this.timers.timeout(() => {
             this.buildTimer = undefined;
             if (this.destroyed || !this.deps.canBuild()) return;
             const kingPos = this.deps.getKingPosition();
@@ -105,8 +108,11 @@ export class BotAI {
 
     takeTurn(): void {
         if (this.destroyed || !this.deps.canFire()) return;
-        clearTimeout(this.fireTimer);
-        this.fireTimer = setTimeout(() => {
+        this.timers.clear(this.fireTimer);
+        this.fireTimer = this.timers.timeout(() => this.fireTurn(), BOT_SKILL[this.difficulty].thinkMs);
+    }
+
+    fireTurn(): void {
             this.fireTimer = undefined;
             if (this.destroyed || !this.deps.canFire()) return;
             const scene = this.deps.getBallisticsScene();
@@ -118,12 +124,12 @@ export class BotAI {
             this.lastTarget = { ...scene.target };
             this.lastWind = wind;
             // Training uncertainty decreases only after observed shots, never merely with time.
-            const uncertainty = Math.max(7, 18 - this.observations * 3);
+            const skill = BOT_SKILL[this.difficulty];
+            const uncertainty = Math.max(skill.minimumUncertainty, skill.uncertainty - this.observations * skill.uncertaintyStep);
             const plan = findBotShot(scene, this.aimOffsetX + (this.random() * 2 - 1) * uncertainty);
             if (this.destroyed || !this.deps.canFire()) return;
             const id = this.deps.fireProjectile(this.side, plan.angle, plan.power);
             if (id !== undefined) this.pendingShot = { id, plan, targetBodyId: scene.targetBodyId };
-        }, BOT_FIRE_DELAY_MS);
     }
 
     observeShot(observation: BotShotObservation): void {
@@ -132,20 +138,22 @@ export class BotAI {
         this.pendingShot = undefined;
         if (!Number.isFinite(observation.closest.x) || !Number.isFinite(observation.closest.y)) return;
         this.observations++;
+        const skill = BOT_SKILL[this.difficulty];
         const blocked = observation.hitLabel && !['Terrain', 'Boundary', 'king'].includes(observation.hitLabel);
         if (blocked || observation.hitBodyId === pending.targetBodyId) {
-            this.aimOffsetX *= 0.65;
+            this.aimOffsetX *= skill.hitDecay;
         } else {
             const miss = observation.closest.x - pending.plan.target.x;
-            const correction = Math.max(-70, Math.min(70, miss * 0.7));
-            this.aimOffsetX = Math.max(-140, Math.min(140, (this.aimOffsetX - correction) * 0.75));
+            const correction = Math.max(-70, Math.min(70, miss * skill.correction));
+            const limit = this.difficulty === 'easy' ? 280 : 140;
+            this.aimOffsetX = Math.max(-limit, Math.min(limit, (this.aimOffsetX - correction) * skill.decay));
         }
     }
 
     destroy(): void {
         this.destroyed = true;
-        clearTimeout(this.fireTimer);
-        clearTimeout(this.buildTimer);
+        this.timers.clear(this.fireTimer);
+        this.timers.clear(this.buildTimer);
         this.pendingShot = undefined;
     }
 }

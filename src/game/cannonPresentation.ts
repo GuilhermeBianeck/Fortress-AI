@@ -14,8 +14,8 @@ export const MUZZLE_LOCAL = {
 };
 
 /** Visual attachment only: never changes the server's projectile launch position. */
-export function cannonMuzzle(side: Side, angle: number, points: readonly Vector[]): Vector {
-    const origin = cannonPosition(side, points);
+export function cannonMuzzle(side: Side, angle: number, points: readonly Vector[], cannons?: Partial<Record<Side, Vector>>): Vector {
+    const origin = cannonPosition(side, points, cannons);
     const facing = side === 'left' ? 1 : -1;
     return {
         x: origin.x + facing * (MUZZLE_LOCAL.x * Math.cos(angle) + MUZZLE_LOCAL.y * Math.sin(angle)),

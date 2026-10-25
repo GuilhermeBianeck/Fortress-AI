@@ -1,473 +1,322 @@
-import { Server } from 'socket.io';
+import { randomUUID } from 'node:crypto';
+import { Server, type Socket } from 'socket.io';
 import { GameSession } from './GameSession';
 import { ScoreManager } from './ScoreManager';
-import type { PlayerInfo, MatchPhase, Side, PlayerProfile, MatchHistoryEntry, MatchScores } from '../types';
-import { ROUNDS_TO_WIN, ROUND_INTERSTITIAL_MS, MAX_MATCH_HISTORY } from '../config/constants';
+import { ProfileStore, type Award, type Identity, type MatchRecord } from '../storage/ProfileStore';
+import { botDifficulty, type BotDifficulty } from '../shared/difficulty';
+import type { RewardKind } from '../shared/progression';
+import type { PlayerInfo, MatchPhase, Side, MatchScores } from '../types';
+import { ROUNDS_TO_WIN, ROUND_INTERSTITIAL_MS } from '../config/constants';
 
+export const RECONNECT_GRACE_MS = 20_000;
+export const MATCH_GRACE_BUDGET_MS = 60_000;
+interface Absence { since: number; deadline: number; timer: ReturnType<typeof setTimeout> }
 export interface Room {
-    id: string;
-    players: Map<string, PlayerInfo>;
-    session: GameSession | null;
-    phase: MatchPhase;
-    rematchRequests: Set<string>;
-    roundScore: { left: number; right: number };
-    currentRound: number;
-    nextRoundTimer: ReturnType<typeof setTimeout> | null;
-    scoreManager: ScoreManager;
+    id: string; matchId: string; mode: 'single' | 'pvp'; difficulty: BotDifficulty;
+    players: Map<string, PlayerInfo>; session: GameSession | null; phase: MatchPhase;
+    rematchRequests: Set<string>; roundScore: { left: number; right: number }; currentRound: number;
+    nextRoundTimer: ReturnType<typeof setTimeout> | null; nextRoundAt: number; nextRoundRemaining: number;
+    scoreManager: ScoreManager; absences: Map<string, Absence>; graceUsed: Map<string, number>;
+    chat: { id: string; sender: string; side: Side; text: string; timestamp: number }[];
+    result: { winner: Side; reason: string } | null; scores: MatchScores | null; roundWinner: Side | null;
+    saveStatus: 'idle' | 'pending' | 'saved';
+    pausedAt: number | null;
 }
-
 function generateRoomId(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 for clarity
-    let id = '';
-    for (let i = 0; i < 6; i++) {
-        id += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return id;
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
+const cleanName = (name: unknown, fallback: string) => typeof name === 'string' ? name.trim().slice(0, 20).replace(/[^\w\s-]/g, '') || fallback : fallback;
 
 export class RoomManager {
-    rooms: Map<string, Room> = new Map();
-    playerRoomMap: Map<string, string> = new Map(); // socketId → roomId
-    private playerProfiles: Map<string, PlayerProfile> = new Map(); // uuid → profile
-    private socketUuids: Map<string, string> = new Map(); // socketId → uuid
+    rooms = new Map<string, Room>();
+    playerRoomMap = new Map<string, string>();
+    private socketUuids = new Map<string, string>();
+    private identitySockets = new Map<string, string>();
     private matchmakingQueue: string[] = [];
-    private queueNames: Map<string, string> = new Map(); // socketId → name
-    private io: Server;
+    private queueNames = new Map<string, string>();
+    private pendingAwards = new Map<string, { awards: Award[]; metadata: MatchRecord; room: Room }>();
+    private retryTimer: ReturnType<typeof setInterval>;
     private cleanupInterval: ReturnType<typeof setInterval>;
-
-    constructor(io: Server) {
-        this.io = io;
-
-        // Periodic cleanup of empty/stale rooms
+    private closed = false;
+    constructor(private io: Server, readonly store = new ProfileStore()) {
         this.cleanupInterval = setInterval(() => this.cleanupStaleRooms(), 60_000);
+        this.retryTimer = setInterval(() => this.retrySaves(), 5000);
     }
 
-    registerUuid(socketId: string, uuid: string): void {
-        if (!uuid || typeof uuid !== 'string') return;
-        // Validate UUID v4 format to prevent arbitrary key injection
-        const uuidV4Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidV4Pattern.test(uuid)) return;
-        this.socketUuids.set(socketId, uuid);
+    authenticate(socket: Socket, credential: unknown): Identity {
+        const identity = this.store.authenticate(credential);
+        const oldId = this.identitySockets.get(identity.id);
+        this.socketUuids.set(socket.id, identity.id);
+        this.identitySockets.set(identity.id, socket.id);
+        if (oldId && oldId !== socket.id) {
+            this.leaveQueue(oldId);
+            const room = this.getRoom(oldId);
+            if (room) {
+                const absent = room.absences.get(oldId);
+                if (absent && Date.now() >= absent.deadline) this.expire(room, oldId);
+                if (room.players.has(oldId)) {
+                    const player = room.players.get(oldId)!;
+                    if (absent) {
+                        clearTimeout(absent.timer);
+                        room.graceUsed.set(identity.id, (room.graceUsed.get(identity.id) ?? 0) + Date.now() - absent.since);
+                        room.absences.delete(oldId);
+                    }
+                    room.players.delete(oldId); player.socketId = socket.id; room.players.set(socket.id, player);
+                    this.playerRoomMap.delete(oldId); this.playerRoomMap.set(socket.id, room.id);
+                    room.session?.rebindPlayer(oldId, socket.id);
+                    if (room.rematchRequests.delete(oldId)) room.rematchRequests.add(socket.id);
+                    socket.join(room.id);
+                    if (!room.absences.size) this.resumeRoom(room, socket.id);
+                }
+            }
+            this.socketUuids.delete(oldId);
+            const oldSocket = this.io.sockets.sockets.get(oldId);
+            oldSocket?.emit('identity_replaced');
+            oldSocket?.disconnect(true);
+        }
+        socket.emit('identity', identity);
+        this.sync(socket.id);
+        return identity;
     }
 
-    createRoom(hostSocketId: string, name?: string, mode: 'pvp' | 'single' = 'pvp'): Room {
-        let roomId: string;
-        do {
-            roomId = generateRoomId();
-        } while (this.rooms.has(roomId));
-
+    private ensureIdentity(socketId: string): void {
+        if (socketId.startsWith('bot-') || this.socketUuids.has(socketId)) return;
+        const identity = this.store.authenticate(null);
+        this.socketUuids.set(socketId, identity.id); this.identitySockets.set(identity.id, socketId);
+    }
+    createRoom(host: string, name?: string, mode: 'pvp' | 'single' = 'pvp', difficulty?: unknown): Room {
+        if (this.getRoom(host)) throw new Error('Leave your current room first.');
+        if (this.pendingAwards.size) throw new Error('Progress saving is recovering. Please try again shortly.');
+        this.ensureIdentity(host); this.leaveQueue(host);
+        let id: string; do { id = generateRoomId(); } while (this.rooms.has(id));
         const room: Room = {
-            id: roomId,
-            players: new Map(),
-            session: null,
-            phase: 'lobby',
-            rematchRequests: new Set(),
-            roundScore: { left: 0, right: 0 },
-            currentRound: 1,
-            nextRoundTimer: null,
-            scoreManager: new ScoreManager(),
+            id, matchId: randomUUID(), mode: mode === 'single' ? 'single' : 'pvp', difficulty: botDifficulty(difficulty),
+            players: new Map(), session: null, phase: 'lobby', rematchRequests: new Set(),
+            roundScore: { left: 0, right: 0 }, currentRound: 1, nextRoundTimer: null, nextRoundAt: 0, nextRoundRemaining: 0,
+            scoreManager: new ScoreManager(), absences: new Map(), graceUsed: new Map(), chat: [], result: null, scores: null, roundWinner: null, saveStatus: 'idle', pausedAt: null,
         };
-
-        const playerInfo: PlayerInfo = {
-            socketId: hostSocketId,
-            side: 'left',
-            ready: false,
-            name: (name?.trim().slice(0, 20).replace(/[^\w\s-]/g, '')) || 'Player 1',
-        };
-
-        room.players.set(hostSocketId, playerInfo);
-        this.rooms.set(roomId, room);
-        this.playerRoomMap.set(hostSocketId, roomId);
-
-        // If single player, add a dummy bot immediately
+        room.players.set(host, { socketId: host, side: 'left', ready: false, name: cleanName(name, 'Player 1') });
+        this.rooms.set(id, room); this.playerRoomMap.set(host, id);
         if (mode === 'single') {
-            const botId = `bot-${Date.now()}`;
-            const botInfo: PlayerInfo = {
-                socketId: botId,
-                side: 'right',
-                ready: true, // Bot is always ready
-                name: 'Training Bot',
-            };
-            room.players.set(botId, botInfo);
-            // We map the bot ID too, so it gets cleaned up if we iterate players
-            this.playerRoomMap.set(botId, roomId);
+            const botId = 'bot-' + randomUUID();
+            room.players.set(botId, { socketId: botId, side: 'right', ready: true, name: 'Training Bot' });
+            this.playerRoomMap.set(botId, id);
         }
-
         return room;
     }
-
-    joinRoom(roomId: string, socketId: string, name?: string): Room | null {
-        const room = this.rooms.get(roomId);
-        if (!room) return null;
-        if (room.players.size >= 2) return null;
-        if (room.phase !== 'lobby') return null;
-
-        const playerInfo: PlayerInfo = {
-            socketId,
-            side: [...room.players.values()].some(player => player.side === 'left') ? 'right' : 'left',
-            ready: false,
-            name: (name?.trim().slice(0, 20).replace(/[^\w\s-]/g, '')) || 'Player 2',
-        };
-
-        room.players.set(socketId, playerInfo);
-        this.playerRoomMap.set(socketId, roomId);
-
-        return room;
+    joinRoom(id: string, socketId: string, name?: string): Room | null {
+        const room = this.rooms.get(id);
+        if (!room || room.players.size >= 2 || room.phase !== 'lobby' || this.getRoom(socketId)) return null;
+        this.ensureIdentity(socketId); this.leaveQueue(socketId);
+        room.players.set(socketId, { socketId, side: [...room.players.values()].some(p => p.side === 'left') ? 'right' : 'left', ready: false, name: cleanName(name, 'Player 2') });
+        this.playerRoomMap.set(socketId, id); return room;
     }
-
-    joinQueue(socketId: string, name?: string): void {
-        if (!this.matchmakingQueue.includes(socketId)) {
-            this.matchmakingQueue.push(socketId);
-            this.queueNames.set(socketId, (name?.trim()) || 'Player');
-        }
+    joinQueue(id: string, name?: string): void {
+        if (this.getRoom(id) || this.pendingAwards.size) return;
+        this.ensureIdentity(id);
+        if (!this.matchmakingQueue.includes(id)) { this.matchmakingQueue.push(id); this.queueNames.set(id, cleanName(name, 'Player')); }
     }
-
-    leaveQueue(socketId: string): void {
-        this.matchmakingQueue = this.matchmakingQueue.filter(id => id !== socketId);
-        this.queueNames.delete(socketId);
-    }
-
+    leaveQueue(id: string): void { this.matchmakingQueue = this.matchmakingQueue.filter(s => s !== id); this.queueNames.delete(id); }
     tryMatchFromQueue(): Room | null {
-        if (this.matchmakingQueue.length < 2) return null;
-
-        const player1 = this.matchmakingQueue.shift()!;
-        const player2 = this.matchmakingQueue.shift()!;
-        const name1 = this.queueNames.get(player1) || 'Player 1';
-        const name2 = this.queueNames.get(player2) || 'Player 2';
-        this.queueNames.delete(player1);
-        this.queueNames.delete(player2);
-
-        const room = this.createRoom(player1, name1);
-        this.joinRoom(room.id, player2, name2);
-
-        return room;
+        if (this.matchmakingQueue.length < 2 || this.pendingAwards.size) return null;
+        const [a, b] = this.matchmakingQueue.splice(0, 2);
+        const nameA = this.queueNames.get(a), nameB = this.queueNames.get(b);
+        this.queueNames.delete(a); this.queueNames.delete(b);
+        const room = this.createRoom(a, nameA); this.joinRoom(room.id, b, nameB); return room;
+    }
+    getQueuePosition(id: string) { return this.matchmakingQueue.indexOf(id); }
+    getRoom(id: string) { return this.rooms.get(this.playerRoomMap.get(id) ?? '') ?? null; }
+    getRoomById(id: string) { return this.rooms.get(id) ?? null; }
+    getPlayerUuid(id: string) { return this.socketUuids.get(id); }
+    getProfile(id: string) { const uuid = this.socketUuids.get(id); return uuid ? this.store.profile(uuid) : null; }
+    history(id: string, cursor?: string, limit?: number) {
+        const uuid = this.socketUuids.get(id); if (!uuid) throw new Error('Identity unavailable');
+        return this.store.history(uuid, cursor, limit);
+    }
+    claim(id: string, kind: RewardKind): number {
+        const uuid = this.socketUuids.get(id); if (!uuid || this.pendingAwards.size) throw new Error('Progress saving is recovering');
+        const amount = this.store.claim(uuid, kind); this.io.to(id).emit('profile_update', this.getProfile(id)); return amount;
     }
 
-    handleDisconnect(socketId: string): void {
-        // Remove from queue (also cleans up queueNames)
-        this.leaveQueue(socketId);
-
-        const roomId = this.playerRoomMap.get(socketId);
-        if (!roomId) return;
-
-        const room = this.rooms.get(roomId);
-        if (!room) {
-            this.playerRoomMap.delete(socketId);
-            return;
+    handleTransportLoss(id: string): void {
+        this.leaveQueue(id);
+        const room = this.getRoom(id);
+        if (!room || room.absences.has(id)) return;
+        const uuid = this.socketUuids.get(id)!;
+        const remaining = MATCH_GRACE_BUDGET_MS - (room.graceUsed.get(uuid) ?? 0);
+        if (room.pausedAt === null) room.pausedAt = Date.now();
+        const duration = Math.max(0, Math.min(RECONNECT_GRACE_MS, remaining));
+        room.absences.set(id, { since: Date.now(), deadline: Date.now() + duration, timer: setTimeout(() => this.expire(room, id), duration) });
+        room.session?.pause();
+        if (room.nextRoundTimer) {
+            room.nextRoundRemaining = Math.max(0, room.nextRoundAt - Date.now()); this.clearNextRound(room);
         }
-
-        const playerInfo = room.players.get(socketId);
-        room.players.delete(socketId);
-        this.playerRoomMap.delete(socketId);
-
-        // Clear rematch requests on disconnect
-        room.rematchRequests.delete(socketId);
-        this.clearNextRound(room);
-        if (room.phase === 'lobby') {
-            for (const player of room.players.values()) player.ready = false;
-        }
-
-        // A bot is not a connected player. Stop abandoned solo simulations immediately.
-        if (![...room.players.keys()].some(id => !id.startsWith('bot-'))) {
-            this.disposeRoom(room);
-            this.socketUuids.delete(socketId);
-            return;
-        }
-
-        // If match was in progress, opponent wins by forfeit
-        if (room.session && room.phase !== 'lobby' && room.phase !== 'result') {
-            const remainingPlayer = Array.from(room.players.values())[0];
-            if (remainingPlayer) {
-                room.phase = 'result';
-                room.session.handleForfeit();
-                this.io.to(roomId).emit('match_result', {
-                    winner: remainingPlayer.side,
-                    reason: 'opponent_disconnected',
-                    kings: room.session.getKingsHp(),
-                });
-                this.io.to(roomId).emit('phase_change', { phase: 'result' });
-            }
-        }
-
-        // Notify remaining player
-        if (playerInfo) {
-            this.io.to(roomId).emit('player_left', {
-                side: playerInfo.side,
-                reason: 'disconnected',
-            });
-        }
-
-        this.socketUuids.delete(socketId);
+        this.io.to(room.id).emit('match_paused', this.pauseState(room));
+    }
+    private pauseState(room: Room) {
+        return { paused: room.absences.size > 0, at: room.pausedAt ?? Date.now(), missing: [...room.absences].map(([id, a]) => ({ side: room.players.get(id)!.side, deadline: a.deadline })) };
+    }
+    private resumeRoom(room: Room, excludeId?: string): void {
+        room.pausedAt = null;
+        room.session?.resume();
+        if (room.phase === 'intermission' && room.nextRoundRemaining > 0) this.scheduleNextRound(room, room.nextRoundRemaining);
+        for (const id of room.players.keys()) if (id !== excludeId) this.sync(id);
+    }
+    private expire(room: Room, id: string): void {
+        if (this.rooms.get(room.id) !== room || !room.absences.has(id)) return;
+        const connectedHuman = [...room.players.keys()].some(s => !s.startsWith('bot-') && !room.absences.has(s));
+        if (!connectedHuman) { this.disposeRoom(room); return; }
+        this.handleDisconnect(id);
+        if (this.rooms.has(room.id) && !room.absences.size) this.resumeRoom(room);
     }
 
-    getRoom(socketId: string): Room | null {
-        const roomId = this.playerRoomMap.get(socketId);
-        if (!roomId) return null;
-        return this.rooms.get(roomId) ?? null;
-    }
-
-    getRoomById(roomId: string): Room | null {
-        return this.rooms.get(roomId) ?? null;
-    }
-
-    setPlayerReady(socketId: string): boolean {
-        const room = this.getRoom(socketId);
-        if (!room) return false;
-
-        const player = room.players.get(socketId);
-        if (!player) return false;
-
-        player.ready = true;
-
-        // Check if all players ready
-        if (room.players.size === 2) {
-            const allReady = Array.from(room.players.values()).every(p => p.ready);
-            return allReady;
+    /** Explicit departure or expired grace; transport loss uses handleTransportLoss. */
+    handleDisconnect(id: string): void {
+        this.leaveQueue(id);
+        const room = this.getRoom(id);
+        if (!room) return;
+        const player = room.players.get(id);
+        const absence = room.absences.get(id); if (absence) clearTimeout(absence.timer);
+        room.absences.delete(id); room.rematchRequests.delete(id); this.clearNextRound(room);
+        const opponent = [...room.players.values()].find(p => p.socketId !== id);
+        if (player && opponent && room.session && room.phase !== 'lobby' && room.phase !== 'result') {
+            room.scoreManager.absorbRound(room.session.getScoreManager());
+            room.phase = 'result'; room.roundScore[opponent.side] = ROUNDS_TO_WIN;
+            room.result = { winner: opponent.side, reason: 'opponent_disconnected' };
+            room.scores = room.scoreManager.computeScores(opponent.side);
+            room.session.handleForfeit();
+            this.saveMatchResults(room, opponent.side, room.scores, room.result.reason);
+            this.io.to(room.id).emit('match_scores', room.scores);
+            this.io.to(room.id).emit('match_result', { ...room.result, kings: room.session.getKingsHp() });
+            this.io.to(room.id).emit('phase_change', { phase: 'result' });
         }
-
-        return false;
+        room.players.delete(id); this.playerRoomMap.delete(id);
+        if (room.phase === 'lobby') for (const p of room.players.values()) p.ready = p.socketId.startsWith('bot-');
+        if (![...room.players.keys()].some(s => !s.startsWith('bot-'))) this.disposeRoom(room);
+        else if (player) this.io.to(room.id).emit('player_left', { side: player.side, reason: 'disconnected' });
     }
-
-    startMatch(roomId: string): GameSession | null {
-        const room = this.rooms.get(roomId);
-        if (!room || room.players.size !== 2) return null;
-
-        room.roundScore = { left: 0, right: 0 };
-        room.currentRound = 1;
-        room.scoreManager.reset();
-
-        const playerInfos = Array.from(room.players.values());
-        const session = new GameSession(this.io, roomId, playerInfos, undefined, (phase) => {
-            room.phase = phase;
-        }, (winner: Side, reason: string) => {
-            return this.handleRoundEnd(room, winner, reason);
-        });
-        room.session = session;
-        room.phase = 'build';
-
-        return session;
+    setPlayerReady(id: string): boolean {
+        const room = this.getRoom(id), player = room?.players.get(id);
+        if (!room || !player || room.absences.size || this.pendingAwards.size) return false;
+        player.ready = true; return room.players.size === 2 && [...room.players.values()].every(p => p.ready);
     }
-
+    canStartMatches(): boolean { return this.pendingAwards.size === 0; }
+    startMatch(id: string): GameSession | null {
+        const room = this.rooms.get(id);
+        if (!room || room.phase !== 'lobby' || room.players.size !== 2 || room.absences.size || this.pendingAwards.size) return null;
+        room.roundScore = { left: 0, right: 0 }; room.currentRound = 1; room.scoreManager.reset(); room.graceUsed.clear();
+        return this.createSession(room);
+    }
+    private createSession(room: Room): GameSession {
+        const session = new GameSession(this.io, room.id, [...room.players.values()], undefined,
+            phase => { room.phase = phase; }, (winner, reason) => this.handleRoundEnd(room, winner, reason), room.difficulty);
+        room.session = session; room.phase = 'build'; return session;
+    }
     private handleRoundEnd(room: Room, winner: Side, reason: string): 'continue' | 'match_over' {
-        if (room.session) room.scoreManager.absorbRound(room.session.getScoreManager());
-        room.roundScore[winner]++;
-
+        room.scoreManager.absorbRound(room.session!.getScoreManager()); room.roundScore[winner]++; room.roundWinner = winner;
         const isFinalRound = room.roundScore[winner] >= ROUNDS_TO_WIN;
-
-        this.io.to(room.id).emit('round_result', {
-            winner,
-            reason,
-            roundScore: room.roundScore,
-            currentRound: room.currentRound,
-            isFinalRound,
-        });
-
+        this.io.to(room.id).emit('round_result', { winner, reason, roundScore: room.roundScore, currentRound: room.currentRound, isFinalRound });
         if (isFinalRound) {
-            // Compute and emit match scores
-            if (room.session) {
-                const scores = room.scoreManager.computeScores(winner);
-                this.io.to(room.id).emit('match_scores', scores);
-                this.saveMatchResults(room, winner, scores);
-            }
+            room.result = { winner, reason }; room.scores = room.scoreManager.computeScores(winner);
+            this.io.to(room.id).emit('match_scores', room.scores); this.saveMatchResults(room, winner, room.scores, reason);
             return 'match_over';
         }
-
-        // Start next round after interstitial
-        room.currentRound++;
-        room.nextRoundTimer = setTimeout(() => {
-            room.nextRoundTimer = null;
-            this.startNextRound(room);
-        }, ROUND_INTERSTITIAL_MS);
-
-        return 'continue';
+        room.currentRound++; this.scheduleNextRound(room, ROUND_INTERSTITIAL_MS); return 'continue';
     }
-
+    private scheduleNextRound(room: Room, ms: number): void {
+        room.nextRoundAt = Date.now() + ms; room.nextRoundRemaining = 0;
+        room.nextRoundTimer = setTimeout(() => { room.nextRoundTimer = null; this.startNextRound(room); }, ms);
+    }
     private startNextRound(room: Room): void {
-        if (this.rooms.get(room.id) !== room || !room.session || room.players.size !== 2 || room.phase !== 'intermission') return;
-
-        // Destroy old session
-        room.session.destroy();
-
-        const playerInfos = Array.from(room.players.values());
-        const session = new GameSession(this.io, room.id, playerInfos, undefined, (phase) => {
-            room.phase = phase;
-        }, (winner: Side, reason: string) => {
-            return this.handleRoundEnd(room, winner, reason);
-        });
-        room.session = session;
-        room.phase = 'build';
-
-        this.io.to(room.id).emit('terrain', session.getTerrainData());
-
-        for (const [sid, pInfo] of room.players.entries()) {
-            const playerSocket = this.io.sockets.sockets.get(sid);
-            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp(), currentRound: room.currentRound, roundScore: room.roundScore });
-        }
-
-        session.getStateMachine().startBuildPhase();
-        console.log(`Round ${room.currentRound} started in room ${room.id}`);
+        if (this.rooms.get(room.id) !== room || !room.session || room.players.size !== 2 || room.phase !== 'intermission' || room.absences.size) return;
+        room.session.destroy(); room.roundWinner = null; this.createSession(room); this.sendMatchStarted(room);
     }
-
-    requestRematch(socketId: string): 'waiting' | 'starting' | null {
-        const room = this.getRoom(socketId);
-        if (!room || room.phase !== 'result' || room.players.size !== 2) return null;
-
-        const player = room.players.get(socketId);
-        if (!player) return null;
-
-        room.rematchRequests.add(socketId);
-
-        // Auto-accept for bot players
-        for (const [sid] of room.players) {
-            if (sid.startsWith('bot-')) room.rematchRequests.add(sid);
-        }
-
-        // Notify everyone about the request
-        this.io.to(room.id).emit('rematch_requested', { side: player.side });
-
-        // Check if both players requested
-        if (room.rematchRequests.size >= 2) {
-            // Start new match
-            this.startNewSession(room);
-            return 'starting';
-        }
-
+    sendMatchStarted(room: Room): void {
+        this.io.to(room.id).emit('terrain', room.session!.getTerrainData());
+        for (const [id, p] of room.players) this.io.sockets.sockets.get(id)?.emit('match_started', { side: p.side, kingsHp: room.session!.getKingsHp(), currentRound: room.currentRound, roundScore: room.roundScore, difficulty: room.difficulty });
+        room.session!.getStateMachine().startBuildPhase();
+    }
+    requestRematch(id: string): 'waiting' | 'starting' | null {
+        const room = this.getRoom(id);
+        if (!room || room.phase !== 'result' || room.players.size !== 2 || room.absences.size || this.pendingAwards.size) return null;
+        room.rematchRequests.add(id);
+        for (const sid of room.players.keys()) if (sid.startsWith('bot-')) room.rematchRequests.add(sid);
+        this.io.to(room.id).emit('rematch_requested', { side: room.players.get(id)!.side });
+        if (room.rematchRequests.size >= 2) { this.startNewSession(room); return 'starting'; }
         return 'waiting';
     }
-
     startNewSession(room: Room): void {
-        this.clearNextRound(room);
-        // Destroy old session
-        room.session?.destroy();
-
-        // Reset state
-        room.rematchRequests.clear();
-        room.roundScore = { left: 0, right: 0 };
-        room.currentRound = 1;
-        room.scoreManager.reset();
-        for (const p of room.players.values()) {
-            p.ready = true;
-        }
-
-        const playerInfos = Array.from(room.players.values());
-        const session = new GameSession(this.io, room.id, playerInfos, undefined, (phase) => {
-            room.phase = phase;
-        }, (winner: Side, reason: string) => {
-            return this.handleRoundEnd(room, winner, reason);
-        });
-        room.session = session;
-        room.phase = 'build';
-
-        // Send events
-        this.io.to(room.id).emit('rematch_start', {});
-        this.io.to(room.id).emit('terrain', session.getTerrainData());
-
-        for (const [sid, pInfo] of room.players.entries()) {
-            const playerSocket = this.io.sockets.sockets.get(sid);
-            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp(), currentRound: room.currentRound, roundScore: room.roundScore });
-        }
-
-        session.getStateMachine().startBuildPhase();
-        console.log(`Rematch started in room ${room.id}`);
+        this.clearNextRound(room); room.session?.destroy(); room.rematchRequests.clear();
+        room.roundScore = { left: 0, right: 0 }; room.currentRound = 1; room.scoreManager.reset(); room.graceUsed.clear();
+        room.matchId = randomUUID(); room.result = null; room.scores = null; room.roundWinner = null; room.saveStatus = 'idle';
+        for (const p of room.players.values()) p.ready = true;
+        this.createSession(room); this.io.to(room.id).emit('rematch_start', {}); this.sendMatchStarted(room);
     }
-
-    getQueuePosition(socketId: string): number {
-        return this.matchmakingQueue.indexOf(socketId);
+    private saveMatchResults(room: Room, winner: Side, scores: MatchScores, reason: string): void {
+        const timestamp = Date.now();
+        const awards: Award[] = [...room.players].filter(([id]) => !id.startsWith('bot-')).map(([id, p]) => ({
+            id: this.socketUuids.get(id)!, name: p.name,
+            entry: { matchId: room.matchId, timestamp, opponentName: [...room.players.values()].find(o => o.side !== p.side)?.name ?? 'Unknown', side: p.side,
+                won: p.side === winner, score: scores[p.side], rounds: { ...room.roundScore }, mode: room.mode, difficulty: room.difficulty, reason },
+        }));
+        const players = [...room.players.values()];
+        const metadata: MatchRecord = { winner, reason, rounds: { ...room.roundScore }, mode: room.mode, difficulty: room.difficulty, scores,
+            names: { left: players.find(p => p.side === 'left')?.name ?? 'Unknown', right: players.find(p => p.side === 'right')?.name ?? 'Unknown' } };
+        room.saveStatus = 'pending'; this.pendingAwards.set(room.matchId, { awards, metadata, room }); this.retrySaves();
     }
-
-    getPlayerUuid(socketId: string): string | undefined {
-        return this.socketUuids.get(socketId);
-    }
-
-    getProfile(socketId: string): PlayerProfile | null {
-        const uuid = this.socketUuids.get(socketId);
-        if (uuid) return this.playerProfiles.get(uuid) ?? null;
-        return null;
-    }
-
-    private getOrCreateProfile(socketId: string, name: string): PlayerProfile {
-        const uuid = this.socketUuids.get(socketId) ?? socketId;
-        let profile = this.playerProfiles.get(uuid);
-        if (!profile) {
-            profile = {
-                name,
-                totalScore: 0,
-                matchesPlayed: 0,
-                matchesWon: 0,
-                history: [],
-                uuid,
-            };
-            this.playerProfiles.set(uuid, profile);
-        }
-        profile.name = name;
-        return profile;
-    }
-
-    private saveMatchResults(room: Room, winner: Side, scores: MatchScores): void {
-        for (const [socketId, playerInfo] of room.players.entries()) {
-            const side = playerInfo.side;
-            const opponentInfo = Array.from(room.players.values()).find(p => p.side !== side);
-            const opponentName = opponentInfo?.name || 'Unknown';
-            const score = scores[side];
-            const won = side === winner;
-
-            const profile = this.getOrCreateProfile(socketId, playerInfo.name);
-            profile.totalScore += score.totalScore;
-            profile.matchesPlayed++;
-            if (won) profile.matchesWon++;
-
-            const historyEntry: MatchHistoryEntry = {
-                matchId: room.id,
-                timestamp: Date.now(),
-                opponentName,
-                side,
-                won,
-                score,
-                rounds: { ...room.roundScore },
-            };
-
-            profile.history.unshift(historyEntry);
-            if (profile.history.length > MAX_MATCH_HISTORY) {
-                profile.history = profile.history.slice(0, MAX_MATCH_HISTORY);
+    private retrySaves(): void {
+        for (const [matchId, { awards, metadata, room }] of this.pendingAwards) {
+            try {
+                this.store.award(awards, metadata);
+                const updates = awards.map(award => ({ award, profile: this.store.profile(award.id) }));
+                this.pendingAwards.delete(matchId); room.saveStatus = 'saved';
+                for (const { award, profile } of updates) {
+                    const sid = this.identitySockets.get(award.id);
+                    if (sid) { this.io.to(sid).emit('profile_update', profile); this.io.to(sid).emit('progress_saved', { status: 'saved' }); }
+                }
+            } catch (error) {
+                console.error('Progress save failed; retry retained:', error instanceof Error ? error.message : 'storage error');
+                for (const award of awards) {
+                    const sid = this.identitySockets.get(award.id); if (sid) this.io.to(sid).emit('progress_saved', { status: 'pending' });
+                }
             }
-
-            // Emit updated profile to the player
-            const playerSocket = this.io.sockets.sockets.get(socketId);
-            playerSocket?.emit('profile_update', profile);
         }
     }
-
-    private clearNextRound(room: Room): void {
-        if (room.nextRoundTimer !== null) clearTimeout(room.nextRoundTimer);
-        room.nextRoundTimer = null;
+    sync(id: string): void {
+        const socket = this.io.sockets.sockets.get(id); if (!socket) return;
+        const room = this.getRoom(id), player = room?.players.get(id);
+        if (!room || !player) { socket.emit('session_ready', { resumed: false }); return; }
+        const status = room.session?.getStateMachine().getStatus();
+        socket.emit('session_state', {
+            roomId: room.id, matchId: room.matchId, side: player.side, mode: room.mode, difficulty: room.difficulty,
+            players: [...room.players.values()].map(p => ({ side: p.side, name: p.name, ready: p.ready, connected: !room.absences.has(p.socketId) })),
+            terrain: room.session?.getTerrainData() ?? null, state: room.session?.getFullState() ?? null,
+            phase: room.phase, endsAt: status?.endsAt || null, turn: status?.turn ?? null, hasFired: status?.hasFired ?? false,
+            buildReady: status?.ready.includes(id) ?? false, roundScore: room.roundScore, currentRound: room.phase === 'intermission' ? room.currentRound - 1 : room.currentRound,
+            buildInterrupted: room.session?.buildWasInterrupted(player.side) ?? false,
+            roundWinner: room.roundWinner, result: room.result, scores: room.scores, chat: room.chat,
+            rematch: room.rematchRequests.has(id) ? 'requested' : room.rematchRequests.size ? 'opponent_requested' : 'none',
+            pause: this.pauseState(room), saveStatus: room.saveStatus,
+        });
     }
-
+    private clearNextRound(room: Room): void { if (room.nextRoundTimer !== null) clearTimeout(room.nextRoundTimer); room.nextRoundTimer = null; }
     private disposeRoom(room: Room): void {
-        this.clearNextRound(room);
-        room.session?.destroy();
-        for (const id of room.players.keys()) {
-            if (this.playerRoomMap.get(id) === room.id) this.playerRoomMap.delete(id);
-            this.socketUuids.delete(id);
-        }
-        room.players.clear();
-        room.rematchRequests.clear();
-        this.rooms.delete(room.id);
+        this.clearNextRound(room); room.session?.destroy();
+        for (const a of room.absences.values()) clearTimeout(a.timer);
+        for (const id of room.players.keys()) this.playerRoomMap.delete(id);
+        room.players.clear(); room.absences.clear(); room.rematchRequests.clear(); this.rooms.delete(room.id);
     }
-
     private cleanupStaleRooms(): void {
-        for (const room of this.rooms.values()) {
-            if (![...room.players.keys()].some(id => !id.startsWith('bot-'))) this.disposeRoom(room);
+        for (const room of this.rooms.values()) if (![...room.players.keys()].some(id => !id.startsWith('bot-'))) this.disposeRoom(room);
+        for (const [uuid, id] of this.identitySockets) {
+            if (!this.getRoom(id) && !this.io.sockets.sockets.has(id)) { this.identitySockets.delete(uuid); this.socketUuids.delete(id); }
         }
     }
-
     destroy(): void {
-        clearInterval(this.cleanupInterval);
-        for (const room of this.rooms.values()) {
-            this.clearNextRound(room);
-            room.session?.destroy();
-        }
-        this.rooms.clear();
-        this.playerRoomMap.clear();
-        this.matchmakingQueue = [];
+        if (this.closed) return; this.closed = true;
+        clearInterval(this.cleanupInterval); clearInterval(this.retryTimer); this.retrySaves();
+        for (const room of this.rooms.values()) this.disposeRoom(room);
+        this.playerRoomMap.clear(); this.matchmakingQueue = []; this.queueNames.clear(); this.socketUuids.clear(); this.identitySockets.clear(); this.store.close();
     }
 }

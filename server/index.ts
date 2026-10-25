@@ -5,6 +5,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { RoomManager } from './game/RoomManager';
 import analyticsRouter from './analytics/events';
+import { ProfileStore } from './storage/ProfileStore';
+import { resolve } from 'node:path';
 
 dotenv.config();
 
@@ -35,49 +37,34 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3001;
 
-const roomManager = new RoomManager(io);
+const progressionPath = process.env.FORTRESS_DB_PATH || resolve(process.cwd(), 'data/progression.sqlite');
+const roomManager = new RoomManager(io, new ProfileStore(progressionPath));
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    // Register player UUID for persistent profiles
-    const playerUuid = socket.handshake.auth?.uuid;
-    if (playerUuid && typeof playerUuid === 'string') {
-        roomManager.registerUuid(socket.id, playerUuid);
-    }
+    try { roomManager.authenticate(socket, socket.handshake.auth?.identity); }
+    catch { socket.emit('room_error', { message: 'Progress storage is unavailable. Please try again shortly.' }); socket.disconnect(true); return; }
+    socket.use(([event], next) => {
+        const paused = roomManager.getRoom(socket.id)?.absences.size;
+        if (paused && !['leave_room', 'get_profile', 'get_history', 'claim_reward'].includes(event)) return;
+        next();
+    });
 
     // --- Lobby events ---
 
-    socket.on('create_room', (data?: { name?: string; mode?: 'pvp' | 'single' }) => {
-        const room = roomManager.createRoom(socket.id, data?.name, data?.mode);
-        socket.join(room.id);
-        socket.emit('room_created', { roomId: room.id });
-        console.log(`Room ${room.id} created by ${socket.id} (mode: ${data?.mode || 'pvp'})`);
-
-        // If single player, we need to notify the client about the bot immediately
-        if (data?.mode === 'single') {
-            const playerInfo = room.players.get(socket.id)!;
-            // We can simulate a join event for the bot or just let the room_joined event handle it
-            // but room_joined event is emitted below for the creator.
-            // We should emit room_joined with both players (user + bot).
-
-            const players = Array.from(room.players.values()).map(p => ({
-                side: p.side,
-                ready: p.ready,
-                name: p.name,
-            }));
-
-            socket.emit('room_joined', {
-                roomId: room.id,
-                side: playerInfo.side,
-                players,
-            });
-            // The bot "joined", so consistent with pvp.
-        }
+    socket.on('create_room', (data?: { name?: string; mode?: 'pvp' | 'single'; difficulty?: unknown }) => {
+        try {
+            const room = roomManager.createRoom(socket.id, data?.name, data?.mode, data?.difficulty);
+            socket.join(room.id);
+            socket.emit('room_created', { roomId: room.id });
+            socket.emit('room_joined', { roomId: room.id, side: 'left', mode: room.mode, difficulty: room.difficulty,
+                players: [...room.players.values()].map(p => ({ side: p.side, ready: p.ready, name: p.name })) });
+        } catch (error) { socket.emit('room_error', { message: error instanceof Error ? error.message : 'Could not create room.' }); }
     });
 
     socket.on('join_room', (data: { roomId: string; name?: string }) => {
-        const roomId = data.roomId?.toUpperCase();
+        const roomId = typeof data?.roomId === 'string' ? data.roomId.toUpperCase() : '';
         if (!roomId) {
             socket.emit('room_error', { message: 'Room code is required.' });
             return;
@@ -149,6 +136,7 @@ io.on('connection', (socket) => {
     socket.on('player_ready', () => {
         const room = roomManager.getRoom(socket.id);
         if (!room) return;
+        if (!roomManager.canStartMatches()) { socket.emit('room_error', { message: 'Progress saving is recovering. Try Ready again shortly.' }); return; }
 
         // During lobby: ready to start the match
         if (room.phase === 'lobby') {
@@ -161,17 +149,7 @@ io.on('connection', (socket) => {
                 // Start the match
                 const session = roomManager.startMatch(room.id);
                 if (session) {
-                    // Send terrain to both players
-                    io.to(room.id).emit('terrain', session.getTerrainData());
-
-                    // Send side info to each player
-                    for (const [sid, pInfo] of room.players.entries()) {
-                        const playerSocket = io.sockets.sockets.get(sid);
-                        playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp(), currentRound: room.currentRound, roundScore: room.roundScore });
-                    }
-
-                    // Start build phase
-                    session.getStateMachine().startBuildPhase();
+                    roomManager.sendMatchStarted(room);
                     console.log(`Match started in room ${room.id}`);
                 }
             }
@@ -213,8 +191,17 @@ io.on('connection', (socket) => {
     // --- Profile ---
 
     socket.on('get_profile', () => {
-        const profile = roomManager.getProfile(socket.id);
-        socket.emit('profile_update', profile);
+        try { socket.emit('profile_update', roomManager.getProfile(socket.id)); }
+        catch { socket.emit('profile_error', { message: 'Your campaign could not be loaded. Please try again shortly.' }); }
+    });
+
+    socket.on('get_history', (data: { cursor?: string; limit?: number } = {}, reply?: (value: unknown) => void) => {
+        try { reply?.(roomManager.history(socket.id, data.cursor, data.limit)); }
+        catch { reply?.({ error: 'Could not load history.' }); }
+    });
+    socket.on('claim_reward', (data: { kind: 'checkin' | 'daily' | 'weekly' }, reply?: (value: unknown) => void) => {
+        try { reply?.({ amount: roomManager.claim(socket.id, data?.kind) }); }
+        catch { reply?.({ error: 'Reward unavailable. Please try again.' }); }
     });
 
     // --- Chat ---
@@ -226,16 +213,18 @@ io.on('connection', (socket) => {
         const player = room.players.get(socket.id);
         if (!player) return;
 
-        const text = (data.text || '').trim().slice(0, 200);
+        const text = typeof data?.text === 'string' ? data.text.trim().slice(0, 200) : '';
         if (!text) return;
 
-        io.to(room.id).emit('chat_message', {
+        const message = {
             id: `${socket.id}-${Date.now()}`,
             sender: player.name,
             side: player.side,
             text,
             timestamp: Date.now(),
-        });
+        };
+        room.chat.push(message); if (room.chat.length > 100) room.chat.shift();
+        io.to(room.id).emit('chat_message', message);
     });
 
     // --- Leave Room (without disconnecting) ---
@@ -245,10 +234,7 @@ io.on('connection', (socket) => {
         if (room) {
             socket.leave(room.id);
             roomManager.handleDisconnect(socket.id);
-            // Re-register UUID since handleDisconnect clears it
-            if (playerUuid && typeof playerUuid === 'string') {
-                roomManager.registerUuid(socket.id, playerUuid);
-            }
+
         }
     });
 
@@ -256,7 +242,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
-        roomManager.handleDisconnect(socket.id);
+        roomManager.handleTransportLoss(socket.id);
     });
 });
 

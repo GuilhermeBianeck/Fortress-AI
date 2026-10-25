@@ -41,7 +41,7 @@ describe('session resource cleanup', () => {
             expect(manager.rooms.has(room.id)).toBe(false);
             expect(manager.playerRoomMap.has(botId)).toBe(false);
             expect(manager.playerRoomMap.has('human')).toBe(false);
-            expect(vi.getTimerCount()).toBe(1); // Only the manager's cleanup interval.
+            expect(vi.getTimerCount()).toBe(2); // Manager cleanup and independent save retry only.
         } finally { manager.destroy(); vi.useRealTimers(); }
     });
 
@@ -58,7 +58,7 @@ describe('session resource cleanup', () => {
             manager.handleDisconnect('left');
             expect(manager.getRoomById(room.id)).toBe(room);
             expect(room.phase).toBe('result');
-            expect(vi.getTimerCount()).toBe(1);
+            expect(vi.getTimerCount()).toBe(2);
             const snapshots = emit.mock.calls.filter(call => call[0] === 'gameState').length;
             const kings = session.getKingsHp();
             vi.advanceTimersByTime(2000);
@@ -79,7 +79,7 @@ describe('session resource cleanup', () => {
             }
             expect(manager.rooms.size).toBe(0);
             expect(manager.playerRoomMap.size).toBe(0);
-            expect(vi.getTimerCount()).toBe(1);
+            expect(vi.getTimerCount()).toBe(2);
         } finally { manager.destroy(); vi.useRealTimers(); }
     });
 });

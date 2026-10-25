@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampCamera, createViewport, screenToWorld, worldToScreen } from './viewport';
+import { clampCamera, createViewport, screenToWorld, showBattleMinimap, worldToScreen } from './viewport';
 
 for (const [width, height] of [[320, 300], [390, 490], [844, 218], [1280, 500]]) {
     test(`world/input transform stays aligned at ${width}x${height}`, () => {
@@ -25,4 +25,9 @@ test('short landscape has a closer view and an explicit full-height overview', (
     assert.equal(overview.top, 40);
     assert.ok(tactical.scale > overview.scale);
     assert.ok(worldToScreen({ x: 600, y: 520 }, 0, tactical).y < 190);
+});
+
+test('small screens use fortress navigation rather than a minimap covering the king or cannon', () => {
+    for (const [w, h] of [[390, 600], [568, 190], [844, 260], [768, 800]]) assert.equal(showBattleMinimap(createViewport(w, h)), false);
+    assert.equal(showBattleMinimap(createViewport(1280, 600)), true);
 });

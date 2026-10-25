@@ -24,9 +24,10 @@ interface PhaseOverlayProps {
     playerProfile?: PlayerProfile | null;
     prevTotalScore?: number;
     prevPlayerProfile?: PlayerProfile | null;
+    pausedAt?: number;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, mySide, matchResult, playerNames, roundScore, currentRound, roundWinner, opponentConnected = true, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, mySide, matchResult, playerNames, roundScore, currentRound, roundWinner, opponentConnected = true, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile, pausedAt }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [botDots, setBotDots] = useState(1);
 
@@ -39,14 +40,14 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, myS
         }
 
         const tick = () => {
-            const remaining = Math.max(0, Math.round((phaseEndsAt - Date.now()) / 1000));
+            const remaining = Math.max(0, Math.round((phaseEndsAt - (pausedAt ?? Date.now())) / 1000));
             setTimeLeft(remaining);
         };
 
         tick();
         const interval = setInterval(tick, 100);
         return () => clearInterval(interval);
-    }, [phaseEndsAt]);
+    }, [phaseEndsAt, pausedAt]);
 
     // Derive display value: null when there's no active phase end time
     const displayTimeLeft = phaseEndsAt ? timeLeft : null;
@@ -207,8 +208,9 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, myS
 
         // First-win-of-day detection
         const todayStart = getUtcDayStartMs(new Date());
-        const prevDailyWins = prevPlayerProfile?.history.filter(e => e.timestamp >= todayStart && e.won).length ?? 0;
-        const currDailyWins = playerProfile?.history.filter(e => e.timestamp >= todayStart && e.won).length ?? 0;
+        const sameDay = !playerProfile?.periodStats || prevPlayerProfile?.periodStats?.dayStart === playerProfile.periodStats.dayStart;
+        const prevDailyWins = sameDay ? prevPlayerProfile?.periodStats?.day.wins ?? prevPlayerProfile?.history.filter(e => e.timestamp >= todayStart && e.won).length ?? 0 : 0;
+        const currDailyWins = playerProfile?.periodStats?.day.wins ?? playerProfile?.history.filter(e => e.timestamp >= todayStart && e.won).length ?? 0;
         const isFirstWinOfDay = isWinner && prevDailyWins === 0 && currDailyWins >= 1;
 
         return (

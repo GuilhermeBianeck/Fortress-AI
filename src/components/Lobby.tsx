@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { FormEvent } from 'react';
-import type { RoomState, PlayerProfile } from '../types';
+import type { RoomState, PlayerProfile, RewardKind, MatchHistoryEntry } from '../types';
 import { Check, Target, Gift, Star, Calendar, Trophy, Copy, ChevronDown, ChevronUp, Bot, Users, Swords, KeyRound, Link2, UserRound, BookOpen, Share2, LoaderCircle, ArrowLeft, Plus, Hammer, Eye, Crosshair } from 'lucide-react';
 import { RankBadge } from './RankBadge';
 import { RoyalMenuStage } from './CartoonMenuScene';
 import { kingReactions } from '../sprites/kingReactions';
 import './Lobby.css';
-import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, getUtcWeekStartMs, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
+import { readStorage, writeStorage } from '../hooks/browserStorage';
+import { botDifficulty, type BotDifficulty } from '../../server/shared/difficulty';
+import { MatchHistory } from './MatchHistory';
+import { getGamificationStats, getDailyMissions, getUtcDayStartMs, getUnlockedAchievements, ACHIEVEMENTS, ACHIEVEMENT_RARITY_COLORS, getWeeklyChallenges, getCheckinReward, CHECKIN_REWARDS, GAMIFICATION_FIRST_WIN_BONUS_EMBERS, MS_PER_DAY } from '../types';
 import { track } from '../analytics/tracker';
 import { playClick, playSwitch, playBoom } from '../audio/SoundManager';
 
@@ -15,13 +18,17 @@ export interface LobbyProps {
     queuePosition: number | null;
     playerName: string;
     onPlayerNameChange: (name: string) => void;
-    onCreateRoom: (name?: string, mode?: 'pvp' | 'single') => void;
+    onCreateRoom: (name?: string, mode?: 'pvp' | 'single', difficulty?: BotDifficulty) => void;
     onJoinRoom: (code: string, name?: string) => void;
     onJoinQueue: (name?: string) => void;
     onLeaveQueue: () => void;
     onReady: () => void;
     playerProfile?: PlayerProfile | null;
     onGetProfile?: () => void;
+    onClaimReward: (kind: RewardKind) => void;
+    rewardNotice: string | null;
+    onGetHistory: (cursor?: string) => Promise<{ entries: MatchHistoryEntry[]; cursor: string | null }>;
+    error: string | null;
 }
 
 const TIPS = [
@@ -41,55 +48,42 @@ export const Lobby = ({
     roomState, queuePosition,
     playerName, onPlayerNameChange,
     onCreateRoom, onJoinRoom, onJoinQueue, onLeaveQueue, onReady,
-    playerProfile, onGetProfile,
+    playerProfile, onGetProfile, onClaimReward, rewardNotice, onGetHistory, error,
 }: LobbyProps) => {
     const [joinCode, setJoinCode] = useState('');
-    const [isReady, setIsReady] = useState(false);
+    const [isReady, setIsReady] = useState(roomState?.ready ?? false);
+    const ready = isReady || roomState?.ready;
     const [hadOpponent, setHadOpponent] = useState(roomState?.opponentConnected ?? false);
     if (hadOpponent !== (roomState?.opponentConnected ?? false)) {
         setHadOpponent(roomState?.opponentConnected ?? false);
         if (!roomState?.opponentConnected) setIsReady(false);
     }
     const [tipIndex, setTipIndex] = useState(0);
-    const [missionDayKey, setMissionDayKey] = useState(() => String(getUtcDayStartMs(new Date())));
-    const [missionToast, setMissionToast] = useState<string | null>(null);
-    const [claimedMissionDay, setClaimedMissionDay] = useState(() => localStorage.getItem('fortress_missions_claim_day') || '');
-    const claimToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const missionToast = rewardNotice;
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [codeCopied, setCodeCopied] = useState(false);
     const [showHowToPlay, setShowHowToPlay] = useState(false);
     const [battleMode, setBattleMode] = useState<'solo' | 'pvp'>('solo');
     const [battlePending, setBattlePending] = useState(false);
+    const [previousError, setPreviousError] = useState(error);
+    if (previousError !== error) { setPreviousError(error); if (error) setBattlePending(false); }
 
-    // Check-in state
-    const [checkinStreak, setCheckinStreak] = useState(() => parseInt(localStorage.getItem('fortress_checkin_streak') || '0', 10));
-    const [checkinLastDay, setCheckinLastDay] = useState(() => localStorage.getItem('fortress_checkin_last_day') || '');
-    const todayKey = String(getUtcDayStartMs(new Date()));
-    const checkinToday = checkinLastDay === todayKey;
-    const pendingCheckinStreak = checkinToday ? checkinStreak : checkinStreak + 1;
+    const [difficulty, setDifficulty] = useState<BotDifficulty>(() => botDifficulty(readStorage('fortress_solo_difficulty')));
+    const day = playerProfile?.periodStats?.dayStart ?? getUtcDayStartMs(new Date());
+    const checkinStreak = playerProfile?.rewards?.checkinStreak ?? 0;
+    const checkinLastDay = playerProfile?.rewards?.checkinDay;
+    const checkinToday = checkinLastDay === day;
+    const pendingCheckinStreak = checkinToday ? checkinStreak : checkinLastDay === day - MS_PER_DAY ? checkinStreak + 1 : 1;
     const checkinRewardToday = getCheckinReward(pendingCheckinStreak);
-
-    // Weekly challenge claim state
-    const [claimedWeekKey, setClaimedWeekKey] = useState(() => localStorage.getItem('fortress_weekly_claim_week') || '');
-    const weekKey = String(getUtcWeekStartMs(new Date()));
-    const claimedWeekRewards = claimedWeekKey === weekKey;
-
     const gamification = playerProfile ? getGamificationStats(playerProfile) : null;
     const dailyMissions = playerProfile ? getDailyMissions(playerProfile) : null;
     const weeklyChallenges = playerProfile ? getWeeklyChallenges(playerProfile) : null;
-    const claimedMissionRewards = claimedMissionDay === missionDayKey;
-    const claimableEmbers = dailyMissions && !claimedMissionRewards ? dailyMissions.claimableEmbers : 0;
-    const claimButtonLabel = claimedMissionRewards
-        ? 'Rewards claimed today'
-        : claimableEmbers > 0
-            ? `Claim ${claimableEmbers} Embers`
-            : 'Complete missions to claim rewards';
-    const weeklyClaimableEmbers = weeklyChallenges && !claimedWeekRewards ? weeklyChallenges.claimableEmbers : 0;
-    const weeklyClaimButtonLabel = claimedWeekRewards
-        ? 'Weekly rewards claimed'
-        : weeklyClaimableEmbers > 0
-            ? `Claim ${weeklyClaimableEmbers} Embers`
-            : 'Complete challenges to claim';
+    const claimedMissionRewards = dailyMissions?.missions.every(m => m.claimed) ?? false;
+    const claimedWeekRewards = weeklyChallenges?.challenges.every(c => c.claimed) ?? false;
+    const claimableEmbers = dailyMissions?.claimableEmbers ?? 0;
+    const weeklyClaimableEmbers = weeklyChallenges?.claimableEmbers ?? 0;
+    const claimButtonLabel = claimableEmbers > 0 ? 'Claim ' + claimableEmbers + ' Embers' : 'No new daily rewards';
+    const weeklyClaimButtonLabel = weeklyClaimableEmbers > 0 ? 'Claim ' + weeklyClaimableEmbers + ' Embers' : 'No new weekly rewards';
 
     // Memoize achievement unlocked set to avoid re-creating on every render
     const unlockedIds = useMemo(
@@ -107,18 +101,12 @@ export const Lobby = ({
     }, []);
 
     useEffect(() => {
-        const t = setInterval(() => {
-            const nextDayKey = String(getUtcDayStartMs(new Date()));
-            setMissionDayKey(prev => prev === nextDayKey ? prev : nextDayKey);
-        }, 60000);
+        const t = setInterval(() => onGetProfile?.(), 60000);
         return () => clearInterval(t);
-    }, []);
+    }, [onGetProfile]);
 
     useEffect(() => {
         return () => {
-            if (claimToastTimeoutRef.current) {
-                clearTimeout(claimToastTimeoutRef.current);
-            }
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
         };
     }, []);
@@ -135,7 +123,7 @@ export const Lobby = ({
         playBoom();
         if (battleMode === 'solo') {
             track('room_created', { mode: 'single' });
-            onCreateRoom(playerName, 'single');
+            onCreateRoom(playerName, 'single', difficulty);
         } else {
             track('queue_joined');
             onJoinQueue(playerName);
@@ -152,45 +140,17 @@ export const Lobby = ({
     };
 
     const handleReady = () => {
-        if (isReady) return;
+        if (ready) return;
         setIsReady(true);
         onReady();
     };
 
-    const handleClaimMissionRewards = () => {
-        if (!dailyMissions || dailyMissions.claimableEmbers <= 0 || claimedMissionRewards) return;
-        // Client-only interim claim state; backend reward persistence can replace this flow later.
-        setClaimedMissionDay(missionDayKey);
-        localStorage.setItem('fortress_missions_claim_day', missionDayKey);
-        setMissionToast(`+${dailyMissions.claimableEmbers} Embers claimed!`);
-        if (claimToastTimeoutRef.current) clearTimeout(claimToastTimeoutRef.current);
-        claimToastTimeoutRef.current = setTimeout(() => setMissionToast(null), 2500);
-    };
+    const handleClaimMissionRewards = () => onClaimReward('daily');
+    const handleCheckin = () => onClaimReward('checkin');
+    const handleClaimWeeklyChallenges = () => onClaimReward('weekly');
 
-    const handleCheckin = () => {
-        if (checkinToday) return;
-        const yesterday = String(getUtcDayStartMs(new Date(Date.now() - MS_PER_DAY)));
-        const newStreak = checkinLastDay === yesterday ? checkinStreak + 1 : 1;
-        setCheckinStreak(newStreak);
-        setCheckinLastDay(todayKey);
-        localStorage.setItem('fortress_checkin_streak', String(newStreak));
-        localStorage.setItem('fortress_checkin_last_day', todayKey);
-        setMissionToast(`+${checkinRewardToday} Embers — Day ${newStreak} check-in!`);
-        if (claimToastTimeoutRef.current) clearTimeout(claimToastTimeoutRef.current);
-        claimToastTimeoutRef.current = setTimeout(() => setMissionToast(null), 3000);
-    };
-
-    const handleClaimWeeklyChallenges = () => {
-        if (!weeklyChallenges || weeklyChallenges.claimableEmbers <= 0 || claimedWeekRewards) return;
-        setClaimedWeekKey(weekKey);
-        localStorage.setItem('fortress_weekly_claim_week', weekKey);
-        setMissionToast(`+${weeklyChallenges.claimableEmbers} Embers — Weekly rewards!`);
-        if (claimToastTimeoutRef.current) clearTimeout(claimToastTimeoutRef.current);
-        claimToastTimeoutRef.current = setTimeout(() => setMissionToast(null), 3000);
-    };
-
-    const getMissionStatus = (mission: { completed: boolean; current: number; target: number }) => {
-        if (mission.completed && claimedMissionRewards) return { label: 'CLAIMED', className: 'text-[var(--gold)]' };
+    const getMissionStatus = (mission: { completed: boolean; current: number; target: number; claimed?: boolean }) => {
+        if (mission.claimed) return { label: 'CLAIMED', className: 'text-[var(--gold)]' };
         if (mission.completed) return { label: 'COMPLETED', className: 'text-[var(--emerald)]' };
         return { label: `${mission.current}/${mission.target}`, className: 'text-[var(--text-muted)]' };
     };
@@ -231,6 +191,7 @@ export const Lobby = ({
                 <RoyalMenuStage variant="room">
                     <section className={`menu-controls menu-ready-room${isSinglePlayer ? ' menu-ready-room--solo' : ''}`} data-side={roomState.side} data-king-character={kingReactions.identity(roomState.side)} aria-labelledby="ready-room-title">
                         <h2 id="ready-room-title">{isSinglePlayer ? 'Training Grounds' : 'War Room'}</h2>
+                        {roomState.mode === 'single' && <p className="menu-difficulty-note">{roomState.difficulty ?? 'normal'} difficulty</p>}
                         {!isSinglePlayer && (
                             <div className="menu-invite">
                                 <span className="menu-field-label">Room code</span>
@@ -259,8 +220,8 @@ export const Lobby = ({
                             ))}
                         </div>
                         {roomState.opponentConnected && (
-                            <button type="button" onClick={handleReady} disabled={isReady || !roomState.opponentConnected} autoFocus data-side={roomState.side} data-king-character={kingReactions.identity(roomState.side)} className="menu-battle-button menu-ready-button">
-                                {isReady ? <Check size={22} aria-hidden="true" /> : <Swords size={22} aria-hidden="true" />}
+                            <button type="button" onClick={handleReady} disabled={Boolean(ready) || !roomState.opponentConnected} autoFocus data-side={roomState.side} data-king-character={kingReactions.identity(roomState.side)} className="menu-battle-button menu-ready-button">
+                                {ready ? <Check size={22} aria-hidden="true" /> : <Swords size={22} aria-hidden="true" />}
                                 READY FOR BATTLE
                             </button>
                         )}
@@ -304,6 +265,7 @@ export const Lobby = ({
                                 placeholder="Enter your name" maxLength={20} autoComplete="nickname" />
                         </div>
                     </div>
+                    <div className={`menu-mode-line${battleMode === 'solo' ? ' menu-mode-line--solo' : ''}`}>
                     <div className="menu-mode-switch" role="radiogroup" aria-label="Game mode"
                         onKeyDown={(event) => {
                             if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
@@ -321,6 +283,13 @@ export const Lobby = ({
                             onClick={() => { setBattleMode('pvp'); playSwitch(); }}>
                             <Users size={18} aria-hidden="true" /> PvP
                         </button>
+                    </div>
+                    {battleMode === 'solo' && <label className="menu-difficulty">Difficulty
+                        <select aria-label="Solo difficulty" value={difficulty} onChange={event => {
+                            const value = botDifficulty(event.target.value); setDifficulty(value); writeStorage('fortress_solo_difficulty', value); playSwitch();
+                        }}><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
+                        <ChevronDown size={18} aria-hidden="true" />
+                    </label>}
                     </div>
                     <button type="button" disabled={battlePending} onClick={handleBattle} className="menu-battle-button" aria-busy={battlePending}>
                         {battlePending ? <LoaderCircle className="menu-spinner" size={20} aria-hidden="true" /> : <Swords size={20} aria-hidden="true" />}
@@ -418,7 +387,10 @@ export const Lobby = ({
                     {/* Player Profile & History */}
                     {playerProfile && (
                         <div className="menu-progression-grid">
-                            <div className="menu-rank-summary"><RankBadge profile={playerProfile} showProgress /></div>
+                            <div className="menu-rank-summary"><RankBadge profile={playerProfile} showProgress />
+                                <p className="menu-ember-balance">{playerProfile.rewards?.embers ?? 0} Embers</p>
+                                <MatchHistory profile={playerProfile} load={onGetHistory} />
+                            </div>
 
                             {/* Daily Check-in */}
                             <div className="menu-progress-section">
@@ -568,7 +540,7 @@ export const Lobby = ({
                                     <div className="flex flex-col gap-2">
                                         {weeklyChallenges.challenges.map((challenge) => {
                                             const isCompleted = challenge.completed;
-                                            const isClaimed = claimedWeekRewards && isCompleted;
+                                            const isClaimed = challenge.claimed && isCompleted;
                                             return (
                                                 <div key={challenge.id} className="rounded-lg px-2 py-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
                                                     <div className="flex items-center justify-between gap-2 mb-1">

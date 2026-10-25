@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, Hammer, Check, Square, RectangleVertical, RectangleHorizontal } from 'lucide-react';
+import { Eye, Hammer, Check, Square, RectangleVertical, RectangleHorizontal, ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { MaterialType, ShapeType, GameMode, MatchPhase } from '../types';
 import { MATERIAL_COLORS } from '../types';
@@ -15,6 +15,7 @@ interface GodToolsProps {
     phase: MatchPhase;
     onReady: () => void;
     blockCount?: number;
+    serverReady?: boolean;
 }
 
 const MATERIALS: { key: MaterialType; label: string }[] = [
@@ -49,8 +50,10 @@ export const GodTools = ({
     phase,
     onReady,
     blockCount = 0,
+    serverReady = false,
 }: GodToolsProps) => {
     const [isReady, setIsReady] = useState(false);
+    const ready = isReady || serverReady;
 
     // Reset ready state when a new build phase starts.
     // Pattern: store previous phase in state; check during render (React docs: "Adjusting some state when a prop changes").
@@ -68,7 +71,7 @@ export const GodTools = ({
     }
 
     const handleReady = () => {
-        if (isReady) return;
+        if (ready) return;
         track('build_phase_skipped');
         setIsReady(true);
         onReady();
@@ -96,6 +99,27 @@ export const GodTools = ({
                     <Eye size={16} aria-hidden="true" />
                     Inspect
                 </button>
+            </div>
+
+            <div className="game-build-pickers">
+                <label>Material
+                    <select aria-label="Block material" value={selectedMaterial} disabled={gameMode !== 'build'} onChange={e => {
+                        const value = e.target.value as MaterialType;
+                        track('material_selected', { material: value }); onMaterialChange(value);
+                    }}>
+                        {MATERIALS.map(material => <option key={material.key} value={material.key}>{material.label}</option>)}
+                    </select>
+                    <ChevronDown size={16} aria-hidden="true" />
+                </label>
+                <label>Shape
+                    <select aria-label="Block shape" value={selectedShape} disabled={gameMode !== 'build'} onChange={e => {
+                        const value = e.target.value as ShapeType;
+                        track('shape_selected', { shape: value }); onShapeChange(value);
+                    }}>
+                        {SHAPES.map(shape => <option key={shape.key} value={shape.key}>{shape.label}</option>)}
+                    </select>
+                    <ChevronDown size={16} aria-hidden="true" />
+                </label>
             </div>
 
             <div className="game-build-options" role="group" aria-label="Block options">
@@ -157,12 +181,12 @@ export const GodTools = ({
             <button
                 type="button"
                 onClick={handleReady}
-                disabled={isReady}
-                aria-label={isReady ? 'Ready for battle' : 'Done building, ready for battle'}
-                className={`game-build-done ${isReady ? 'game-build-ready' : 'btn-emerald'}`}
+                disabled={ready}
+                aria-label={ready ? 'Ready for battle' : 'Done building, ready for battle'}
+                className={`game-build-done ${ready ? 'game-build-ready' : 'btn-emerald'}`}
             >
                 <Check size={16} aria-hidden="true" />
-                {isReady ? 'READY!' : 'DONE'}
+                {ready ? 'READY!' : 'DONE'}
             </button>
         </div>
     );

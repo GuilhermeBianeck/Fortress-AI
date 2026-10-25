@@ -205,7 +205,7 @@ describe('Multi-round match flow (best-of-3)', () => {
         session.getStateMachine().checkKingDefeat();
         rm.handleDisconnect('socket-1');
         expect(room.phase).toBe('result');
-        expect(vi.getTimerCount()).toBe(1);
+        expect(vi.getTimerCount()).toBe(2);
         vi.advanceTimersByTime(ROUND_INTERSTITIAL_MS);
         expect(room.session).toBe(session);
         expect(room.phase).toBe('result');

@@ -2,49 +2,21 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, TerrainData, BuildStatus, MaterialType, ShapeType, Side, MatchPhase, RoomState, KingHpState, ChatMessage, MatchScores, PlayerProfile, CompactGameState, BodyState } from '../types';
 import { debugStats, debugVisible } from '../debug/debugStats';
-import { track } from '../analytics/tracker';
+import { track, setAnalyticsIdentity } from '../analytics/tracker';
 import { reconstructGameState } from './gameStateSnapshot';
+import { readStorage, writeStorage } from './browserStorage';
+import type { BotDifficulty } from '../../server/shared/difficulty';
+import type { SessionState, PauseState, RewardKind } from '../types';
 import type { KingDamageEvent, ProjectileImpactEvent, BlockDestroyedEvent } from '../types';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
-const PROFILE_STORAGE_KEY = 'fortress_player_profile';
-const UUID_STORAGE_KEY = 'fortress_player_uuid';
-
-function getOrCreateUuid(): string {
-    let uuid = localStorage.getItem(UUID_STORAGE_KEY);
-    if (!uuid) {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            uuid = crypto.randomUUID();
-        } else {
-            // Fallback: RFC 4122 v4 UUID using Math.random
-            uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-                const r = (Math.random() * 16) | 0;
-                const v = c === 'x' ? r : (r & 0x3) | 0x8;
-                return v.toString(16);
-            });
-        }
-        localStorage.setItem(UUID_STORAGE_KEY, uuid);
-    }
-    return uuid;
-}
-
-function loadStoredProfile(): PlayerProfile | null {
-    try {
-        const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
-        return raw ? (JSON.parse(raw) as PlayerProfile) : null;
-    } catch {
-        return null;
-    }
-}
-
-function saveProfileToStorage(profile: PlayerProfile): void {
-    try {
-        localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-    } catch {
-        // storage quota exceeded -- ignore
-    }
-}
+const IDENTITY_KEY = 'fortress_identity_v12';
+const ROOM_HINT = 'fortress_resume_room';
+let identity: { id: string; token: string } | null = (() => {
+    try { const value = JSON.parse(readStorage(IDENTITY_KEY) || 'null'); return typeof value?.id === 'string' && typeof value?.token === 'string' ? value : null; }
+    catch { return null; }
+})();
 
 export const useGameState = () => {
     const [gameState, setGameState] = useState<GameState | null>(null);
@@ -69,13 +41,23 @@ export const useGameState = () => {
     const [roundWinner, setRoundWinner] = useState<Side | null>(null);
     const [hazards, setHazards] = useState<{ type: string; id: string; position: { x: number; y: number }; width: number; height: number; windDirection?: number; windStrength?: number }[]>([]);
     const [matchScores, setMatchScores] = useState<MatchScores | null>(null);
-    const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(() => loadStoredProfile());
+    const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
     const [prevPlayerProfile, setPrevPlayerProfile] = useState<PlayerProfile | null>(null);
-    const playerProfileRef = useRef<PlayerProfile | null>(loadStoredProfile());
+    const playerProfileRef = useRef<PlayerProfile | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
-    const hasConnectedRef = useRef(false);
+    const [identityReplaced, setIdentityReplaced] = useState(false);
+    const [lobbyError, setLobbyError] = useState<string | null>(null);
+    const hadRoomRef = useRef(Boolean(readStorage(ROOM_HINT)));
+    const activeRef = useRef(false);
+    const pausedRef = useRef(false);
+    const [pauseState, setPauseState] = useState<PauseState>({ paused: false, at: 0, missing: [] });
+    const [syncRevision, setSyncRevision] = useState(0);
+    const [serverHasFired, setServerHasFired] = useState(false);
+    const [progressStatus, setProgressStatus] = useState<'idle' | 'pending' | 'saved'>('idle');
+    const [rewardNotice, setRewardNotice] = useState<string | null>(null);
     const rematchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const buildStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const socketRef = useRef<Socket | null>(null);
     const mySideRef = useRef<Side>('left');
@@ -96,6 +78,8 @@ export const useGameState = () => {
     const kingDamageCbRef = useRef<((data: KingDamageEvent) => void) | null>(null);
 
     const resetMatch = useCallback(() => {
+        if (buildStatusTimerRef.current) clearTimeout(buildStatusTimerRef.current);
+        buildStatusTimerRef.current = null;
         if (rematchTimerRef.current) clearTimeout(rematchTimerRef.current);
         rematchTimerRef.current = null;
         bodyCacheRef.current.clear();
@@ -116,12 +100,20 @@ export const useGameState = () => {
         setRoundWinner(null);
         setHazards([]);
         setMatchScores(null);
+        pausedRef.current = false; setPauseState({ paused: false, at: 0, missing: [] });
+        setServerHasFired(false); setLobbyError(null);
     }, []);
 
     useEffect(() => {
-        const playerUuid = getOrCreateUuid();
+        const updateBuildStatus = (status: BuildStatus, clearAfter?: number) => {
+            if (buildStatusTimerRef.current) clearTimeout(buildStatusTimerRef.current);
+            buildStatusTimerRef.current = null; setBuildStatus(status);
+            if (clearAfter) buildStatusTimerRef.current = setTimeout(() => {
+                buildStatusTimerRef.current = null; setBuildStatus({ status: 'idle', message: '' });
+            }, clearAfter);
+        };
         socketRef.current = io(SERVER_URL, {
-            auth: { uuid: playerUuid },
+            auth: callback => callback({ protocol: 12, identity }),
             // Match server: websocket-only, skip polling overhead
             transports: ['websocket'],
             // Reconnect aggressively for real-time game
@@ -130,22 +122,66 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('connect', () => {
-            // Rooms are socket-scoped: a new connection cannot resume the old match.
-            if (hasConnectedRef.current) {
-                resetMatch();
-                setConnectionNotice('Connection restored. Your previous session ended. Start or join a new battle.');
-            }
-            hasConnectedRef.current = true;
-            setIsConnected(true);
-            socketRef.current?.emit('get_profile');
-            track('connection_restored');
+            activeRef.current = false; setIsConnected(false);
         });
-        socketRef.current.on('connect_error', () => setIsConnected(false));
+        socketRef.current.on('identity', (value: { id: string; token: string }) => {
+            identity = value;
+            setAnalyticsIdentity(value.id);
+            if (!writeStorage(IDENTITY_KEY, JSON.stringify(value))) setConnectionNotice('Browser storage is unavailable. Keep this tab open to preserve your player identity.');
+        });
+        socketRef.current.on('session_ready', () => {
+            setQueuePosition(null);
+            if (hadRoomRef.current) {
+                resetMatch();
+                setConnectionNotice('Your previous battle is no longer available: its reconnect time expired or the server restarted. Saved progression is retained.');
+            }
+            hadRoomRef.current = false; writeStorage(ROOM_HINT, null);
+            pausedRef.current = false; activeRef.current = true; setIsConnected(true);
+            socketRef.current?.emit('get_profile');
+        });
+        socketRef.current.on('session_state', (data: SessionState) => {
+            const me = data.players.find(p => p.side === data.side)!;
+            const opponent = data.players.find(p => p.side !== data.side);
+            bodyCacheRef.current.clear();
+            if (data.state) {
+                const snapshot = reconstructGameState(bodyCacheRef.current, data.state);
+                bodyCacheRef.current = snapshot.bodyCache; setGameState(snapshot.gameState); setKingsHp(snapshot.gameState.kings);
+            } else setGameState(null);
+            mySideRef.current = data.side;
+            setRoomState({ roomId: data.roomId, side: data.side, phase: data.phase, myName: me.name,
+                opponentName: opponent?.name ?? '', opponentConnected: opponent?.connected ?? false,
+                mode: data.mode, difficulty: data.difficulty, ready: me.ready, buildReady: data.buildReady });
+            setTerrain(data.terrain); setHazards(data.terrain?.hazards ?? []);
+            setPhase(data.phase); setPhaseEndsAt(data.endsAt); setTurnPlayer(data.turn);
+            setServerHasFired(data.hasFired); setRoundScore(data.roundScore); setCurrentRound(data.currentRound);
+            setRoundWinner(data.roundWinner); setMatchResult(data.result); setMatchScores(data.scores);
+            setChatMessages(data.chat); setRematchState(data.rematch); setProgressStatus(data.saveStatus);
+            setPauseState(data.pause); pausedRef.current = data.pause.paused;
+            updateBuildStatus(data.buildInterrupted ? { status: 'error', message: 'Your AI build was interrupted. Submit the prompt again when ready.' } : { status: 'idle', message: '' }); setQueuePosition(null);
+            hadRoomRef.current = true; writeStorage(ROOM_HINT, data.roomId);
+            setSyncRevision(value => value + 1); activeRef.current = true; setIsConnected(true);
+            setConnectionNotice(null); socketRef.current?.emit('get_profile');
+        });
+        socketRef.current.on('match_paused', (data: PauseState) => {
+            pausedRef.current = data.paused; setPauseState(data);
+            updateBuildStatus({ status: 'idle', message: '' });
+        });
+        socketRef.current.on('identity_replaced', () => {
+            setIdentityReplaced(true);
+            activeRef.current = false; socketRef.current?.io.reconnection(false);
+            socketRef.current?.disconnect(); resetMatch(); hadRoomRef.current = false;
+            setIsConnected(true);
+            setConnectionNotice('This player is active in another tab. Close this tab, or reload to take control here.');
+        });
+        socketRef.current.on('progress_saved', (data: { status: 'pending' | 'saved' }) => setProgressStatus(data.status));
+        socketRef.current.on('profile_error', (data: { message: string }) => setConnectionNotice(data.message));
+        socketRef.current.on('connect_error', () => { activeRef.current = false; setIsConnected(false); });
 
         // --- Game state (compact delta-encoded format) ---
 
         socketRef.current.on('gameState', (data: CompactGameState) => {
             if (!mountedRef.current) return;
+            if (!activeRef.current || pausedRef.current) return;
             // Debug network stats (zero cost when overlay hidden)
             if (debugVisible) debugStats.recordSnapshot(data.t, data);
 
@@ -178,23 +214,21 @@ export const useGameState = () => {
         // --- Build status ---
 
         socketRef.current.on('build_status', (data: { status: string; message: string }) => {
-            setBuildStatus({
+            updateBuildStatus({
                 status: data.status as BuildStatus['status'],
                 message: data.message
             });
         });
 
         socketRef.current.on('build_success', (data: { count: number; thought: string }) => {
-            setBuildStatus({
+            updateBuildStatus({
                 status: 'success',
                 message: `Built ${data.count} blocks! "${data.thought}"`
-            });
-            setTimeout(() => setBuildStatus({ status: 'idle', message: '' }), 5000);
+            }, 5000);
         });
 
         socketRef.current.on('build_error', (data: { message: string }) => {
-            setBuildStatus({ status: 'error', message: data.message });
-            setTimeout(() => setBuildStatus({ status: 'idle', message: '' }), 5000);
+            updateBuildStatus({ status: 'error', message: data.message }, 5000);
         });
 
         // --- King events ---
@@ -204,7 +238,7 @@ export const useGameState = () => {
                 ...prev,
                 [data.side]: { ...prev[data.side], hp: data.hp, maxHp: data.maxHp },
             }));
-            kingDamageCbRef.current?.(data);
+            if (activeRef.current && !pausedRef.current) kingDamageCbRef.current?.(data);
         });
 
         socketRef.current.on('king_dead', () => {
@@ -213,6 +247,7 @@ export const useGameState = () => {
         // --- Room/lobby events ---
 
         socketRef.current.on('room_created', (data: { roomId: string }) => {
+            hadRoomRef.current = true; writeStorage(ROOM_HINT, data.roomId);
             setRoomState(prev => ({
                 roomId: data.roomId,
                 side: 'left',
@@ -223,7 +258,8 @@ export const useGameState = () => {
             }));
         });
 
-        socketRef.current.on('room_joined', (data: { roomId: string; side: Side; players: { side: Side; ready: boolean; name: string }[] }) => {
+        socketRef.current.on('room_joined', (data: { roomId: string; side: Side; mode?: 'single' | 'pvp'; difficulty?: BotDifficulty; players: { side: Side; ready: boolean; name: string }[] }) => {
+            hadRoomRef.current = true; writeStorage(ROOM_HINT, data.roomId);
             const me = data.players.find(p => p.side === data.side);
             const opponent = data.players.find(p => p.side !== data.side);
             mySideRef.current = data.side;
@@ -233,14 +269,13 @@ export const useGameState = () => {
                 phase: 'lobby',
                 opponentConnected: data.players.length >= 2,
                 myName: me?.name || 'Player',
-                opponentName: opponent?.name || '',
+                opponentName: opponent?.name || '', mode: data.mode, difficulty: data.difficulty, ready: me?.ready,
             });
         });
 
         socketRef.current.on('room_error', (data: { message: string }) => {
-            console.error('Room error:', data.message);
-            setBuildStatus({ status: 'error', message: data.message });
-            setTimeout(() => setBuildStatus({ status: 'idle', message: '' }), 3000);
+            setLobbyError(data.message); setConnectionNotice(data.message);
+
         });
 
         socketRef.current.on('player_joined', (data: { side: Side; name?: string }) => {
@@ -248,12 +283,12 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('player_left', () => {
-            setRoomState(prev => prev ? { ...prev, opponentConnected: false } : prev);
+            setRoomState(prev => prev ? { ...prev, opponentConnected: false, ready: false } : prev);
             setRematchState('none');
         });
 
-        socketRef.current.on('player_ready_ack', () => {
-            // Could track which players are ready in UI
+        socketRef.current.on('player_ready_ack', (data: { side: Side }) => {
+            if (data.side === mySideRef.current) setRoomState(prev => prev ? { ...prev, ready: true } : prev);
         });
 
         socketRef.current.on('queue_status', (data: { position: number }) => {
@@ -265,10 +300,11 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('match_started', (data: { side: Side; kingsHp?: { left: KingHpState; right: KingHpState }; currentRound?: number; roundScore?: { left: number; right: number } }) => {
+            updateBuildStatus({ status: 'idle', message: '' });
             // Emitted before the first metadata snapshot for every new round/session.
             bodyCacheRef.current.clear();
             setGameState(null);
-            setRoundWinner(null);
+            setRoundWinner(null); setServerHasFired(false); setProgressStatus('idle');
             setTurnPlayer(null);
             setMatchResult(null);
             if (data.currentRound !== undefined) setCurrentRound(data.currentRound);
@@ -290,6 +326,7 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('turn_start', (data: { side: Side; endsAt: number }) => {
+            setServerHasFired(false);
             setTurnPlayer(data.side);
             setPhaseEndsAt(data.endsAt);
         });
@@ -307,11 +344,11 @@ export const useGameState = () => {
         // --- Visual effects ---
 
         socketRef.current.on('block_destroyed', (data: BlockDestroyedEvent) => {
-            blockDestroyedCbRef.current?.(data);
+            if (activeRef.current && !pausedRef.current) blockDestroyedCbRef.current?.(data);
         });
 
         socketRef.current.on('projectile_impact', (data: ProjectileImpactEvent) => {
-            projectileImpactCbRef.current?.(data);
+            if (activeRef.current && !pausedRef.current) projectileImpactCbRef.current?.(data);
         });
 
         // --- Chat ---
@@ -363,13 +400,16 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('profile_update', (data: PlayerProfile | null) => {
-            setPrevPlayerProfile(playerProfileRef.current);
+            setPrevPlayerProfile(playerProfileRef.current ?? data);
             playerProfileRef.current = data;
             setPlayerProfile(data);
-            if (data) saveProfileToStorage(data);
+
         });
 
         socketRef.current.on('disconnect', () => {
+            if (buildStatusTimerRef.current) clearTimeout(buildStatusTimerRef.current);
+            buildStatusTimerRef.current = null;
+            activeRef.current = false;
             if (socketRef.current) socketRef.current.sendBuffer = [];
             if (rematchTimerRef.current) clearTimeout(rematchTimerRef.current);
             rematchTimerRef.current = null;
@@ -378,6 +418,8 @@ export const useGameState = () => {
         });
 
         return () => {
+            if (buildStatusTimerRef.current) clearTimeout(buildStatusTimerRef.current);
+            buildStatusTimerRef.current = null;
             socketRef.current?.disconnect();
             if (rematchTimerRef.current) clearTimeout(rematchTimerRef.current);
             bodyCacheRef.current.clear();
@@ -386,21 +428,24 @@ export const useGameState = () => {
 
     // --- Actions ---
 
-    const createRoom = useCallback((name?: string, mode: 'pvp' | 'single' = 'pvp') => {
-        if (!socketRef.current?.connected) return;
+    const createRoom = useCallback((name?: string, mode: 'pvp' | 'single' = 'pvp', difficulty: BotDifficulty = 'normal') => {
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         setConnectionNotice(null);
-        socketRef.current?.emit('create_room', { name, mode });
+        setLobbyError(null);
+        socketRef.current?.emit('create_room', { name, mode, difficulty });
     }, []);
 
     const joinRoom = useCallback((roomId: string, name?: string) => {
-        if (!socketRef.current?.connected) return;
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         setConnectionNotice(null);
+        setLobbyError(null);
         socketRef.current?.emit('join_room', { roomId, name });
     }, []);
 
     const joinQueue = useCallback((name?: string) => {
-        if (!socketRef.current?.connected) return;
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         setConnectionNotice(null);
+        setLobbyError(null);
         socketRef.current?.emit('join_queue', { name });
     }, []);
 
@@ -410,7 +455,7 @@ export const useGameState = () => {
     }, []);
 
     const playerReady = useCallback(() => {
-        if (!socketRef.current?.connected) return;
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         socketRef.current?.emit('player_ready');
     }, []);
 
@@ -421,28 +466,31 @@ export const useGameState = () => {
         shape: ShapeType = 'rectangle',
         dimensions: number[] = [30, 30]
     ) => {
-        if (!socketRef.current?.connected) return;
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         socketRef.current?.emit('spawn', { x, y, material, shape, dimensions });
     }, []);
 
     const requestBuild = useCallback((apiKey: string, prompt: string) => {
-        if (!prompt || !socketRef.current?.connected) return;
+        if (!prompt || !socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
+        if (buildStatusTimerRef.current) clearTimeout(buildStatusTimerRef.current);
+        buildStatusTimerRef.current = null;
         setBuildStatus({ status: 'generating', message: 'Sending to Architect...' });
         socketRef.current?.emit('request_build', { apiKey: apiKey || undefined, prompt });
     }, []);
 
     const fireProjectile = useCallback((angle: number, power: number) => {
-        if (!socketRef.current?.connected) return;
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
+        setServerHasFired(true);
         socketRef.current?.emit('fire_projectile', { angle, power });
     }, []);
 
     const sendChatMessage = useCallback((text: string) => {
-        if (!socketRef.current?.connected) return;
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         socketRef.current?.emit('chat_message', { text });
     }, []);
 
     const requestRematch = useCallback(() => {
-        if (!socketRef.current?.connected) return;
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         socketRef.current?.emit('request_rematch');
         setRematchState('requested');
         // Timeout: if opponent doesn't respond in 15s, reset
@@ -459,8 +507,22 @@ export const useGameState = () => {
 
     const returnToLobby = useCallback(() => {
         if (socketRef.current?.connected) socketRef.current.emit('leave_room');
+        hadRoomRef.current = false; writeStorage(ROOM_HINT, null);
         resetMatch();
     }, [resetMatch]);
+
+    const claimReward = useCallback((kind: RewardKind) => {
+        if (!socketRef.current?.connected || !activeRef.current) return;
+        socketRef.current.timeout(5000).emit('claim_reward', { kind }, (error: Error | null, result: { amount?: number; error?: string }) => {
+            setRewardNotice(error ? 'Reward confirmation timed out. Refresh your campaign before retrying.' : result.error ?? (result.amount ? '+' + result.amount + ' Embers saved.' : 'No new rewards to claim.'));
+        });
+    }, []);
+    const getHistory = useCallback(async (cursor?: string): Promise<{ entries: import('../types').MatchHistoryEntry[]; cursor: string | null }> => {
+        if (!socketRef.current?.connected || !activeRef.current) throw new Error('Connect to load history.');
+        return socketRef.current.timeout(5000).emitWithAck('get_history', { cursor, limit: 20 }).then(result => {
+            if (result.error) throw new Error(result.error); return result;
+        });
+    }, []);
 
     const setBlockDestroyedCallback = useCallback((cb: ((data: BlockDestroyedEvent) => void) | null) => {
         blockDestroyedCbRef.current = cb;
@@ -479,6 +541,9 @@ export const useGameState = () => {
         roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
         chatMessages, rematchState, roundScore, currentRound, hazards,
         matchScores, playerProfile, prevPlayerProfile, isConnected, connectionNotice, roundWinner,
+        identityReplaced,
+        lobbyError,
+        pauseState, syncRevision, serverHasFired, progressStatus, rewardNotice, claimReward, getHistory,
         createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
         spawnBox, requestBuild, fireProjectile,
         sendChatMessage, requestRematch, getProfile, returnToLobby,

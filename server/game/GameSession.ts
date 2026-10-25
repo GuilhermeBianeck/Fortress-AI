@@ -19,7 +19,7 @@ import {
     PROJECTILE_RADIUS, PROJECTILE_DENSITY, PROJECTILE_RESTITUTION,
     PROJECTILE_FRICTION, PROJECTILE_LIFESPAN_MS,
     WORLD_WIDTH, CANVAS_HEIGHT,
-    LEFT_SIDE, RIGHT_SIDE, LEFT_CANNON_X, RIGHT_CANNON_X,
+    LEFT_SIDE, RIGHT_SIDE,
     FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS,
     COL_BLOCK, SHAPE_DIMS,
     PHYSICS_MAX_SPEED, PHYSICS_POWER_MULTIPLIER, PHYSICS_AIR_FRICTION,
@@ -55,6 +55,10 @@ interface GameBody extends Matter.Body {
     side?: Side;
 }
 
+import { PausableTimers, type TimerId } from './PausableTimers';
+import type { BotDifficulty } from '../shared/difficulty';
+import { kingCannonX } from '../shared/battleLayout';
+
 export class GameSession {
     readonly id: string;
     private engine: Matter.Engine;
@@ -64,7 +68,12 @@ export class GameSession {
     private gameLoop: GameLoop;
     private io: Server;
     private roomId: string;
-    private projectileTimers: Map<number, ReturnType<typeof setTimeout>> = new Map();
+    private projectileTimers: Map<number, TimerId> = new Map();
+    private timers = new PausableTimers();
+    private paused = false;
+    private buildGeneration = 0;
+    private buildHeartbeats = new Set<ReturnType<typeof setInterval>>();
+    private interruptedBuildSides = new Set<Side>();
     private projectileBodies: Set<Matter.Body> = new Set();
     private projectileHits = new Map<number, Set<number>>();
     private botShotTracks = new Map<number, {
@@ -80,7 +89,7 @@ export class GameSession {
     private hazards: HazardData[] = [];
     private windHazards: HazardData[] = [];
     private lavaHazards: HazardData[] = [];
-    private hazardTimers: ReturnType<typeof setInterval>[] = [];
+    private hazardTimers: TimerId[] = [];
     private scoreManager: ScoreManager = new ScoreManager();
     private botAI: BotAI | null = null;
     private hazardTickCounter = 0;
@@ -88,7 +97,7 @@ export class GameSession {
     private rightPlayer: PlayerState | null = null;
     private buildInProgress: Set<string> = new Set(); // socketIds with active builds
 
-    constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void, onRoundEnd?: (winner: Side, reason: string) => 'continue' | 'match_over') {
+    constructor(io: Server, roomId: string, playerInfos: PlayerInfo[], seed?: number, onPhaseChange?: (phase: MatchPhase) => void, onRoundEnd?: (winner: Side, reason: string) => 'continue' | 'match_over', difficulty: BotDifficulty = 'normal') {
         this.onPhaseChangeCallback = onPhaseChange;
         this.onRoundEndCallback = onRoundEnd;
         this.io = io;
@@ -103,9 +112,8 @@ export class GameSession {
         // Spawn kings for each player
         for (const info of playerInfos) {
             const sideBounds = info.side === 'left' ? LEFT_SIDE : RIGHT_SIDE;
-            const cannonX = info.side === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
-
             const king = this.spawnKing(info.side, sideBounds);
+            const cannonX = kingCannonX(info.side, king.body.position.x, WORLD_WIDTH);
 
             const playerState: PlayerState = {
                 socketId: info.socketId,
@@ -160,13 +168,14 @@ export class GameSession {
             },
             onMatchResult: () => { /* Room manager handles result */ },
             onRoundEnd: (winner, reason) => {
+                this.gameLoop.publishFullState();
                 // Freeze the resolved scene and release bot/hazard/physics timers during results.
                 this.destroy();
                 return this.onRoundEndCallback?.(winner, reason) ?? 'match_over';
             },
             getKingState: (side: Side) => this.getKingStateBySide(side),
             getWorld: () => this.world,
-        });
+        }, this.timers);
 
         // Initialize BotAI if there's a bot player
         const botPlayer = this.getBotPlayer();
@@ -202,7 +211,7 @@ export class GameSession {
                 fireProjectile: (side, angle, power) => {
                     return this.fireProjectile(side, angle, power);
                 },
-            });
+            }, difficulty, this.timers);
         }
 
         // Generate hazards
@@ -218,6 +227,36 @@ export class GameSession {
 
     // --- Public API ---
 
+    getFullState() { return this.gameLoop.getFullState(); }
+    isPaused() { return this.paused; }
+    buildWasInterrupted(side: Side) { return this.interruptedBuildSides.has(side); }
+    rebindPlayer(oldId: string, newId: string): void {
+        const player = this.players.get(oldId);
+        if (!player) return;
+        this.players.delete(oldId); player.socketId = newId; this.players.set(newId, player);
+        this.stateMachine.rebindPlayer(oldId, newId);
+    }
+    private invalidateBuilds(): void {
+        this.buildGeneration++;
+        for (const timer of this.buildHeartbeats) clearInterval(timer);
+        this.buildHeartbeats.clear();
+        for (const id of this.buildInProgress) {
+            const player = this.players.get(id); if (player) this.interruptedBuildSides.add(player.side);
+            this.io.to(id).emit('build_error', { message: 'Build cancelled because play was interrupted. Submit again when ready.' });
+        }
+        this.buildInProgress.clear();
+    }
+    pause(): void {
+        if (this.paused) return;
+        this.paused = true; this.invalidateBuilds();
+        this.gameLoop.stop(); this.stateMachine.pause(); this.scoreManager.pause();
+    }
+    resume(): void {
+        if (!this.paused) return;
+        this.paused = false; this.stateMachine.resume(); this.scoreManager.resume();
+        if (!this.destroyed) this.gameLoop.start();
+    }
+
     getStateMachine(): MatchStateMachine {
         return this.stateMachine;
     }
@@ -232,7 +271,12 @@ export class GameSession {
     }
 
     getTerrainData() {
+        const cannons: Partial<Record<Side, Matter.Vector>> = {};
+        for (const player of this.players.values()) cannons[player.side] = {
+            x: player.cannonX, y: this.interpolateTerrainY(player.cannonX) - 20,
+        };
         return {
+            cannons,
             points: this.terrain.points,
             buildZones: this.terrain.buildZones,
             seed: this.terrain.seed,
@@ -275,6 +319,7 @@ export class GameSession {
     }
 
     handleSpawn(socketId: string, data: { x: number; y: number; material?: string; shape?: string; dimensions?: number[] }) {
+        if (this.paused || this.destroyed || !data || typeof data !== 'object') return;
         const phase = this.stateMachine.getPhase();
         if (phase !== 'build') return;
 
@@ -300,6 +345,7 @@ export class GameSession {
     }
 
     async handleRequestBuild(socket: Socket, data: { apiKey?: string; prompt: string }, playerUuid?: string) {
+        if (this.paused || this.destroyed || !data || typeof data !== 'object' || typeof data.prompt !== 'string') return;
         const phase = this.stateMachine.getPhase();
         if (phase !== 'build') {
             socket.emit('build_error', { message: 'Building is only allowed during the build phase.' });
@@ -340,6 +386,8 @@ export class GameSession {
         }
 
         this.buildInProgress.add(socket.id);
+        this.interruptedBuildSides.delete(player.side);
+        const generation = this.buildGeneration;
 
         // Start heartbeat so the client knows the build is still running
         const buildStart = Date.now();
@@ -347,6 +395,7 @@ export class GameSession {
             const elapsed = Math.round((Date.now() - buildStart) / 1000);
             socket.emit('build_status', { status: 'generating', message: `Generating fortress... (${elapsed}s)` });
         }, 3000);
+        this.buildHeartbeats.add(heartbeat);
 
         try {
             socket.emit('build_status', { status: 'generating', message: 'Architect is thinking...' });
@@ -362,6 +411,7 @@ export class GameSession {
             };
 
             const plan = await generateFortress(apiKey, prompt, terrainCtx);
+            if (generation !== this.buildGeneration || this.destroyed || this.paused || this.stateMachine.getPhase() !== 'build') return;
 
             if (!plan.bodies || plan.bodies.length === 0) {
                 socket.emit('build_error', { message: 'AI generated no blocks. Try a different prompt.' });
@@ -404,15 +454,18 @@ export class GameSession {
             this.scoreManager.recordAIBuild(player.side, spawnedCount);
         } catch (err: unknown) {
             clearInterval(heartbeat);
-            // Log full error server-side but NEVER forward raw error to client (could contain API key)
-            console.error("Build Error:", err instanceof Error ? err.message : err);
+            if (generation !== this.buildGeneration || this.destroyed) return;
+            // Provider error messages can contain credential-bearing URLs.
+            console.error('Build request failed:', err instanceof Error ? err.name : 'Unknown error');
             socket.emit('build_error', { message: 'AI generation failed. Please try again.' });
         } finally {
-            this.buildInProgress.delete(socket.id);
+            clearInterval(heartbeat); this.buildHeartbeats.delete(heartbeat);
+            if (generation === this.buildGeneration) this.buildInProgress.delete(socket.id);
         }
     }
 
     handleFireProjectile(socketId: string, data: { angle?: unknown; power?: unknown }) {
+        if (!data || typeof data !== 'object') return;
         if (!this.stateMachine.canFire()) return;
 
         const player = this.players.get(socketId);
@@ -476,7 +529,7 @@ export class GameSession {
         });
 
         // Auto-remove after lifespan
-        const timer = setTimeout(() => this.removeProjectile(body), PROJECTILE_LIFESPAN_MS);
+        const timer = this.timers.timeout(() => this.removeProjectile(body), PROJECTILE_LIFESPAN_MS);
         this.projectileTimers.set(body.id, timer);
         this.projectileBodies.add(body);
         this.projectileHits.set(body.id, new Set());
@@ -500,6 +553,7 @@ export class GameSession {
     }
 
     handlePlayerBuildReady(socketId: string): void {
+        if (this.paused || this.destroyed) return;
         this.stateMachine.handlePlayerBuildReady(socketId);
         // Auto-ready the bot so build phase ends when the human clicks DONE
         if (this.botAI) {
@@ -517,21 +571,23 @@ export class GameSession {
 
     destroy() {
         this.destroyed = true;
+        this.invalidateBuilds();
         this.botAI?.destroy();
         this.botAI = null;
         this.gameLoop.stop();
         this.stateMachine.destroy();
         for (const timer of this.projectileTimers.values()) {
-            clearTimeout(timer);
+            this.timers.clear(timer);
         }
         this.projectileTimers.clear();
         this.projectileBodies.clear();
         this.projectileHits.clear();
         this.botShotTracks.clear();
         for (const timer of this.hazardTimers) {
-            clearInterval(timer);
+            this.timers.clear(timer);
         }
         this.hazardTimers = [];
+        this.timers.dispose();
     }
 
     startFallingRocks(): void {
@@ -541,7 +597,7 @@ export class GameSession {
         const rockHazards = this.hazards.filter(h => h.type === 'falling_rocks');
         if (rockHazards.length === 0) return;
 
-        const interval = setInterval(() => {
+        const interval = this.timers.interval(() => {
             if (this.stateMachine.getPhase() !== 'combat') return;
 
             for (const hazard of rockHazards) {
@@ -846,7 +902,7 @@ export class GameSession {
                                 maxHp: ps.kingState.maxHp,
                                 damage,
                                 source: otherBody.label,
-                                timestamp, position: { ...kingBody.position }, projectileId: projectile?.id,
+                                timestamp, position: { ...kingBody.position }, projectileId: projectile?.id, attackerSide,
                             });
 
                             if (ps.kingState.hp <= 0) {
@@ -885,6 +941,7 @@ export class GameSession {
                         }
                     }
                     this.io.to(this.roomId).emit('projectile_impact', {
+                        side: (projectile as GameBody).side,
                         position: { ...projectile.position }, timestamp, projectileId: projectile.id, targetId: block.id,
                         target: block.label === 'king' ? 'king' : ['Terrain', 'Boundary', 'foundation'].includes(block.label) ? 'terrain' : 'block',
                         material: block.label, damage: appliedDamage, destroyed,
@@ -969,7 +1026,7 @@ export class GameSession {
 
         const timer = this.projectileTimers.get(body.id);
         if (timer) {
-            clearTimeout(timer);
+            this.timers.clear(timer);
             this.projectileTimers.delete(body.id);
         }
 

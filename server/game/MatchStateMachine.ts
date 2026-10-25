@@ -1,5 +1,6 @@
 import Matter from 'matter-js';
 import { Server } from 'socket.io';
+import { PausableTimers, type TimerId } from './PausableTimers';
 import type { Side, MatchPhase, KingState } from '../types';
 import {
     BUILD_PHASE_DURATION_MS,
@@ -27,8 +28,10 @@ export class MatchStateMachine {
     private phase: MatchPhase = 'lobby';
     private callbacks: MatchCallbacks;
 
-    private phaseTimer: ReturnType<typeof setTimeout> | null = null;
-    private settleInterval: ReturnType<typeof setInterval> | null = null;
+    private phaseTimer: TimerId | null = null;
+    private settleInterval: TimerId | null = null;
+    private endsAt = 0;
+    private pausedAt: number | null = null;
     private settleStart: number = 0;
     private settleConfirmCount: number = 0;
 
@@ -37,7 +40,7 @@ export class MatchStateMachine {
     private matchEnded: boolean = false;
     private hasFiredThisTurn: boolean = false;
 
-    constructor(io: Server, roomId: string, callbacks: MatchCallbacks) {
+    constructor(io: Server, roomId: string, callbacks: MatchCallbacks, private timers = new PausableTimers()) {
         this.io = io;
         this.roomId = roomId;
         this.callbacks = callbacks;
@@ -51,23 +54,36 @@ export class MatchStateMachine {
         return this.currentTurn;
     }
 
+    getStatus() { return { phase: this.phase, turn: this.currentTurn, endsAt: this.endsAt, hasFired: this.hasFiredThisTurn, ready: [...this.playersReady] }; }
+    rebindPlayer(oldId: string, newId: string): void {
+        if (this.playersReady.delete(oldId)) this.playersReady.add(newId);
+    }
+    pause(): void { if (this.pausedAt === null) { this.pausedAt = Date.now(); this.timers.pause(); } }
+    resume(): void {
+        if (this.pausedAt === null) return;
+        const elapsed = Date.now() - this.pausedAt;
+        if (this.endsAt) this.endsAt += elapsed;
+        this.settleStart += elapsed;
+        this.pausedAt = null; this.timers.resume();
+    }
+
     startBuildPhase(): void {
         this.setPhase('build');
         this.playersReady.clear();
 
-        const endsAt = Date.now() + BUILD_PHASE_DURATION_MS;
+        const endsAt = this.endsAt = Date.now() + BUILD_PHASE_DURATION_MS;
         this.io.to(this.roomId).emit('phase_change', {
             phase: 'build',
             endsAt,
         });
 
-        this.phaseTimer = setTimeout(() => {
+        this.phaseTimer = this.timers.timeout(() => {
             this.startRevealPhase();
         }, BUILD_PHASE_DURATION_MS);
     }
 
     handlePlayerBuildReady(socketId: string): void {
-        if (this.phase !== 'build') return;
+        if (this.phase !== 'build' || this.pausedAt !== null) return;
 
         this.playersReady.add(socketId);
 
@@ -81,13 +97,13 @@ export class MatchStateMachine {
     startRevealPhase(): void {
         this.setPhase('reveal');
 
-        const endsAt = Date.now() + REVEAL_DURATION_MS;
+        const endsAt = this.endsAt = Date.now() + REVEAL_DURATION_MS;
         this.io.to(this.roomId).emit('phase_change', {
             phase: 'reveal',
             endsAt,
         });
 
-        this.phaseTimer = setTimeout(() => {
+        this.phaseTimer = this.timers.timeout(() => {
             this.startCombatPhase();
         }, REVEAL_DURATION_MS);
     }
@@ -103,7 +119,7 @@ export class MatchStateMachine {
         this.currentTurn = side;
         this.hasFiredThisTurn = false;
 
-        const endsAt = Date.now() + COMBAT_TURN_DURATION_MS;
+        const endsAt = this.endsAt = Date.now() + COMBAT_TURN_DURATION_MS;
         this.io.to(this.roomId).emit('phase_change', {
             phase: 'combat',
             endsAt,
@@ -117,13 +133,13 @@ export class MatchStateMachine {
         this.callbacks.onTurnStart(side);
 
         // Auto-skip turn if timer expires
-        this.phaseTimer = setTimeout(() => {
+        this.phaseTimer = this.timers.timeout(() => {
             this.onProjectileSettled();
         }, COMBAT_TURN_DURATION_MS);
     }
 
     canFire(): boolean {
-        return this.phase === 'combat' && !this.matchEnded && !this.hasFiredThisTurn;
+        return this.phase === 'combat' && !this.matchEnded && !this.hasFiredThisTurn && this.pausedAt === null;
     }
 
     onProjectileFired(): void {
@@ -136,7 +152,7 @@ export class MatchStateMachine {
         this.settleStart = Date.now();
         this.settleConfirmCount = 0;
 
-        this.settleInterval = setInterval(() => {
+        this.settleInterval = this.timers.interval(() => {
             const world = this.callbacks.getWorld();
             const dynamicBodies = Matter.Composite.allBodies(world).filter(
                 b => !b.isStatic && b.label !== 'Terrain'
@@ -211,6 +227,7 @@ export class MatchStateMachine {
         const result = this.callbacks.onRoundEnd(winner, reason);
 
         if (result === 'continue') {
+            this.endsAt = Date.now() + ROUND_INTERSTITIAL_MS;
             this.setPhase('intermission');
             this.io.to(this.roomId).emit('phase_change', {
                 phase: 'intermission', endsAt: Date.now() + ROUND_INTERSTITIAL_MS,
@@ -220,6 +237,7 @@ export class MatchStateMachine {
 
         // Match is truly over
         this.setPhase('result');
+        this.endsAt = 0;
 
         this.io.to(this.roomId).emit('phase_change', { phase: 'result' });
         this.io.to(this.roomId).emit('match_result', {
@@ -247,14 +265,14 @@ export class MatchStateMachine {
 
     private clearPhaseTimer(): void {
         if (this.phaseTimer) {
-            clearTimeout(this.phaseTimer);
+            this.timers.clear(this.phaseTimer);
             this.phaseTimer = null;
         }
     }
 
     private clearSettleInterval(): void {
         if (this.settleInterval) {
-            clearInterval(this.settleInterval);
+            this.timers.clear(this.settleInterval);
             this.settleInterval = null;
         }
     }

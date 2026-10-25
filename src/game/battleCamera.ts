@@ -1,5 +1,6 @@
 import type { Viewport } from './viewport';
 import { clampCamera } from './viewport';
+import type { Vector } from '../types';
 
 export interface BattleCameraState { x: number; target: number; velocity: number; manualUntil: number; initialized: boolean }
 const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
@@ -34,4 +35,21 @@ export function advanceBattleCamera(camera: BattleCameraState, view: Viewport, d
 export function projectileCameraTarget(x: number, camera: BattleCameraState, view: Viewport) {
     const left = camera.x + view.worldWidth * 0.3, right = camera.x + view.worldWidth * 0.7;
     return x < left ? x - view.worldWidth * 0.3 : x > right ? x - view.worldWidth * 0.7 : camera.target;
+}
+
+/** Feed observed display velocity into the camera; never advance the ball beyond authority. */
+export function trackBattleCamera(camera: BattleCameraState, view: Viewport, point: Vector, velocity: Vector, deltaMs: number, safeTop: number) {
+    const dt = Number.isFinite(deltaMs) ? Math.max(0, Math.min(50, deltaMs)) : 0;
+    const weight = 1 - Math.exp(-dt / 75);
+    camera.target = clampCamera(point.x - view.worldWidth * (velocity.x >= 0 ? 0.43 : 0.57), view);
+    const moved = camera.x + velocity.x * dt / (1000 / 60);
+    camera.x = moved + (camera.target - moved) * weight;
+    camera.x = clampCamera(Math.max(point.x - view.worldWidth * 0.84, Math.min(point.x - view.worldWidth * 0.16, camera.x)), view);
+    camera.velocity = velocity.x * 60;
+    const baseline = 600 - view.worldHeight;
+    const low = point.y - (view.height - 28) / view.scale;
+    const high = point.y - Math.min(view.height - 44, safeTop) / view.scale;
+    const top = Math.min(baseline, Math.max(-500, point.y - (safeTop + view.height - 28) / 2 / view.scale));
+    view.top += (top - view.top) * weight;
+    view.top = Math.max(low, Math.min(high, view.top));
 }

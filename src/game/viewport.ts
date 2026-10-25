@@ -37,3 +37,7 @@ export function minimapRect(view: Viewport) {
     const width = Math.min(176, Math.max(108, view.width * 0.27));
     return { x: view.width - width - 10, y: view.height - 54, width, height: 44 };
 }
+
+export function showBattleMinimap(view: Viewport): boolean {
+    return view.width >= 900 && view.height >= 320;
+}

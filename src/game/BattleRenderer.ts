@@ -2,7 +2,7 @@ import type { BodyState, GameState, KingHpState, MatchPhase, Side, TerrainData, 
 import { WORLD_WIDTH } from '../types';
 import { cartoon } from '../sprites/cartoon';
 import type { ParticleSystem } from '../effects/particles';
-import { minimapRect, worldToScreen, type Viewport } from './viewport';
+import { minimapRect, showBattleMinimap, worldToScreen, type Viewport } from './viewport';
 import { cannonPosition, terrainHeight } from './ballistics';
 import { canPlace } from './placement';
 import { kingPresentation } from './kingAnimation';
@@ -241,7 +241,7 @@ function hazards(ctx: CanvasRenderingContext2D, f: BattleFrame) {
 }
 
 function cannon(ctx: CanvasRenderingContext2D, f: BattleFrame, side: Side) {
-    const pos = cannonPosition(side, f.terrain?.points ?? []);
+    const pos = cannonPosition(side, f.terrain?.points ?? [], f.terrain?.cannons);
     const angle = side === f.side ? f.angle : f.shot?.side === side ? f.shot.angle : Math.PI / 4;
     const facing = side === 'left' ? 1 : -1;
     const base = cartoon.get('cannon_base');
@@ -551,9 +551,10 @@ export function drawBattle(ctx: CanvasRenderingContext2D, f: BattleFrame) {
         ctx.restore();
     }
     ctx.restore();
-    health(ctx, f, 'left'); health(ctx, f, 'right'); minimap(ctx, f);
+    health(ctx, f, 'left'); health(ctx, f, 'right');
+    if (showBattleMinimap(f.view)) minimap(ctx, f);
     const excluded = [{ x: 0, y: 0, width: f.view.width, height: 68 }, healthPanel(f.view.width, f.view.height, 'left'),
-        healthPanel(f.view.width, f.view.height, 'right'), minimapRect(f.view)];
+        healthPanel(f.view.width, f.view.height, 'right'), ...(showBattleMinimap(f.view) ? [minimapRect(f.view)] : [])];
     const cues = f.effects.flatMap(effect => {
         const cue = hitFeedback(effect, f.hitLabels !== false);
         if (!cue || f.now - effect.at >= 950) return [];

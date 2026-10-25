@@ -17,6 +17,13 @@ export class ScoreManager {
     private combatStartTime: number = 0;
     private combatEndTime: number = 0;
     private completedCombatMs: number = 0;
+    private pausedAt: number | null = null;
+    pause(): void { if (this.pausedAt === null) this.pausedAt = Date.now(); }
+    resume(): void {
+        if (this.pausedAt === null) return;
+        if (this.combatStartTime && !this.combatEndTime) this.combatStartTime += Date.now() - this.pausedAt;
+        this.pausedAt = null;
+    }
 
     absorbRound(round: ScoreManager): void {
         round.stopCombatTimer();
@@ -45,12 +52,12 @@ export class ScoreManager {
     }
 
     stopCombatTimer(): void {
-        this.combatEndTime = Date.now();
+        if (!this.combatEndTime) this.combatEndTime = this.pausedAt ?? Date.now();
     }
 
     getCombatTimeMs(): number {
         if (this.combatStartTime === 0) return this.completedCombatMs;
-        const end = this.combatEndTime > 0 ? this.combatEndTime : Date.now();
+        const end = this.combatEndTime > 0 ? this.combatEndTime : this.pausedAt ?? Date.now();
         return this.completedCombatMs + end - this.combatStartTime;
     }
 
@@ -117,5 +124,6 @@ export class ScoreManager {
         this.combatStartTime = 0;
         this.combatEndTime = 0;
         this.completedCombatMs = 0;
+        this.pausedAt = null;
     }
 }

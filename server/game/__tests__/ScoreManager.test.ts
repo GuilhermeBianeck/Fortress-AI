@@ -8,6 +8,16 @@ import {
 } from '../../config/constants';
 
 describe('ScoreManager', () => {
+    it('excludes paused wall time from combat scoring', () => {
+        vi.useFakeTimers();
+        try {
+            const score = new ScoreManager(); score.startCombatTimer();
+            vi.advanceTimersByTime(2000); score.pause(); vi.advanceTimersByTime(20000);
+            expect(score.getCombatTimeMs()).toBe(2000);
+            score.resume(); vi.advanceTimersByTime(1000); score.stopCombatTimer();
+            expect(score.getCombatTimeMs()).toBe(3000);
+        } finally { vi.useRealTimers(); }
+    });
     let sm: ScoreManager;
 
     beforeEach(() => {

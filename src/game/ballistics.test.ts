@@ -115,6 +115,15 @@ test('terrain height interpolates, clamps edges, and supplies the server fallbac
     assert.deepEqual(cannonPosition('left', []), { x: 20, y: 480 });
 });
 
+test('server-provided king-relative cannon origins drive art, aiming and trajectory on either side', () => {
+    const cannons = { left: { x: 760, y: 500 }, right: { x: 1640, y: 500 } };
+    for (const side of ['left', 'right'] as const) {
+        assert.deepEqual(cannonPosition(side, flat, cannons), cannons[side]);
+        const actual = predictTrajectory({ side, angle: 0.6, power: 25, terrainPoints: [], cannons });
+        assertPath(actual, serverFlight({ side, angle: 0.6, power: 25, origin: cannons[side] }).path);
+    }
+});
+
 test('free flight matches a separate server-like Matter simulation on both sides', () => {
     for (const side of ['left', 'right'] as const) {
         for (const [angle, power] of [[0.4, 25], [Math.PI / 2, 100], [2.7, 65]]) {

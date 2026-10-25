@@ -307,20 +307,12 @@ describe('RoomManager', () => {
         });
     });
 
-    describe('UUID registration', () => {
-        it('accepts valid UUID v4', () => {
-            rm.registerUuid('socket-1', '550e8400-e29b-41d4-a716-446655440000');
-            expect(rm.getPlayerUuid('socket-1')).toBe('550e8400-e29b-41d4-a716-446655440000');
-        });
-
-        it('rejects invalid UUID format', () => {
-            rm.registerUuid('socket-1', 'not-a-uuid');
-            expect(rm.getPlayerUuid('socket-1')).toBeUndefined();
-        });
-
-        it('rejects empty UUID', () => {
-            rm.registerUuid('socket-1', '');
-            expect(rm.getPlayerUuid('socket-1')).toBeUndefined();
+    describe('authenticated identity', () => {
+        it('does not trust a UUID without its token', () => {
+            const first = rm.store.authenticate(null);
+            const forged = rm.store.authenticate({ id: first.id, token: '0'.repeat(64) });
+            expect(forged.id).not.toBe(first.id);
+            expect(rm.store.authenticate(first)).toEqual(first);
         });
     });
 

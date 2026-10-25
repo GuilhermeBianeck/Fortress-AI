@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { advanceBattleCamera, projectileCameraTarget, resizeBattleCamera, type BattleCameraState } from './battleCamera';
+import { advanceBattleCamera, projectileCameraTarget, resizeBattleCamera, trackBattleCamera, type BattleCameraState } from './battleCamera';
 import { createViewport } from './viewport';
 
 const state = (x = 0, target = 2000): BattleCameraState => ({ x, target, velocity: 0, manualUntil: 0, initialized: true });
@@ -43,4 +43,21 @@ test('resizing preserves the viewed world center instead of leaving the king at 
     resizeBattleCamera(cam, before, after);
     assert.equal(cam.x + after.worldWidth / 2, center);
     assert.equal(cam.target + after.worldWidth / 2, target);
+});
+
+test('fast shots stay on screen in both directions, above the HUD, at 30/60/120Hz', () => {
+    for (const [w, h] of [[390, 500], [844, 260], [1280, 600]]) for (const hz of [30, 60, 120]) for (const direction of [-1, 1]) {
+        const view = createViewport(w, h), cam = state();
+        for (let i = 0; i <= hz; i++) {
+            const x = direction > 0 ? 650 + 1100 * i / hz : 1750 - 1100 * i / hz;
+            const point = { x, y: 420 - 500 * Math.sin(Math.PI * i / hz) };
+            trackBattleCamera(cam, view, point, { x: direction * 1100 / 60, y: 0 }, 1000 / hz, 150);
+            const px = (point.x - cam.x) * view.scale, py = (point.y - view.top) * view.scale;
+            assert.ok(px >= 0 && px <= w, `horizontal ${w}/${hz}/${direction}`);
+            assert.ok(py >= Math.min(h - 44, 150) - 0.01 && py <= h - 28 + 0.01, `vertical ${w}/${hz}/${direction}`);
+            assert.ok(Number.isFinite(cam.x) && Number.isFinite(view.top));
+        }
+        trackBattleCamera(cam, view, { x: 1200, y: 500 }, { x: 0, y: 0 }, NaN, 150);
+        assert.ok(Number.isFinite(cam.x));
+    }
 });

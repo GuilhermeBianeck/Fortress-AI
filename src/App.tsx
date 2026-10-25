@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
+import { readStorage, writeStorage } from './hooks/browserStorage';
+import { MatchPauseNotice } from './components/MatchPauseNotice';
 import { GameCanvas } from './components/GameCanvas';
 import { GodTools } from './components/GodTools';
 import { toggleMute, isMuted } from './audio/SoundManager';
@@ -35,6 +37,9 @@ function App() {
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards,
     matchScores, playerProfile, prevPlayerProfile, isConnected, connectionNotice, roundWinner,
+    pauseState, syncRevision, serverHasFired, progressStatus, rewardNotice, claimReward, getHistory,
+    identityReplaced,
+    lobbyError,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
     sendChatMessage, requestRematch, getProfile, returnToLobby,
@@ -50,14 +55,14 @@ function App() {
   const [spawnCount, setSpawnCount] = useState(0);
 
   // Player name state (persisted)
-  const [playerName, setPlayerName] = useState(() => localStorage.getItem('fortress_player_name') || '');
+  const [playerName, setPlayerName] = useState(() => readStorage('fortress_player_name') || '');
   const handlePlayerNameChange = (name: string) => {
     setPlayerName(name);
-    localStorage.setItem('fortress_player_name', name);
+    writeStorage('fortress_player_name', name);
   };
 
   // AI Architect state
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('fortress_api_key') || '');
+  const [apiKey, setApiKey] = useState(() => readStorage('fortress_api_key') || '');
   const [prompt, setPrompt] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [showRankPanel, setShowRankPanel] = useState(false);
@@ -69,6 +74,12 @@ function App() {
 
   // Determine screen: lobby or game
   const inGame = phase !== 'lobby';
+  const [resultVisible, setResultVisible] = useState(phase === 'result');
+  useEffect(() => {
+    // Let the delayed renderer show the finishing hit before covering the battlefield.
+    const timer = setTimeout(() => setResultVisible(phase === 'result'), phase === 'result' ? 950 : 0);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
   useEffect(() => { setThemeMusic(inGame, muted); }, [inGame, muted]);
   useEffect(() => () => disposeThemeMusic(), []);
@@ -122,7 +133,7 @@ function App() {
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
-    localStorage.setItem('fortress_api_key', value);
+    writeStorage('fortress_api_key', value);
   };
 
   const handleSpawn = (x: number, y: number) => {
@@ -159,7 +170,7 @@ function App() {
   } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
-    <div className={`h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top ${inGame ? 'game-shell' : 'menu-shell'} ${isConnected && connectionNotice ? 'has-connection-notice' : ''}`} style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: inGame ? '#55a9df' : 'var(--bg-deepest)', ...(inGame ? battleShellStyle : {}) }}>
+    <div className={`h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top ${inGame ? 'game-shell' : 'menu-shell'} ${connectionNotice || pauseState.paused || !isConnected ? 'has-connection-notice' : ''}`} style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: inGame ? '#55a9df' : 'var(--bg-deepest)', ...(inGame ? battleShellStyle : {}) }}>
       {/* The approved menu header stays separate from the in-game HUD. */}
       <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'game-header hidden' : 'menu-header'}`} style={{ background: '#f4f8f4', boxShadow: '0 1px 0 #bdcec6' }}>
         <div className="flex items-center gap-2.5">
@@ -270,9 +281,11 @@ function App() {
         </div>
       )}
 
-      {isConnected && connectionNotice && <div role="status" className="connection-notice">{connectionNotice}</div>}
+      {isConnected && connectionNotice && <div role="status" className="connection-notice">{connectionNotice} {identityReplaced && <button type="button" onClick={() => window.location.reload()}>Reload</button>}</div>}
+      {isConnected && pauseState.paused && <MatchPauseNotice pause={pauseState} side={mySide} leave={returnToLobby} />}
+      {progressStatus === 'pending' && <div className="progress-save-notice" role="status">Progress could not be saved yet. Retrying automatically. New battles are temporarily unavailable.</div>}
 
-      <main inert={!isConnected} className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'game-main overflow-hidden' : 'overflow-y-auto'}`}>
+      <main inert={!isConnected || pauseState.paused || identityReplaced} className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'game-main overflow-hidden' : 'overflow-y-auto'}`}>
         {/* API Key Input (Modal Overlay) */}
         {showApiKey && (
           <div
@@ -328,12 +341,17 @@ function App() {
             onReady={playerReady}
             playerProfile={playerProfile}
             onGetProfile={getProfile}
+            onClaimReward={claimReward}
+            rewardNotice={rewardNotice}
+            onGetHistory={getHistory}
+            error={lobbyError}
           />
         ) : (
           <div className="game-container" data-phase={phase}>
+            {roomState?.mode === 'single' && <span className="sr-only">Solo difficulty: {roomState.difficulty}</span>}
             <div className="game-battle-row" inert={(showChat && !isSinglePlayer) || showApiKey}>
               <div className="game-battlefield">
-                <div className={phase === 'result' ? 'game-phase-result' : 'game-phase-row'}>
+                <div className={phase === 'result' ? `game-phase-result${resultVisible ? '' : ' game-result-pending'}` : 'game-phase-row'}>
                   {phase === 'result' && <button type="button" className="battle-result-sound" onClick={() => setMuted(toggleMute())}
                     aria-label={muted ? 'Unmute sounds' : 'Mute sounds'} aria-pressed={muted} title={muted ? 'Unmute sounds' : 'Mute sounds'}>
                     {muted ? <VolumeX size={20} aria-hidden="true" /> : <Volume2 size={20} aria-hidden="true" />}
@@ -343,12 +361,14 @@ function App() {
                       <SpriteIcon name="logo_crest" size={42} />
                       <div>
                         <span className="game-battle-brand">FORTRESS <b>AI</b></span>
+                        {roomState?.mode === 'single' && <small className="battle-difficulty">{roomState.difficulty} solo</small>}
                         <span className="game-battle-room">Room: {roomState?.roomId}</span>
                       </div>
                     </div>
                   )}
                   <div className="game-phase-content">
                     <PhaseOverlay
+                      pausedAt={pauseState.paused ? pauseState.at : undefined}
                       phase={phase}
                       phaseEndsAt={phaseEndsAt}
                       turnPlayer={turnPlayer}
@@ -410,6 +430,9 @@ function App() {
                 {/* GameCanvas measures this flex slot, including its own combat dock. */}
                 <div className="game-canvas-slot">
                   <GameCanvas
+                    paused={!isConnected || pauseState.paused}
+                    syncRevision={syncRevision}
+                    serverHasFired={serverHasFired}
                     preferences={battlePreferences}
                     gameState={gameState}
                     terrain={terrain}
@@ -419,6 +442,7 @@ function App() {
                     gameMode={gameMode}
                     selectedShape={selectedShape}
                     phase={phase}
+                    phaseEndsAt={phaseEndsAt}
                     turnPlayer={turnPlayer}
                     onFire={fireProjectile}
                     setBlockDestroyedCallback={setBlockDestroyedCallback}
@@ -447,6 +471,7 @@ function App() {
                   onModeChange={setGameMode}
                   phase={phase}
                   onReady={playerReady}
+                  serverReady={roomState?.buildReady}
                   blockCount={spawnCount}
                 />
                 <form onSubmit={handleSubmitPrompt} className="game-prompt-row" role="search" aria-label="AI fortress builder">

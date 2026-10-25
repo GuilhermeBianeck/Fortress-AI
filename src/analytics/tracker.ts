@@ -19,13 +19,7 @@ const queue: AnalyticsEvent[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 let userId = '';
 
-// Resolve user ID lazily from localStorage
-function getUid(): string {
-    if (!userId) {
-        userId = localStorage.getItem('fortress_player_uuid') || 'anonymous';
-    }
-    return userId;
-}
+export function setAnalyticsIdentity(id: string): void { userId = id; }
 
 export function track(name: string, props?: EventProperties): void {
     queue.push({
@@ -35,8 +29,9 @@ export function track(name: string, props?: EventProperties): void {
             platform: window.innerWidth < 768 ? 'mobile' : 'desktop',
         },
         ts: Date.now(),
-        uid: getUid(),
+        uid: userId || 'anonymous',
     });
+    if (queue.length > 50) queue.shift();
 
     // Auto-flush when queue hits 20 events
     if (queue.length >= 20) flush();

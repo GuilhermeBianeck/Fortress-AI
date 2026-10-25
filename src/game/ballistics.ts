@@ -19,6 +19,7 @@ export interface TrajectoryOptions {
     /** Surface samples in ascending x order, as supplied by the server. */
     terrainPoints: readonly Vector[];
     hazards?: readonly TrajectoryHazard[];
+    cannons?: Partial<Record<Side, Vector>>;
 }
 
 // Keep these aligned with server/config/constants.ts and the server's 60 Hz loop.
@@ -44,7 +45,8 @@ export function terrainHeight(points: readonly Vector[], x: number): number {
     return start.y + ((x - start.x) / (end.x - start.x)) * (end.y - start.y);
 }
 
-export function cannonPosition(side: Side, points: readonly Vector[]): Vector {
+export function cannonPosition(side: Side, points: readonly Vector[], cannons?: Partial<Record<Side, Vector>>): Vector {
+    if (cannons?.[side]) return { ...cannons[side] };
     const x = side === 'left' ? LEFT_CANNON_X : RIGHT_CANNON_X;
     return { x, y: terrainHeight(points, x) - 20 };
 }
@@ -74,13 +76,13 @@ function outsideWorld(position: Vector): boolean {
  * The server's hazard-tick phase is not sent to clients; tick 4 is the first gust.
  */
 export function predictTrajectory({
-    side, angle: rawAngle, power: rawPower, terrainPoints, hazards = [],
+    side, angle: rawAngle, power: rawPower, terrainPoints, hazards = [], cannons,
 }: TrajectoryOptions): Vector[] {
     if (!Number.isFinite(rawAngle) || !Number.isFinite(rawPower)) return [];
 
     const angle = Math.max(Math.PI / 18, Math.min(17 * Math.PI / 18, rawAngle));
     const power = Math.max(5, Math.min(100, rawPower));
-    const origin = cannonPosition(side, terrainPoints);
+    const origin = cannonPosition(side, terrainPoints, cannons);
     const engine = Matter.Engine.create();
     engine.gravity.x = 0;
     engine.gravity.y = 2;
