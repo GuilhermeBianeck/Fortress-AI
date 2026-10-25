@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { GameSession } from './GameSession';
+import { ScoreManager } from './ScoreManager';
 import type { PlayerInfo, MatchPhase, Side, PlayerProfile, MatchHistoryEntry, MatchScores } from '../types';
 import { ROUNDS_TO_WIN, ROUND_INTERSTITIAL_MS, MAX_MATCH_HISTORY } from '../config/constants';
 
@@ -11,6 +12,8 @@ export interface Room {
     rematchRequests: Set<string>;
     roundScore: { left: number; right: number };
     currentRound: number;
+    nextRoundTimer: ReturnType<typeof setTimeout> | null;
+    scoreManager: ScoreManager;
 }
 
 function generateRoomId(): string {
@@ -61,6 +64,8 @@ export class RoomManager {
             rematchRequests: new Set(),
             roundScore: { left: 0, right: 0 },
             currentRound: 1,
+            nextRoundTimer: null,
+            scoreManager: new ScoreManager(),
         };
 
         const playerInfo: PlayerInfo = {
@@ -99,7 +104,7 @@ export class RoomManager {
 
         const playerInfo: PlayerInfo = {
             socketId,
-            side: 'right',
+            side: [...room.players.values()].some(player => player.side === 'left') ? 'right' : 'left',
             ready: false,
             name: (name?.trim().slice(0, 20).replace(/[^\w\s-]/g, '')) || 'Player 2',
         };
@@ -157,6 +162,10 @@ export class RoomManager {
 
         // Clear rematch requests on disconnect
         room.rematchRequests.delete(socketId);
+        this.clearNextRound(room);
+        if (room.phase === 'lobby') {
+            for (const player of room.players.values()) player.ready = false;
+        }
 
         // A bot is not a connected player. Stop abandoned solo simulations immediately.
         if (![...room.players.keys()].some(id => !id.startsWith('bot-'))) {
@@ -225,6 +234,7 @@ export class RoomManager {
 
         room.roundScore = { left: 0, right: 0 };
         room.currentRound = 1;
+        room.scoreManager.reset();
 
         const playerInfos = Array.from(room.players.values());
         const session = new GameSession(this.io, roomId, playerInfos, undefined, (phase) => {
@@ -239,6 +249,7 @@ export class RoomManager {
     }
 
     private handleRoundEnd(room: Room, winner: Side, reason: string): 'continue' | 'match_over' {
+        if (room.session) room.scoreManager.absorbRound(room.session.getScoreManager());
         room.roundScore[winner]++;
 
         const isFinalRound = room.roundScore[winner] >= ROUNDS_TO_WIN;
@@ -254,7 +265,7 @@ export class RoomManager {
         if (isFinalRound) {
             // Compute and emit match scores
             if (room.session) {
-                const scores = room.session.computeMatchScores(winner);
+                const scores = room.scoreManager.computeScores(winner);
                 this.io.to(room.id).emit('match_scores', scores);
                 this.saveMatchResults(room, winner, scores);
             }
@@ -263,7 +274,8 @@ export class RoomManager {
 
         // Start next round after interstitial
         room.currentRound++;
-        setTimeout(() => {
+        room.nextRoundTimer = setTimeout(() => {
+            room.nextRoundTimer = null;
             this.startNextRound(room);
         }, ROUND_INTERSTITIAL_MS);
 
@@ -271,7 +283,7 @@ export class RoomManager {
     }
 
     private startNextRound(room: Room): void {
-        if (!room.session || room.players.size !== 2) return;
+        if (this.rooms.get(room.id) !== room || !room.session || room.players.size !== 2 || room.phase !== 'intermission') return;
 
         // Destroy old session
         room.session.destroy();
@@ -289,7 +301,7 @@ export class RoomManager {
 
         for (const [sid, pInfo] of room.players.entries()) {
             const playerSocket = this.io.sockets.sockets.get(sid);
-            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp() });
+            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp(), currentRound: room.currentRound, roundScore: room.roundScore });
         }
 
         session.getStateMachine().startBuildPhase();
@@ -298,7 +310,7 @@ export class RoomManager {
 
     requestRematch(socketId: string): 'waiting' | 'starting' | null {
         const room = this.getRoom(socketId);
-        if (!room || room.phase !== 'result') return null;
+        if (!room || room.phase !== 'result' || room.players.size !== 2) return null;
 
         const player = room.players.get(socketId);
         if (!player) return null;
@@ -324,6 +336,7 @@ export class RoomManager {
     }
 
     startNewSession(room: Room): void {
+        this.clearNextRound(room);
         // Destroy old session
         room.session?.destroy();
 
@@ -331,6 +344,7 @@ export class RoomManager {
         room.rematchRequests.clear();
         room.roundScore = { left: 0, right: 0 };
         room.currentRound = 1;
+        room.scoreManager.reset();
         for (const p of room.players.values()) {
             p.ready = true;
         }
@@ -350,7 +364,7 @@ export class RoomManager {
 
         for (const [sid, pInfo] of room.players.entries()) {
             const playerSocket = this.io.sockets.sockets.get(sid);
-            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp() });
+            playerSocket?.emit('match_started', { side: pInfo.side, kingsHp: session.getKingsHp(), currentRound: room.currentRound, roundScore: room.roundScore });
         }
 
         session.getStateMachine().startBuildPhase();
@@ -423,7 +437,13 @@ export class RoomManager {
         }
     }
 
+    private clearNextRound(room: Room): void {
+        if (room.nextRoundTimer !== null) clearTimeout(room.nextRoundTimer);
+        room.nextRoundTimer = null;
+    }
+
     private disposeRoom(room: Room): void {
+        this.clearNextRound(room);
         room.session?.destroy();
         for (const id of room.players.keys()) {
             if (this.playerRoomMap.get(id) === room.id) this.playerRoomMap.delete(id);
@@ -443,6 +463,7 @@ export class RoomManager {
     destroy(): void {
         clearInterval(this.cleanupInterval);
         for (const room of this.rooms.values()) {
+            this.clearNextRound(room);
             room.session?.destroy();
         }
         this.rooms.clear();

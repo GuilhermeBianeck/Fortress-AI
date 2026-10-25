@@ -16,6 +16,17 @@ export class ScoreManager {
     private aiBlocksUsed: { left: number; right: number } = { left: 0, right: 0 };
     private combatStartTime: number = 0;
     private combatEndTime: number = 0;
+    private completedCombatMs: number = 0;
+
+    absorbRound(round: ScoreManager): void {
+        round.stopCombatTimer();
+        for (const side of ['left', 'right'] as const) {
+            this.damageDealt[side] += round.damageDealt[side];
+            this.resourcesUsed[side] += round.resourcesUsed[side];
+            this.aiBlocksUsed[side] += round.aiBlocksUsed[side];
+        }
+        this.completedCombatMs += round.getCombatTimeMs();
+    }
 
     recordDamage(attackerSide: Side, damage: number): void {
         this.damageDealt[attackerSide] += damage;
@@ -38,9 +49,9 @@ export class ScoreManager {
     }
 
     getCombatTimeMs(): number {
-        if (this.combatStartTime === 0) return 0;
+        if (this.combatStartTime === 0) return this.completedCombatMs;
         const end = this.combatEndTime > 0 ? this.combatEndTime : Date.now();
-        return end - this.combatStartTime;
+        return this.completedCombatMs + end - this.combatStartTime;
     }
 
     computeScores(winner: Side): MatchScores {
@@ -105,5 +116,6 @@ export class ScoreManager {
         this.aiBlocksUsed = { left: 0, right: 0 };
         this.combatStartTime = 0;
         this.combatEndTime = 0;
+        this.completedCombatMs = 0;
     }
 }

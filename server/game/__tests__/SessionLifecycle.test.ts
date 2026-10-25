@@ -3,6 +3,31 @@ import type { Server } from 'socket.io';
 import { RoomManager } from '../RoomManager';
 
 describe('session resource cleanup', () => {
+    it('periodic cleanup does not cancel a populated room next-round timer', () => {
+        vi.useFakeTimers();
+        const manager = new RoomManager({ to: () => ({ emit: vi.fn() }) } as unknown as Server);
+        try {
+            const room = manager.createRoom('human', 'Player', 'single');
+            vi.advanceTimersByTime(58000);
+            room.phase = 'intermission';
+            const nextRound = vi.fn();
+            room.nextRoundTimer = global.setTimeout(() => { nextRound(); }, 4000);
+            vi.advanceTimersByTime(4000);
+            expect(nextRound).toHaveBeenCalledOnce();
+        } finally { manager.destroy(); vi.useRealTimers(); }
+    });
+
+    it('manager shutdown cancels pending next-round timers too', () => {
+        vi.useFakeTimers();
+        const manager = new RoomManager({ to: () => ({ emit: vi.fn() }) } as unknown as Server);
+        const room = manager.createRoom('human', 'Player', 'single');
+        room.nextRoundTimer = global.setTimeout(() => {}, 4000);
+        manager.destroy();
+        const timers = vi.getTimerCount();
+        vi.useRealTimers();
+        expect(timers).toBe(0);
+    });
+
     it.each(['lobby', 'build', 'result'] as const)('removes a solo room and its timers when the human leaves during %s', phase => {
         vi.useFakeTimers();
         const emit = vi.fn();

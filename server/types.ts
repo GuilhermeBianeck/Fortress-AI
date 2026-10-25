@@ -15,7 +15,7 @@ export interface BodyState {
 }
 
 export type Side = 'left' | 'right';
-export type MatchPhase = 'lobby' | 'build' | 'reveal' | 'combat' | 'result';
+export type MatchPhase = 'lobby' | 'build' | 'reveal' | 'combat' | 'intermission' | 'result';
 
 export interface KingHpState {
     hp: number;

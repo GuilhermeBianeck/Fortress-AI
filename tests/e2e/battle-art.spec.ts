@@ -42,8 +42,11 @@ test('illustrated battlefield is sharp, layered and usable through rotation and 
             const c = canvas as HTMLCanvasElement;
             return { backing: c.width, css: c.getBoundingClientRect().width, device: devicePixelRatio };
         });
-        const expected = Math.min(3, dpr.device, Math.max(1, Math.sqrt(4_194_304 / (canvas.width * canvas.height))));
-        expect(Math.abs(dpr.backing / dpr.css - expected)).toBeLessThan(0.01);
+        const maximum = Math.min(3, dpr.device, Math.max(1, Math.sqrt(4_194_304 / (canvas.width * canvas.height))));
+        // Resolution may adapt to sustained slow frames, but never below CSS pixels or above its budget.
+        expect(dpr.backing / dpr.css).toBeGreaterThanOrEqual(1);
+        expect(dpr.backing / dpr.css).toBeLessThanOrEqual(maximum + 0.01);
+        expect(Math.abs(dpr.backing / dpr.css - (await read()).rendering.pixelRatio)).toBeLessThan(0.01);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.screenshot({ path: `output/battle-v5/${testInfo.project.name}-build-${width}x${height}.png`, scale: 'css' });
     }

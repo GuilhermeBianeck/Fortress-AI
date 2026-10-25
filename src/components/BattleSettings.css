@@ -22,3 +22,7 @@
 .battle-settings-check { display: flex; align-items: center; gap: 12px; min-height: 48px; margin-top: 12px; cursor: pointer; }
 .battle-settings-check input { width: 22px; height: 22px; accent-color: #41b69a; }
 .battle-settings :focus-visible { outline: 3px solid #68d2ee; outline-offset: 3px; }
+.battle-settings-leave { border-top: 1px solid #65716b; margin-top: 10px; padding-top: 14px; }
+.battle-settings-leave p { margin: 0 0 12px; font-size: 14px; }
+.battle-settings-leave > div { display: flex; gap: 10px; }
+.battle-settings-leave button { display: flex; justify-content: center; gap: 8px; width: auto; min-width: 88px; min-height: 44px; height: auto; flex: 1; padding: 8px 12px; font-size: 14px; }

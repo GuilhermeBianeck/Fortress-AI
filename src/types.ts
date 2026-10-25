@@ -21,7 +21,7 @@ export interface BodyState {
 }
 
 export type GameMode = 'build' | 'fire';
-export type MatchPhase = 'lobby' | 'build' | 'reveal' | 'combat' | 'result';
+export type MatchPhase = 'lobby' | 'build' | 'reveal' | 'combat' | 'intermission' | 'result';
 export type Side = 'left' | 'right';
 
 export interface KingHpState {

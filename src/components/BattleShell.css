@@ -311,7 +311,8 @@
 .game-shell .chat-bubble-mine { color: #fff5d9; border-color: #569ba3; background: #1a5365; border-radius: 6px 6px 2px 6px; }
 .game-shell .chat-bubble-theirs { color: #fff5d9; border-color: #657a9c; background: #283e63; border-radius: 6px 6px 6px 2px; }
 
-.game-shell .game-phase-result { z-index: 30; background: #0a25484f; padding: 16px; }
+.game-shell .game-phase-result { z-index: 30; background: #0a25484f; padding: 64px 16px 16px; }
+.game-shell .battle-result-sound { position: fixed; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 40; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 2px solid #dfb761; border-radius: 4px; color: #fff0ca; background: #194967; cursor: pointer; }
 .game-shell .game-phase-result > .game-phase-content { max-width: 470px; }
 .game-shell .battle-result {
   max-width: 470px;
@@ -330,6 +331,7 @@
 .game-shell .battle-result button:hover { filter: brightness(1.12); }
 .game-shell .battle-result-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .game-shell .battle-result-actions button { padding-inline: 8px; font-size: 11px; }
+.connection-notice { flex: 0 0 auto; padding: 10px 16px; background: #e7f3ed; color: #183d31; border-bottom: 1px solid #79a895; font-size: 13px; line-height: 1.4; text-align: center; }
 .game-shell .battle-api-dialog { border: 2px solid #e4bc69; border-radius: 6px; background: #123251; box-shadow: inset 0 0 0 2px #71603f, 0 8px 32px #06192a88; }
 .game-shell .battle-api-dialog input { color: #263c4a; background: #fff2d5; border-color: #d5a956; }
 .game-shell .battle-api-dialog .btn-primary { background: #0c7160; color: #fff5d1; border: 1px solid #d8b45e; box-shadow: none; }
@@ -399,7 +401,7 @@
   .game-shell .game-chat-modal { padding: 8px; }
   .game-shell .game-chat-window { width: 100%; }
   .game-shell .battle-chat-panel { height: min(520px, 75dvh); }
-  .game-shell .game-phase-result { padding: 10px; }
+  .game-shell .game-phase-result { padding: 64px 10px 10px; }
   .game-shell .battle-result { padding: 16px; }
 }
 

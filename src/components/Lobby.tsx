@@ -45,6 +45,11 @@ export const Lobby = ({
 }: LobbyProps) => {
     const [joinCode, setJoinCode] = useState('');
     const [isReady, setIsReady] = useState(false);
+    const [hadOpponent, setHadOpponent] = useState(roomState?.opponentConnected ?? false);
+    if (hadOpponent !== (roomState?.opponentConnected ?? false)) {
+        setHadOpponent(roomState?.opponentConnected ?? false);
+        if (!roomState?.opponentConnected) setIsReady(false);
+    }
     const [tipIndex, setTipIndex] = useState(0);
     const [missionDayKey, setMissionDayKey] = useState(() => String(getUtcDayStartMs(new Date())));
     const [missionToast, setMissionToast] = useState<string | null>(null);
@@ -254,7 +259,7 @@ export const Lobby = ({
                             ))}
                         </div>
                         {roomState.opponentConnected && (
-                            <button type="button" onClick={handleReady} disabled={isReady} autoFocus data-side={roomState.side} data-king-character={kingReactions.identity(roomState.side)} className="menu-battle-button menu-ready-button">
+                            <button type="button" onClick={handleReady} disabled={isReady || !roomState.opponentConnected} autoFocus data-side={roomState.side} data-king-character={kingReactions.identity(roomState.side)} className="menu-battle-button menu-ready-button">
                                 {isReady ? <Check size={22} aria-hidden="true" /> : <Swords size={22} aria-hidden="true" />}
                                 READY FOR BATTLE
                             </button>

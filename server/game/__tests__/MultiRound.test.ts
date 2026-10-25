@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { Server } from 'socket.io';
 import { RoomManager } from '../RoomManager';
-import { ROUNDS_TO_WIN, COMBAT_TURN_DURATION_MS } from '../../config/constants';
+import { ROUNDS_TO_WIN, COMBAT_TURN_DURATION_MS, ROUND_INTERSTITIAL_MS } from '../../config/constants';
 
 // Suppress console.log during tests
 vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -179,5 +179,78 @@ describe('Multi-round match flow (best-of-3)', () => {
         const kingsHp = room.session!.getKingsHp();
         expect(kingsHp.left.hp).toBe(kingsHp.left.maxHp);
         expect(kingsHp.right.hp).toBe(kingsHp.right.maxHp);
+    });
+
+    it('announces a non-interactive round break and sends the new round number to each player', () => {
+        const room = setupMatch();
+        const leftEmit = vi.fn();
+        io.sockets.sockets.set('socket-1', { emit: leftEmit } as never);
+        const session = room.session!;
+        session.getStateMachine().startCombatPhase();
+        session.getPlayerState('socket-1')!.kingState.hp = 0;
+        session.getStateMachine().checkKingDefeat();
+        expect(room.phase).toBe('intermission');
+        expect(emitFn).toHaveBeenCalledWith('phase_change', expect.objectContaining({ phase: 'intermission', endsAt: expect.any(Number) }));
+        expect(session.getStateMachine().canFire()).toBe(false);
+        vi.advanceTimersByTime(ROUND_INTERSTITIAL_MS);
+        expect(room.phase).toBe('build');
+        expect(leftEmit).toHaveBeenCalledWith('match_started', expect.objectContaining({ currentRound: 2, roundScore: { left: 0, right: 1 } }));
+    });
+
+    it('cancels the pending next round when a player leaves during the break', () => {
+        const room = setupMatch();
+        const session = room.session!;
+        session.getStateMachine().startCombatPhase();
+        session.getPlayerState('socket-1')!.kingState.hp = 0;
+        session.getStateMachine().checkKingDefeat();
+        rm.handleDisconnect('socket-1');
+        expect(room.phase).toBe('result');
+        expect(vi.getTimerCount()).toBe(1);
+        vi.advanceTimersByTime(ROUND_INTERSTITIAL_MS);
+        expect(room.session).toBe(session);
+        expect(room.phase).toBe('result');
+    });
+
+    it('rejects a rematch without an opponent', () => {
+        const room = setupMatch();
+        rm.handleDisconnect('socket-2');
+        expect(room.phase).toBe('result');
+        expect(rm.requestRematch('socket-1')).toBeNull();
+        expect(room.rematchRequests.size).toBe(0);
+    });
+
+    it('reuses the vacant left side when the original host leaves the lobby', () => {
+        const room = rm.createRoom('host', 'Host');
+        rm.joinRoom(room.id, 'guest', 'Guest');
+        rm.setPlayerReady('guest');
+        rm.handleDisconnect('host');
+        expect(room.players.get('guest')!.ready).toBe(false);
+        rm.joinRoom(room.id, 'replacement', 'Replacement');
+        expect(room.players.get('guest')!.side).toBe('right');
+        expect(room.players.get('replacement')!.side).toBe('left');
+    });
+
+    it('reports all rounds in the match score and clears those totals for a rematch', () => {
+        const room = setupMatch();
+        let session = room.session!;
+        session.getScoreManager().recordDamage('left', 40);
+        session.getScoreManager().recordResourceUsed('left', 2);
+        session.getStateMachine().startCombatPhase();
+        session.getPlayerState('socket-2')!.kingState.hp = 0;
+        session.getStateMachine().checkKingDefeat();
+        vi.advanceTimersByTime(ROUND_INTERSTITIAL_MS);
+        session = room.session!;
+        session.handlePlayerBuildReady('socket-1');
+        session.handlePlayerBuildReady('socket-2');
+        vi.advanceTimersByTime(5000);
+        session.getScoreManager().recordDamage('left', 70);
+        session.getScoreManager().recordResourceUsed('left', 3);
+        session.getPlayerState('socket-2')!.kingState.hp = 0;
+        session.getStateMachine().checkKingDefeat();
+        const scores = emitFn.mock.calls.find(call => call[0] === 'match_scores')![1];
+        expect(scores.left.damageDealt).toBe(110);
+        expect(scores.left.resourcesUsed).toBe(5);
+        rm.requestRematch('socket-1'); rm.requestRematch('socket-2');
+        expect(room.scoreManager.computeScores('left').left.damageDealt).toBe(0);
     });
 });

@@ -14,6 +14,8 @@ interface PhaseOverlayProps {
     playerNames?: { left: string; right: string };
     roundScore?: { left: number; right: number };
     currentRound?: number;
+    roundWinner?: Side | null;
+    opponentConnected?: boolean;
     rematchState?: 'none' | 'requested' | 'opponent_requested';
     onRequestRematch?: () => void;
     onReturnToLobby?: () => void;
@@ -24,7 +26,7 @@ interface PhaseOverlayProps {
     prevPlayerProfile?: PlayerProfile | null;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, mySide, matchResult, playerNames, roundScore, currentRound, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, mySide, matchResult, playerNames, roundScore, currentRound, roundWinner, opponentConnected = true, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [botDots, setBotDots] = useState(1);
 
@@ -58,6 +60,20 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, myS
     }, [turnPlayer, mySide, playerNames]);
 
     if (phase === 'lobby') return null;
+
+    if (phase === 'intermission') {
+        const won = roundWinner === mySide;
+        return <div className="battle-phase-wrap">
+            <div role="status" aria-live="polite" className={`battle-phase-banner ${won ? 'battle-phase-build' : 'battle-phase-opponent'}`}>
+                <div className="battle-phase-heading">
+                    <Crown size={21} aria-hidden="true" />
+                    <span className="battle-phase-title">ROUND {currentRound ?? 1} {won ? 'WON' : 'LOST'}</span>
+                    {displayTimeLeft !== null && <span className="battle-phase-time" aria-live="off">{displayTimeLeft}s</span>}
+                </div>
+                <span className="battle-phase-score">{roundScore?.left ?? 0} : {roundScore?.right ?? 0} · NEXT ROUND</span>
+            </div>
+        </div>;
+    }
 
     // Build phase banner
     if (phase === 'build') {
@@ -358,7 +374,8 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, myS
                     )}
 
                     {/* Rematch button */}
-                    {onRequestRematch && (
+                    {!opponentConnected && <p role="status" className="mt-3 text-xs">Opponent left the battlefield. Start a new game.</p>}
+                    {opponentConnected && onRequestRematch && (
                         <div className="mt-3">
                             {rematchState === 'none' && (
                                 <button

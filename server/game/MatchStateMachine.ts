@@ -9,6 +9,7 @@ import {
     SETTLE_POLL_INTERVAL_MS,
     SETTLE_SPEED_THRESHOLD,
     SETTLE_CONFIRM_COUNT,
+    ROUND_INTERSTITIAL_MS,
 } from '../config/constants';
 
 export interface MatchCallbacks {
@@ -210,7 +211,10 @@ export class MatchStateMachine {
         const result = this.callbacks.onRoundEnd(winner, reason);
 
         if (result === 'continue') {
-            // RoomManager will handle interstitial + next round
+            this.setPhase('intermission');
+            this.io.to(this.roomId).emit('phase_change', {
+                phase: 'intermission', endsAt: Date.now() + ROUND_INTERSTITIAL_MS,
+            });
             return;
         }
 

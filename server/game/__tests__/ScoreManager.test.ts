@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ScoreManager } from '../ScoreManager';
 import {
     SCORE_DAMAGE_MULTIPLIER,
@@ -115,5 +115,27 @@ describe('ScoreManager', () => {
             expect(scores.left.aiBlocksUsed).toBe(0);
             expect(scores.left.combatTimeMs).toBe(0);
         });
+    });
+
+    it('combines round statistics without counting breaks or awarding multiple win bonuses', () => {
+        vi.useFakeTimers();
+        try {
+            vi.setSystemTime(100000);
+            const first = new ScoreManager(), second = new ScoreManager();
+            first.startCombatTimer();
+            first.recordDamage('left', 60); first.recordResourceUsed('left', 2); first.recordAIBuild('left', 1);
+            vi.advanceTimersByTime(2000); sm.absorbRound(first);
+            vi.advanceTimersByTime(4000);
+            second.startCombatTimer();
+            second.recordDamage('left', 100); second.recordResourceUsed('left', 3); second.recordAIBuild('left', 2);
+            vi.advanceTimersByTime(3000); sm.absorbRound(second);
+            const score = sm.computeScores('left').left;
+            expect(score.combatTimeMs).toBe(5000);
+            expect(score.damageDealt).toBe(160);
+            expect(score.resourcesUsed).toBe(5);
+            expect(score.aiBlocksUsed).toBe(3);
+            expect(score.winBonus).toBe(SCORE_WIN_BONUS);
+            sm.reset(); expect(sm.getCombatTimeMs()).toBe(0);
+        } finally { vi.useRealTimers(); }
     });
 });

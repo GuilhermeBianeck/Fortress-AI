@@ -13,6 +13,7 @@ import { livingKingState } from '../game/livingKing';
 import { KingActionDirector, type KingActionPose } from '../game/kingActions';
 import { battleArt } from '../sprites/battleArt';
 import { healthPanel, renderPixelRatio } from '../game/battlePresentation';
+import { RenderQuality } from '../game/renderQuality';
 import { PRESENTATION_DELAY_MS, renderedPosition, SnapshotInterpolator, type RenderSnapshot } from '../game/snapshotInterpolation';
 import { kingPresentation } from '../game/kingAnimation';
 import { cannonMuzzle } from '../game/cannonPresentation';
@@ -62,6 +63,7 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 function GameCanvasInner(props: GameCanvasProps) {
     const latest = useRef(props);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const renderQuality = useRef(new RenderQuality());
     const stageRef = useRef<HTMLDivElement>(null);
     const camera = useRef<BattleCameraState>({ x: 0, target: 0, velocity: 0, manualUntil: 0, initialized: false });
     const cameraDissolve = useRef<{ frame: HTMLCanvasElement; at: number } | null>(null);
@@ -246,8 +248,9 @@ function GameCanvasInner(props: GameCanvasProps) {
             const ctx = canvas?.getContext('2d');
             const p = latest.current;
             if (canvas && ctx) {
+                const renderStart = performance.now();
                 const v = view.current;
-                const dpr = renderPixelRatio(v.width, v.height, window.devicePixelRatio);
+                const dpr = Math.min(renderQuality.current.maxRatio, renderPixelRatio(v.width, v.height, window.devicePixelRatio));
                 const w = Math.round(v.width * dpr), h = Math.round(v.height * dpr);
                 if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
                 ctx.setTransform(w / v.width, 0, 0, h / v.height, 0, 0);
@@ -339,6 +342,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                     debugStats.updateFrame(now); debugStats.totalBodies = p.gameState?.bodies.length ?? 0;
                     debugStats.particlesActive = particles.current.count; debugStats.phase = p.phase;
                 }
+                renderQuality.current.record(elapsed, performance.now() - renderStart);
             }
             raf = requestAnimationFrame(render);
         };
@@ -367,7 +371,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                     action: kingActions.current[side],
                 })])),
                 battleArtLoaded: battleArt.loaded,
-                rendering: { pixelRatio: renderPixelRatio(view.current.width, view.current.height, window.devicePixelRatio), reducedMotion: reducedMotion.current },
+                rendering: { pixelRatio: canvasRef.current ? canvasRef.current.width / view.current.width : 1, reducedMotion: reducedMotion.current },
                 presentation: { delayMs: presented.current?.delayMs ?? PRESENTATION_DELAY_MS, targetDelayMs: presented.current?.targetDelayMs,
                     held: presented.current?.held, resynced: presented.current?.resynced, timestamp: presented.current?.timestamp,
                     snapshots: presented.current?.buffered ?? 0,

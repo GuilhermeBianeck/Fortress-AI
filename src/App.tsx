@@ -34,7 +34,7 @@ function App() {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards,
-    matchScores, playerProfile, prevPlayerProfile, isConnected,
+    matchScores, playerProfile, prevPlayerProfile, isConnected, connectionNotice, roundWinner,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
     spawnBox, requestBuild, fireProjectile,
     sendChatMessage, requestRematch, getProfile, returnToLobby,
@@ -80,18 +80,17 @@ function App() {
       viewport_height: window.innerHeight,
     });
 
-    // Support ?room=XXXXXX invite links
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    // Wait for the real connection rather than dropping an invite on slow startup.
     const urlRoom = new URLSearchParams(window.location.search).get('room');
     if (urlRoom && urlRoom.length >= 4) {
-      // Small delay to ensure socket is connected
-      const timer = setTimeout(() => {
-        joinRoom(urlRoom, playerName);
-        // Clean URL without reload
-        window.history.replaceState({}, '', window.location.pathname);
-      }, 500);
-      return () => clearTimeout(timer);
+      joinRoom(urlRoom, playerName);
+      window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isConnected, joinRoom, playerName]);
 
   // Reset build controls when a new build phase starts.
   // Pattern: store previous phase in state; check during render (React docs: "Adjusting some state when a prop changes").
@@ -271,7 +270,9 @@ function App() {
         </div>
       )}
 
-      <main className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'game-main overflow-hidden' : 'overflow-y-auto'}`}>
+      {isConnected && connectionNotice && <div role="status" className="connection-notice">{connectionNotice}</div>}
+
+      <main inert={!isConnected} className={`flex-1 flex flex-col items-center overflow-x-hidden min-h-0 ${inGame ? 'game-main overflow-hidden' : 'overflow-y-auto'}`}>
         {/* API Key Input (Modal Overlay) */}
         {showApiKey && (
           <div
@@ -333,6 +334,10 @@ function App() {
             <div className="game-battle-row" inert={(showChat && !isSinglePlayer) || showApiKey}>
               <div className="game-battlefield">
                 <div className={phase === 'result' ? 'game-phase-result' : 'game-phase-row'}>
+                  {phase === 'result' && <button type="button" className="battle-result-sound" onClick={() => setMuted(toggleMute())}
+                    aria-label={muted ? 'Unmute sounds' : 'Mute sounds'} aria-pressed={muted} title={muted ? 'Unmute sounds' : 'Mute sounds'}>
+                    {muted ? <VolumeX size={20} aria-hidden="true" /> : <Volume2 size={20} aria-hidden="true" />}
+                  </button>}
                   {phase !== 'result' && (
                     <div className="game-battle-identity" aria-label={`Fortress AI. Room ${roomState?.roomId ?? ''}`}>
                       <SpriteIcon name="logo_crest" size={42} />
@@ -353,6 +358,8 @@ function App() {
                       playerNames={playerNamesMap}
                       roundScore={roundScore}
                       currentRound={currentRound}
+                      roundWinner={roundWinner}
+                      opponentConnected={roomState?.opponentConnected}
                       rematchState={rematchState}
                       onRequestRematch={requestRematch}
                       onReturnToLobby={returnToLobby}
@@ -398,7 +405,7 @@ function App() {
                   )}
                 </div>
 
-                {showBattleSettings && <BattleSettings preferences={battlePreferences} onChange={changeBattlePreferences} onClose={() => setShowBattleSettings(false)} />}
+                {showBattleSettings && <BattleSettings preferences={battlePreferences} onChange={changeBattlePreferences} onClose={() => setShowBattleSettings(false)} onLeave={returnToLobby} />}
 
                 {/* GameCanvas measures this flex slot, including its own combat dock. */}
                 <div className="game-canvas-slot">
