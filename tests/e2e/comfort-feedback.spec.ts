@@ -10,6 +10,29 @@ async function start(page: Page) {
     await expect.poll(async () => (await read(page)).livingKingsLoaded).toBe(12);
 }
 
+test('recovery notice clears the menu header and leaves Battle reachable at every size', async ({ page, context }, testInfo) => {
+    await start(page);
+    await context.setOffline(true);
+    await expect(page.getByRole('alert').filter({ hasText: /Connection lost/ })).toBeVisible({ timeout: 18000 });
+    await expect(page.locator('main')).toHaveAttribute('inert', '');
+    await context.setOffline(false);
+    const notice = page.locator('.connection-notice');
+    await expect(notice).toHaveText(/Connection restored/, { timeout: 10000 });
+    await expect(page.locator('.battle-canvas')).toHaveCount(0);
+    for (const [width, height] of [[320, 568], [390, 844], [844, 390], [1280, 800]]) {
+        await page.setViewportSize({ width, height }); await page.waitForTimeout(200);
+        const header = (await page.locator('.menu-header').boundingBox())!;
+        const message = (await notice.boundingBox())!;
+        const battle = (await page.getByRole('button', { name: /BATTLE/ }).boundingBox())!;
+        expect(message.y).toBeGreaterThanOrEqual(header.y + header.height);
+        expect(message.x).toBeGreaterThanOrEqual(0);
+        expect(message.x + message.width).toBeLessThanOrEqual(width);
+        expect(battle.y).toBeGreaterThanOrEqual(message.y + message.height);
+        expect(battle.y + battle.height).toBeLessThanOrEqual(height + 1);
+        await page.screenshot({ path: `output/playwright/v11-recovery-${testInfo.project.name}-${width}x${height}.png` });
+    }
+});
+
 test('saved comfort settings fit phones, trap focus and keep Manual camera still through real turns', async ({ page }, testInfo) => {
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
     // Keep this a private solo game, but render the three-button multiplayer header at320px too.

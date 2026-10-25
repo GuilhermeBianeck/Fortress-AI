@@ -159,7 +159,7 @@ function App() {
   } as { left: string; right: string } : { left: 'Player 1', right: 'Player 2' };
 
   return (
-    <div className={`h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top ${inGame ? 'game-shell' : 'menu-shell'}`} style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: inGame ? '#55a9df' : 'var(--bg-deepest)', ...(inGame ? battleShellStyle : {}) }}>
+    <div className={`h-[100dvh] text-[var(--text-primary)] selection:bg-amber-300/20 flex flex-col overflow-hidden safe-area-top ${inGame ? 'game-shell' : 'menu-shell'} ${isConnected && connectionNotice ? 'has-connection-notice' : ''}`} style={{ fontFamily: "'Inter', 'Cinzel', Georgia, serif", background: inGame ? '#55a9df' : 'var(--bg-deepest)', ...(inGame ? battleShellStyle : {}) }}>
       {/* The approved menu header stays separate from the in-game HUD. */}
       <header className={`px-4 py-2.5 border-b border-[var(--border-subtle)] flex justify-between items-center backdrop-blur-md sticky top-0 z-50 ${inGame ? 'game-header hidden' : 'menu-header'}`} style={{ background: '#f4f8f4', boxShadow: '0 1px 0 #bdcec6' }}>
         <div className="flex items-center gap-2.5">

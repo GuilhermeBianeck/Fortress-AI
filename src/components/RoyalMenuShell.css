@@ -77,7 +77,20 @@
 .menu-shell .menu-header button:hover { filter: brightness(1.15); }
 .menu-shell .menu-header button:focus-visible { outline: 3px solid #fff5b6; outline-offset: 3px; }
 
+.menu-shell.has-connection-notice .menu-header {
+  position: relative;
+  inset: auto;
+  flex: 0 0 58px;
+  width: calc(100% - 32px);
+  margin: 12px 16px;
+}
+
 @media (max-width: 600px), (max-height: 500px) {
+  .menu-shell.has-connection-notice .menu-header {
+    flex-basis: 44px;
+    width: calc(100% - 16px);
+    margin: 6px 8px;
+  }
   .menu-shell .menu-header {
     inset: max(6px, env(safe-area-inset-top, 0px)) 8px auto;
     height: 44px;
