@@ -85,4 +85,8 @@ No subjective listening, phone-speaker assessment or Bluetooth latency certifica
 
 ## Publication
 
-Publication was authorized on 25 October 2026. The release needs both the matching browser and backend updates, not Vercel alone; the deployment receipt will be recorded after live verification. Local review URL: `http://localhost:5174` (production preview); `http://localhost:5173` serves development.
+Published gameplay commit `62ce1d8` to main on 25 October 2026. Vercel reports success, and the matching VPS backend passed its build and all 175 tests before restarting only the game service with zero connected players. Its production dependency audit reports zero vulnerabilities; the environment file is unchanged and protected code/configuration/data rollback backups were retained. No dependency or shared-infrastructure changes were required.
+
+Private live acceptance on [Fortress Battle](https://www.fortressbattle.com) passed: a complete phone-sized 2-0 solo match with eight human shots and 200 combined king damage, round breaks, result mute/unmute and a fresh R1 / 0-0 rematch; real PvP host replacement with a 1.5-second delayed invite connection, chat, both cannon turns, exit-forfeit and no impossible rematch; forced offline recovery with blocked/discarded actions, a fresh usable menu, cancel/confirm exit and one additional enter/leave cycle. No page errors occurred; the forced outage produced the expected browser network error. Live screenshots were inspected, test clients closed and game-port connections returned to zero.
+
+Physical-device testing and the remaining work listed above are not implied complete by deployment. Local review remains available at `http://localhost:5174` (production preview) and `http://localhost:5173` (development).
