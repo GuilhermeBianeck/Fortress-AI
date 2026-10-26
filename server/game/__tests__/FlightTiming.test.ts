@@ -6,7 +6,7 @@ import { MatchStateMachine } from '../MatchStateMachine';
 afterEach(() => vi.useRealTimers());
 it('does not hand over at the old five-second cutoff while a paced shot is still airborne', () => {
     vi.useFakeTimers();
-    const world = Matter.World.create(), ball = Matter.Bodies.circle(800, 200, 9, { label: 'projectile' });
+    const world = Matter.World.create({}), ball = Matter.Bodies.circle(800, 200, 9, { label: 'projectile' });
     Matter.Body.setVelocity(ball, { x: 30, y: 0 }); Matter.Composite.add(world, ball);
     const sm = new MatchStateMachine({ to: () => ({ emit: vi.fn() }) } as unknown as Server, 'flight', {
         onPhaseChange: vi.fn(), onTurnStart: vi.fn(), onMatchResult: vi.fn(), onRoundEnd: () => 'match_over',
