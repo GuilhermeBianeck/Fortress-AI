@@ -6,7 +6,7 @@ import { applyWindForce } from '../physics/hazards';
 import { BOT_DIFFICULTIES, type BotDifficulty } from '../shared/difficulty';
 import { kingCannonX } from '../shared/battleLayout';
 import type { Side } from '../types';
-import { PHYSICS_AIR_FRICTION, PROJECTILE_RADIUS, PROJECTILE_DENSITY, PROJECTILE_RESTITUTION, PROJECTILE_FRICTION } from '../config/constants';
+import { PHYSICS_AIR_FRICTION, PHYSICS_POWER_MULTIPLIER, PROJECTILE_RADIUS, PROJECTILE_DENSITY, PROJECTILE_RESTITUTION, PROJECTILE_FRICTION } from '../config/constants';
 
 function random(seed: number) { return () => { seed = seed * 16807 % 2147483647; return (seed - 1) / 2147483646; }; }
 function scene(seed: number, side: Side, turn: number): BallisticsScene {
@@ -38,7 +38,8 @@ function replay(scene: BallisticsScene, angle: number, power: number) {
         label: 'projectile', density: PROJECTILE_DENSITY, frictionAir: PHYSICS_AIR_FRICTION,
         restitution: PROJECTILE_RESTITUTION, friction: PROJECTILE_FRICTION,
     });
-    Matter.Body.setVelocity(ball, { x: (scene.side === 'left' ? 1 : -1) * power * Math.cos(angle), y: -power * Math.sin(angle) });
+    const speed = power * PHYSICS_POWER_MULTIPLIER;
+    Matter.Body.setVelocity(ball, { x: (scene.side === 'left' ? 1 : -1) * speed * Math.cos(angle), y: -speed * Math.sin(angle) });
     Matter.Composite.add(engine.world, [...scene.bodies, ball]);
     let closest = { ...ball.position }, previous = closest, distance = Infinity;
     let hit: Matter.Body | undefined;

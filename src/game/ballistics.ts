@@ -20,6 +20,8 @@ export interface TrajectoryOptions {
     terrainPoints: readonly Vector[];
     hazards?: readonly TrajectoryHazard[];
     cannons?: Partial<Record<Side, Vector>>;
+    /** Stop after this many 60 Hz frames (aim previews show only the opening arc). */
+    maxFrames?: number;
 }
 
 // Keep these aligned with server/config/constants.ts and the server's 60 Hz loop.
@@ -27,6 +29,7 @@ const FRAME_MS = 1000 / 60;
 const MAX_FRAMES = 300;
 const MAX_SPEED = 1000;
 const WIND_STRENGTH = 0.0005;
+export const POWER_SPEED_MULTIPLIER = 0.45; // server/shared/combatTuning.ts
 
 export function terrainHeight(points: readonly Vector[], x: number): number {
     if (points.length === 0) return 500;
@@ -76,12 +79,12 @@ function outsideWorld(position: Vector): boolean {
  * The server's hazard-tick phase is not sent to clients; tick 4 is the first gust.
  */
 export function predictTrajectory({
-    side, angle: rawAngle, power: rawPower, terrainPoints, hazards = [], cannons,
+    side, angle: rawAngle, power: rawPower, terrainPoints, hazards = [], cannons, maxFrames = MAX_FRAMES,
 }: TrajectoryOptions): Vector[] {
     if (!Number.isFinite(rawAngle) || !Number.isFinite(rawPower)) return [];
 
     const angle = Math.max(Math.PI / 18, Math.min(17 * Math.PI / 18, rawAngle));
-    const power = Math.max(5, Math.min(100, rawPower));
+    const speed = Math.max(5, Math.min(100, rawPower)) * POWER_SPEED_MULTIPLIER;
     const origin = cannonPosition(side, terrainPoints, cannons);
     const engine = Matter.Engine.create();
     engine.gravity.x = 0;
@@ -99,10 +102,10 @@ export function predictTrajectory({
         label: 'projectile',
     });
     const direction = side === 'right' ? -1 : 1;
-    const speedScale = Math.min(1, MAX_SPEED / power);
+    const speedScale = Math.min(1, MAX_SPEED / speed);
     Matter.Body.setVelocity(projectile, {
-        x: direction * power * Math.cos(angle) * speedScale,
-        y: -power * Math.sin(angle) * speedScale,
+        x: direction * speed * Math.cos(angle) * speedScale,
+        y: -speed * Math.sin(angle) * speedScale,
     });
     Matter.Composite.add(engine.world, [...terrainBodies(terrainPoints), projectile]);
 
@@ -124,7 +127,7 @@ export function predictTrajectory({
     };
 
     try {
-        for (let frame = 1; frame <= MAX_FRAMES; frame++) {
+        for (let frame = 1; frame <= Math.min(MAX_FRAMES, maxFrames); frame++) {
             if (step()) break;
 
             // GameLoop runs checkProjectileBounds then tickHazards BETWEEN half-steps.

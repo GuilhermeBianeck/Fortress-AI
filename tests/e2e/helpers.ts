@@ -82,3 +82,13 @@ export async function skipBuildPhase(page: Page): Promise<void> {
         await doneBtn.click();
     }
 }
+
+/** Hold Fire long enough for the charge bar to reach `power` (5..100 over 3 s), then release. */
+export async function chargeFire(page: Page, power: number): Promise<void> {
+    const fire = page.getByRole('button', { name: 'Fire', exact: true });
+    const box = (await fire.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(Math.max(0, (power - 5) / 95 * 3000));
+    await page.mouse.up();
+}

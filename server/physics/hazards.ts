@@ -23,9 +23,16 @@ function seededRandom(seed: number): () => number {
     };
 }
 
-const HAZARD_TYPES: HazardType[] = ['wind_zone', 'lava_pool', 'falling_rocks'];
+// Wind is rolled every combat turn (see shared/combatTuning), not as a match hazard.
+const HAZARD_TYPES: HazardType[] = ['lava_pool', 'falling_rocks'];
 
-export function generateHazards(terrain: TerrainResult, seed: number): HazardData[] {
+export interface NeutralZone { min: number; max: number }
+
+/** Hazards sit centered in the no-man's-land between the cannons so neither side is favored. */
+export function generateHazards(
+    terrain: TerrainResult, seed: number,
+    neutral: NeutralZone = { min: WORLD_WIDTH / 2 - 400, max: WORLD_WIDTH / 2 + 400 },
+): HazardData[] {
     const rng = seededRandom(seed + 12345);
     const hazards: HazardData[] = [];
 
@@ -34,31 +41,16 @@ export function generateHazards(terrain: TerrainResult, seed: number): HazardDat
     const shuffled = [...HAZARD_TYPES].sort(() => rng() - 0.5);
     const chosen = shuffled.slice(0, count);
 
-    // Place hazards in the middle zone (~400-1200px)
-    const midStart = 400;
-    const midEnd = 1200;
-    const midWidth = midEnd - midStart;
+    const center = (neutral.min + neutral.max) / 2;
+    const room = Math.max(0, neutral.max - neutral.min);
 
     for (const type of chosen) {
         const id = `hazard_${type}_${Math.floor(rng() * 10000)}`;
 
-        if (type === 'wind_zone') {
-            // Wind covers the entire world width, full height
-            // Randomize wind strength: 0.5x to 1.5x of base strength
-            const variation = 0.5 + rng(); // 0.5 to 1.5
-            hazards.push({
-                type: 'wind_zone',
-                id,
-                position: { x: 0, y: 0 },
-                width: WORLD_WIDTH,
-                height: CANVAS_HEIGHT,
-                windDirection: rng() < 0.5 ? -1 : 1,
-                windStrength: WIND_STRENGTH * variation,
-            });
-        } else if (type === 'lava_pool') {
-            const w = 80 + rng() * 120;
-            const x = midStart + rng() * (midWidth - w);
-            const terrainY = interpolateTerrainY(terrain.points, x + w / 2);
+        if (type === 'lava_pool') {
+            const w = Math.min(room, 80 + rng() * 120);
+            const x = center - w / 2;
+            const terrainY = interpolateTerrainY(terrain.points, center);
             hazards.push({
                 type: 'lava_pool',
                 id,
@@ -68,12 +60,11 @@ export function generateHazards(terrain: TerrainResult, seed: number): HazardDat
                 damage: LAVA_DAMAGE_PER_TICK,
             });
         } else if (type === 'falling_rocks') {
-            const w = 150 + rng() * 100;
-            const x = midStart + rng() * (midWidth - w);
+            const w = Math.min(room, 150 + rng() * 100);
             hazards.push({
                 type: 'falling_rocks',
                 id,
-                position: { x, y: 0 },
+                position: { x: center - w / 2, y: 0 },
                 width: w,
                 height: CANVAS_HEIGHT,
             });

@@ -1,6 +1,7 @@
 import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
 import { reconstructGameState } from '../../src/hooks/gameStateSnapshot';
 import type { BodyState, CompactGameState, GameState, Side } from '../../src/types';
+import { chargeFire } from './helpers';
 
 const read = (page: Page) => page.evaluate(() => JSON.parse((window as Window & { render_game_to_text: () => string }).render_game_to_text()));
 async function frameKing(page: Page, side: Side) {
@@ -47,8 +48,7 @@ test('kings aim, recoil on accepted shots, brace on both sides and recover with 
     await expect.poll(async () => (await read(page)).kingActions.left.aim).toBe(1);
     await frameKing(page, 'left');
     await page.screenshot({ path: `output/king-actions-v7/${testInfo.project.name}-aim.png` });
-    await page.locator('#cannon-power').fill('65');
-    await page.getByRole('button', { name: 'Fire', exact: true }).click();
+    await chargeFire(page, 65);
     await expect.poll(async () => (await read(page)).kingActions.left.mode, { intervals: [10, 20] }).toBe('recoil');
     const launch = await read(page);
     expect(launch.shot.side).toBe('left');

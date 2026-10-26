@@ -30,45 +30,30 @@ describe('generateHazards', () => {
         expect(a.map(h => h.id)).not.toEqual(b.map(h => h.id));
     });
 
-    it('wind zones cover the full world', () => {
-        // Find a seed that produces a wind zone
+    it('leaves wind to the per-turn roll', () => {
         for (let seed = 0; seed < 50; seed++) {
-            const hazards = generateHazards(terrain, seed);
-            const wind = hazards.find(h => h.type === 'wind_zone');
-            if (wind) {
-                expect(wind.width).toBe(WORLD_WIDTH);
-                expect(wind.height).toBe(CANVAS_HEIGHT);
-                expect(wind.windDirection).toBeDefined();
-                expect(Math.abs(wind.windDirection!)).toBe(1);
-                expect(wind.windStrength).toBeGreaterThan(0);
-                return;
-            }
+            expect(generateHazards(terrain, seed).some(h => h.type === 'wind_zone')).toBe(false);
         }
     });
 
-    it('lava pools are placed in the middle zone', () => {
+    it('lava pools sit centered in the default neutral zone', () => {
         for (let seed = 0; seed < 50; seed++) {
-            const hazards = generateHazards(terrain, seed);
-            const lava = hazards.find(h => h.type === 'lava_pool');
-            if (lava) {
-                expect(lava.position.x).toBeGreaterThanOrEqual(400);
-                expect(lava.position.x + lava.width).toBeLessThanOrEqual(1200 + 200); // midEnd + max width
-                expect(lava.damage).toBe(LAVA_DAMAGE_PER_TICK);
-                return;
-            }
+            const lava = generateHazards(terrain, seed).find(h => h.type === 'lava_pool');
+            if (!lava) continue;
+            expect(lava.position.x).toBeGreaterThanOrEqual(WORLD_WIDTH / 2 - 400);
+            expect(lava.position.x + lava.width).toBeLessThanOrEqual(WORLD_WIDTH / 2 + 400);
+            expect(lava.position.x + lava.width / 2).toBeCloseTo(WORLD_WIDTH / 2);
+            expect(lava.damage).toBe(LAVA_DAMAGE_PER_TICK);
         }
     });
 
-    it('falling rocks are placed in the middle zone', () => {
+    it('falling rocks sit centered in the default neutral zone', () => {
         for (let seed = 0; seed < 50; seed++) {
-            const hazards = generateHazards(terrain, seed);
-            const rocks = hazards.find(h => h.type === 'falling_rocks');
-            if (rocks) {
-                expect(rocks.position.x).toBeGreaterThanOrEqual(400);
-                expect(rocks.position.y).toBe(0);
-                expect(rocks.height).toBe(CANVAS_HEIGHT);
-                return;
-            }
+            const rocks = generateHazards(terrain, seed).find(h => h.type === 'falling_rocks');
+            if (!rocks) continue;
+            expect(rocks.position.x + rocks.width / 2).toBeCloseTo(WORLD_WIDTH / 2);
+            expect(rocks.position.y).toBe(0);
+            expect(rocks.height).toBe(CANVAS_HEIGHT);
         }
     });
 });

@@ -95,6 +95,21 @@ function frozenBody(body: Matter.Body): Matter.Body {
         parts.map(part => part.vertices.map(vertex => ({ x: vertex.x, y: vertex.y }))), options, true);
 }
 
+// Near-equal open-air scores would otherwise pick six neighbouring flat angles that one
+// wall blocks together; spreading finalists across the reachable arc keeps a lob in play.
+function spreadFinalists<T extends { angle: number; score: number }>(candidates: T[], count: number): T[] {
+    const reachable = candidates.filter(c => c.score < 50).sort((a, b) => a.angle - b.angle);
+    const picked = new Set<T>();
+    for (let i = 0; i < count && reachable.length; i++) {
+        picked.add(reachable[Math.round(i * (reachable.length - 1) / Math.max(1, count - 1))]);
+    }
+    for (const c of [...candidates].sort((a, b) => a.score - b.score)) {
+        if (picked.size >= count) break;
+        picked.add(c);
+    }
+    return [...picked].sort((a, b) => a.score - b.score);
+}
+
 export function findBotShot(scene: BallisticsScene, aimOffsetX: number): BotShotPlan {
     const deadline = performance.now() + 75;
     const direction = scene.side === 'left' ? 1 : -1;
@@ -128,7 +143,7 @@ export function findBotShot(scene: BallisticsScene, aimOffsetX: number): BotShot
     }
     let best: BotShotPlan | undefined;
     let bestScore = Infinity;
-    for (const candidate of candidates.sort((a, b) => a.score - b.score).slice(0, 6)) {
+    for (const candidate of spreadFinalists(candidates, 6)) {
         if (best && performance.now() >= deadline) break;
         const ball = makeProjectile(scene, candidate.angle, candidate.power);
         Matter.Composite.add(engine.world, ball);

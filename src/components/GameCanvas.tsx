@@ -19,6 +19,7 @@ import { kingPresentation } from '../game/kingAnimation';
 import { cannonMuzzle } from '../game/cannonPresentation';
 import { drawBattle, type BattleEffect, type BattleHazard } from '../game/BattleRenderer';
 import { cannonPosition, predictTrajectory } from '../game/ballistics';
+import { chargePower, MAX_POWER } from '../game/chargePower';
 import { kingFeedbackPosition, projectileOwner } from '../game/battleFeedback';
 import { canPlace, PLACEMENT_DIMENSIONS } from '../game/placement';
 import { clampCamera, createViewport, minimapRect, screenToWorld, showBattleMinimap } from '../game/viewport';
@@ -61,6 +62,8 @@ interface Gesture {
     camera: number;
     cancelled: boolean;
 }
+// The aim preview shows only the opening of the arc: reading wind and power is the skill.
+const PREVIEW_FRAMES = 18;
 const MIN_ANGLE = 10 * Math.PI / 180;
 const MAX_ANGLE = 170 * Math.PI / 180;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -77,8 +80,11 @@ function GameCanvasInner(props: GameCanvasProps) {
     const [size, setSize] = useState({ width: 800, height: 560 });
     const [overview, setOverview] = useState(false);
     const view = useRef(createViewport(800, 560));
-    const [aim, setAimState] = useState({ angle: Math.PI / 4, power: 35 });
+    const [aim, setAimState] = useState({ angle: Math.PI / 4, power: 60 });
     const aimRef = useRef(aim);
+    const [charging, setCharging] = useState(false);
+    const chargeStart = useRef<number | null>(null);
+    const [lastPower, setLastPower] = useState<number | null>(null);
     const [inspect, setInspect] = useState(false);
     const inspectRef = useRef(false);
     const [shotPending, setShotPending] = useState(false);
@@ -169,6 +175,7 @@ function GameCanvasInner(props: GameCanvasProps) {
     }, [size, overview, focus, teamCenter]);
     useEffect(() => {
         pendingRef.current = false; setShotPending(false);
+        chargeStart.current = null; setCharging(false);
         if (shotCamera.current.id === null) followedProjectile.current = null;
     }, [props.phase, props.turnPlayer]);
     useEffect(() => {
@@ -196,8 +203,9 @@ function GameCanvasInner(props: GameCanvasProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [props.syncRevision, props.paused]);
     useEffect(() => {
-        if (props.serverHasFired) { pendingRef.current = true; setShotPending(true); }
-    }, [props.serverHasFired]);
+        // shot_fired reaches both players; only the shooter's controls become "Fired".
+        if (props.serverHasFired && props.turnPlayer === props.mySide) { pendingRef.current = true; setShotPending(true); }
+    }, [props.serverHasFired, props.turnPlayer, props.mySide]);
     useEffect(() => {
         if (props.gameState) snapshots.current.push(props.gameState, performance.now());
     }, [props.gameState]);
@@ -250,7 +258,8 @@ function GameCanvasInner(props: GameCanvasProps) {
             trajectory.current = []; return;
         }
         trajectory.current = predictTrajectory({ side: props.mySide, angle: aim.angle, power: aim.power,
-            terrainPoints: props.terrain?.points ?? [], cannons: props.terrain?.cannons, hazards: props.hazards ?? [] });
+            terrainPoints: props.terrain?.points ?? [], cannons: props.terrain?.cannons, hazards: props.hazards ?? [],
+            maxFrames: PREVIEW_FRAMES });
     }, [aim, props.phase, props.turnPlayer, props.mySide, props.terrain, props.hazards, shotPending, inspect]);
 
     const fire = useCallback(() => {
@@ -260,8 +269,41 @@ function GameCanvasInner(props: GameCanvasProps) {
         if (p.preferences.camera === 'follow') camera.current.manualUntil = 0;
         gesture.current = null; trajectory.current = [];
         track('projectile_fired', { angle: Math.round(aimRef.current.angle * 180 / Math.PI), power: Math.round(aimRef.current.power) });
+        setLastPower(aimRef.current.power);
         p.onFire(aimRef.current.angle, aimRef.current.power);
     }, []);
+    const canCharge = () => {
+        const p = latest.current;
+        return !p.paused && !impactHold.current && p.phase === 'combat' && p.turnPlayer === p.mySide
+            && !pendingRef.current && !inspectRef.current && chargeStart.current === null;
+    };
+    const startCharge = useCallback(() => {
+        if (!canCharge()) return;
+        chargeStart.current = performance.now(); setCharging(true);
+        updateAim(aimRef.current.angle, chargePower(0));
+    }, [updateAim]);
+    const cancelCharge = useCallback(() => { chargeStart.current = null; setCharging(false); }, []);
+    // Release fires with the power reached at that instant, not the last rendered frame.
+    const releaseCharge = useCallback(() => {
+        const start = chargeStart.current;
+        if (start === null) return;
+        chargeStart.current = null; setCharging(false);
+        updateAim(aimRef.current.angle, chargePower(performance.now() - start));
+        fire();
+    }, [fire, updateAim]);
+    useEffect(() => {
+        if (!charging) return;
+        let frame = requestAnimationFrame(function tick() {
+            const start = chargeStart.current;
+            if (start === null) return;
+            const power = chargePower(performance.now() - start);
+            if (power >= MAX_POWER) { releaseCharge(); return; }
+            updateAim(aimRef.current.angle, power);
+            frame = requestAnimationFrame(tick);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [charging, releaseCharge, updateAim]);
+    useEffect(() => { if (props.paused) cancelCharge(); }, [props.paused, cancelCharge]);
     useEffect(() => {
         const addEffect = (effect: BattleEffect, sound: () => void) => {
             effects.current.push(effect);
@@ -450,7 +492,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                 side: p.mySide, turn: p.turnPlayer, mode: p.phase === 'build' ? p.gameMode : inspectRef.current ? 'inspect' : 'aim',
                 shotFocus: { mode: shotViewModeRef.current, receipt: shotCamera.current.receipt },
                 cannons: p.terrain?.cannons,
-                aim: { degrees: Math.round(aimRef.current.angle * 180 / Math.PI), power: aimRef.current.power, pending: pendingRef.current },
+                aim: { degrees: Math.round(aimRef.current.angle * 180 / Math.PI), power: aimRef.current.power, pending: pendingRef.current, charging: chargeStart.current !== null },
                 viewport: view.current, camera: camera.current.x,
                 cameraMotion: { target: camera.current.target, velocity: camera.current.velocity, following: followedProjectile.current,
                     mode: p.preferences.camera, motion: p.preferences.motion, hitLabels: p.preferences.hitLabels,
@@ -487,6 +529,12 @@ function GameCanvasInner(props: GameCanvasProps) {
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
             if (latest.current.paused) return;
+            // Space charges even when the Fire button itself has focus.
+            if (e.key === ' ' && e.target instanceof HTMLElement && e.target.matches('.battle-fire')) {
+                e.preventDefault();
+                if (!e.repeat) startCharge();
+                return;
+            }
             if (e.target instanceof HTMLElement && (e.target.matches('input, textarea, button, select') || e.target.isContentEditable)) return;
             if (e.key === '`') { toggleDebug(); return; }
             if (['a', 'd'].includes(e.key.toLowerCase())) keys.current.add(e.key.toLowerCase());
@@ -497,17 +545,21 @@ function GameCanvasInner(props: GameCanvasProps) {
             }
             if (p.phase !== 'combat' || p.turnPlayer !== p.mySide || pendingRef.current || inspectRef.current) return;
             const { angle, power } = aimRef.current;
-            const step = 2 * Math.PI / 180;
-            if (e.key === 'ArrowLeft') updateAim(angle + step, power);
-            else if (e.key === 'ArrowRight') updateAim(angle - step, power);
-            else if (e.key === 'ArrowUp') updateAim(angle, power + 1);
-            else if (e.key === 'ArrowDown') updateAim(angle, power - 1);
-            else if (e.key === ' ' && !e.repeat) fire();
+            const degree = Math.PI / 180;
+            // Power comes only from charging; arrows set the angle (Up/Down for fine steps).
+            if (e.key === 'ArrowLeft') updateAim(angle + 2 * degree, power);
+            else if (e.key === 'ArrowRight') updateAim(angle - 2 * degree, power);
+            else if (e.key === 'ArrowUp') updateAim(angle + degree, power);
+            else if (e.key === 'ArrowDown') updateAim(angle - degree, power);
+            else if (e.key === ' ') { if (!e.repeat) startCharge(); }
             else return;
             e.preventDefault();
         };
-        const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
-        const cancel = () => { keys.current.clear(); pointers.current.clear(); gesture.current = null; ghost.current = undefined; };
+        const up = (e: KeyboardEvent) => {
+            keys.current.delete(e.key.toLowerCase());
+            if (e.key === ' ' && chargeStart.current !== null) { e.preventDefault(); releaseCharge(); }
+        };
+        const cancel = () => { keys.current.clear(); pointers.current.clear(); gesture.current = null; ghost.current = undefined; cancelCharge(); };
         const visibility = () => {
             cancel(); effects.current = []; particles.current.reset(); presentationEvents.current = []; shot.current = undefined;
             const state = latest.current.gameState;
@@ -522,7 +574,7 @@ function GameCanvasInner(props: GameCanvasProps) {
             window.removeEventListener('keydown', down); window.removeEventListener('keyup', up);
             window.removeEventListener('blur', cancel); document.removeEventListener('visibilitychange', visibility);
         };
-    }, [fire, updateAim, resetShotPresentation]);
+    }, [startCharge, releaseCharge, cancelCharge, updateAim, resetShotPresentation]);
 
     const screenPoint = (e: React.PointerEvent<HTMLCanvasElement>): Vector => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -616,7 +668,7 @@ function GameCanvasInner(props: GameCanvasProps) {
             <canvas ref={canvasRef} aria-label="Fortress battlefield" className="battle-canvas"
                 onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={e => endPointer(e, false)}
                 onPointerCancel={e => endPointer(e, true)} onLostPointerCapture={e => { if (pointers.current.has(e.pointerId)) endPointer(e, true); }}
-                onWheel={e => { if (isMyTurn && !shotPending && !inspect && !impactHold.current) updateAim(aim.angle, aim.power + (e.deltaY < 0 ? 2 : -2)); }} />
+                onWheel={e => { if (isMyTurn && !shotPending && !charging && !inspect && !impactHold.current) updateAim(aim.angle + (e.deltaY < 0 ? 1 : -1) * Math.PI / 180, aim.power); }} />
         </div>
         <div className={`battle-dock ${props.phase === 'combat' ? 'battle-dock-combat' : ''}`}>
             <nav className="battle-camera" aria-label="Battlefield camera">
@@ -631,10 +683,21 @@ function GameCanvasInner(props: GameCanvasProps) {
                 <div className="battle-aim-controls">
                     <label htmlFor="cannon-angle"><span>Angle <output>{Math.round(aim.angle * 180 / Math.PI)}&deg;</output></span>
                         <input id="cannon-angle" type="range" min="10" max="170" step="1" value={Math.round(aim.angle * 180 / Math.PI)} disabled={!isMyTurn || shotPending || inspect || (shotViewMode === 'impact' && props.preferences.camera === 'follow')} onChange={e => updateAim(Number(e.target.value) * Math.PI / 180, aim.power)} /></label>
-                    <label htmlFor="cannon-power"><span>Power <output>{Math.round(aim.power)}</output></span>
-                        <input id="cannon-power" type="range" min="5" max="100" step="1" value={aim.power} disabled={!isMyTurn || shotPending || inspect || (shotViewMode === 'impact' && props.preferences.camera === 'follow')} onChange={e => updateAim(aim.angle, Number(e.target.value))} /></label>
+                    <div className={`battle-power ${charging ? 'battle-power--charging' : ''}`}>
+                        <span>{charging ? 'Power' : 'Last'} <output>{charging ? Math.round(aim.power) : lastPower === null ? '–' : Math.round(lastPower)}</output></span>
+                        <div className="battle-power-track" role="meter" aria-label="Shot power" aria-valuemin={0} aria-valuemax={100}
+                            aria-valuenow={Math.round(charging ? aim.power : lastPower ?? 0)}>
+                            <div className="battle-power-fill" style={{ width: `${charging ? aim.power : 0}%` }} />
+                            {lastPower !== null && <div className="battle-power-last" style={{ left: `${lastPower}%` }} />}
+                            {!charging && lastPower === null && isMyTurn && <span className="battle-power-hint">Hold Fire or Space</span>}
+                        </div>
+                    </div>
                 </div>
-                <button className="battle-fire" type="button" disabled={!isMyTurn || shotPending || inspect || (shotViewMode === 'impact' && props.preferences.camera === 'follow')} onClick={fire}><Flame size={20} /><span>{shotViewMode === 'impact' ? 'Impact' : shotPending ? 'Fired' : isMyTurn ? 'Fire' : 'Waiting'}</span></button>
+                <button className={`battle-fire ${charging ? 'battle-fire--charging' : ''}`} type="button" title="Hold to charge, release to fire"
+                    disabled={!isMyTurn || shotPending || inspect || (shotViewMode === 'impact' && props.preferences.camera === 'follow')}
+                    onPointerDown={e => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); startCharge(); }}
+                    onPointerUp={releaseCharge} onPointerCancel={cancelCharge}
+                    onContextMenu={e => e.preventDefault()}><Flame size={20} /><span>{shotViewMode === 'impact' ? 'Impact' : shotPending ? 'Fired' : isMyTurn ? 'Fire' : 'Waiting'}</span></button>
             </>}
         </div>
     </div>;

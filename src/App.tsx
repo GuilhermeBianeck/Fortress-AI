@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { readStorage, writeStorage } from './hooks/browserStorage';
@@ -19,6 +19,7 @@ import type { MaterialType, ShapeType, GameMode } from './types';
 import { getRankTier } from './types';
 import { track } from './analytics/tracker';
 import { royalMenu } from './sprites/royalMenu';
+import { turnWindHazard } from '../server/shared/combatTuning';
 import { battleArt } from './sprites/battleArt';
 import './components/RoyalMenuShell.css';
 import './components/BattleShell.css';
@@ -35,7 +36,7 @@ function App() {
   const {
     gameState, terrain, buildStatus, kingsHp,
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
-    chatMessages, rematchState, roundScore, currentRound, hazards,
+    chatMessages, rematchState, roundScore, currentRound, hazards, wind,
     matchScores, playerProfile, prevPlayerProfile, isConnected, connectionNotice, roundWinner,
     pauseState, syncRevision, serverHasFired, progressStatus, rewardNotice, claimReward, getHistory,
     identityReplaced,
@@ -45,6 +46,8 @@ function App() {
     sendChatMessage, requestRematch, getProfile, returnToLobby,
     setBlockDestroyedCallback, setProjectileImpactCallback, setKingDamageCallback,
   } = useGameState();
+  // Per-turn wind joins the match hazards so the banner, renderer and aim preview all read it.
+  const battleHazards = useMemo(() => wind === null ? hazards : [...hazards, turnWindHazard(wind)], [hazards, wind]);
 
   // God Tools state
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialType>('wood');
@@ -373,6 +376,7 @@ function App() {
                       phaseEndsAt={phaseEndsAt}
                       turnPlayer={turnPlayer}
                       shotInFlight={gameState?.bodies.some(body => body.label === 'projectile' && Math.hypot(body.velocity.x, body.velocity.y) > 1)}
+                      turnResolving={serverHasFired}
                       mySide={mySide}
                       matchResult={matchResult}
                       playerNames={playerNamesMap}
@@ -383,7 +387,7 @@ function App() {
                       rematchState={rematchState}
                       onRequestRematch={requestRematch}
                       onReturnToLobby={returnToLobby}
-                      hazards={hazards}
+                      hazards={battleHazards}
                       matchScores={matchScores}
                       playerProfile={playerProfile}
                       prevTotalScore={prevTotalScore}
@@ -449,7 +453,7 @@ function App() {
                     setProjectileImpactCallback={setProjectileImpactCallback}
                     setKingDamageCallback={setKingDamageCallback}
                     playerNames={playerNamesMap}
-                    hazards={hazards}
+                    hazards={battleHazards}
                     roundScore={roundScore}
                     currentRound={currentRound}
                     winner={matchResult?.winner}

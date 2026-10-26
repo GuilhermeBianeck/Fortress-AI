@@ -1,6 +1,7 @@
 import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
 import { reconstructGameState } from '../../src/hooks/gameStateSnapshot';
 import type { BodyState, CompactGameState, GameState } from '../../src/types';
+import { chargeFire } from './helpers';
 
 const read = (page: Page) => page.evaluate(() => JSON.parse((window as Window & { render_game_to_text: () => string }).render_game_to_text()));
 async function start(page: Page) {
@@ -86,7 +87,7 @@ test('saved comfort settings fit phones, trap focus and keep Manual camera still
     await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled({ timeout: 15000 });
     const combat = await read(page);
     expect(Math.abs(combat.camera + combat.viewport.worldWidth / 2 - initial)).toBeLessThan(1);
-    await page.locator('#cannon-power').fill('70'); await page.getByRole('button', { name: 'Fire', exact: true }).click();
+    await chargeFire(page, 70);
     await expect.poll(async () => (await read(page)).turn, { timeout: 12000 }).toBe('right');
     const after = await read(page);
     expect(Math.abs(after.camera + after.viewport.worldWidth / 2 - initial)).toBeLessThan(1);
@@ -118,7 +119,7 @@ test('a batched WebSocket stream adapts its presentation buffer during real game
     expect((await read(page)).presentation.delayMs).toBeLessThanOrEqual(240);
     await page.getByRole('button', { name: 'Done building, ready for battle' }).click();
     await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled({ timeout: 15000 });
-    await page.locator('#cannon-power').fill('70'); await page.getByRole('button', { name: 'Fire', exact: true }).click();
+    await chargeFire(page, 70);
     await expect.poll(async () => (await read(page)).presentation.projectiles.length, { intervals: [10, 20] }).toBeGreaterThan(0);
     const samples = await page.evaluate(async () => {
         const values: { time: number; presentation: number; delay: number }[] = [];

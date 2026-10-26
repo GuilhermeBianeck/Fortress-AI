@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { chargeFire } from './helpers';
 
 test('living kings draw independent parts and shots advance smoothly between server packets', async ({ page }, testInfo) => {
     const errors: string[] = [];
@@ -47,8 +48,7 @@ test('living kings draw independent parts and shots advance smoothly between ser
     await page.getByRole('button', { name: 'Done building, ready for battle' }).click();
     await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled({ timeout: 15000 });
     // A low-power default shot may hit nearby ground before a useful sample window.
-    await page.locator('#cannon-power').fill('70');
-    await page.getByRole('button', { name: 'Fire', exact: true }).click();
+    await chargeFire(page, 70);
     await expect.poll(async () => (await read()).presentation.projectiles.length, { intervals: [10, 20] }).toBeGreaterThan(0);
     const samples = await page.evaluate(async () => {
         const positions: { x: number; y: number; t: number; serverT: number }[] = [];

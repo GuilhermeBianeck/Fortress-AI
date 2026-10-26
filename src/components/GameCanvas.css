@@ -6,12 +6,19 @@
 .battle-camera button { display: grid; place-items: center; min-width: 44px; min-height: 44px; border: 0; border-radius: 4px; background: transparent; color: #355b64; cursor: pointer; }
 .battle-camera button:hover, .battle-camera button[aria-pressed="true"] { background: #d3e5de; color: #145f61; }
 .battle-aim-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; flex: 1; gap: 20px; min-width: 0; }
-.battle-aim-controls label { display: flex; flex-direction: column; min-width: 0; font: 600 12px/1.2 system-ui, sans-serif; }
-.battle-aim-controls label > span { display: flex; justify-content: space-between; gap: 8px; }
+.battle-aim-controls :is(label, .battle-power) { display: flex; flex-direction: column; min-width: 0; font: 600 12px/1.2 system-ui, sans-serif; }
+.battle-aim-controls :is(label, .battle-power) > span { display: flex; justify-content: space-between; gap: 8px; }
 .battle-aim-controls output { color: #1d6376; font-variant-numeric: tabular-nums; }
 .battle-aim-controls input { display: block; min-width: 0; width: 100%; height: 44px; margin: 0; accent-color: #208e88; cursor: pointer; }
 .battle-fire { display: flex; align-items: center; justify-content: center; gap: 6px; flex: 0 0 104px; min-height: 48px; padding: 8px 14px; border: 1px solid #9b4139; border-bottom-width: 3px; border-radius: 6px; background: #d8644d; color: #fffaf0; font: 800 16px/1 system-ui, sans-serif; cursor: pointer; }
 .battle-fire:hover:not(:disabled) { background: #e77751; }
+.battle-power-track { position: relative; height: 16px; margin: 14px 0; border-radius: 7px; background: #e4ece8; overflow: visible; }
+.battle-power-fill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, #f2b33d, #e0502f); }
+/* Last shot's power: the DDTank reference mark players correct from. */
+.battle-power-last { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: #fff; box-shadow: 0 0 0 1px #0008; }
+.battle-power-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; opacity: 0.8; pointer-events: none; }
+.battle-fire { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.battle-fire--charging { transform: translateY(1px) scale(0.98); }
 .battle-fire:disabled { background: #d4ddd8; border-color: #b6c7bd; color: #667d78; cursor: default; }
 .battle-dock button:focus-visible, .battle-dock input:focus-visible { outline: 3px solid #287f9c; outline-offset: -2px; }
 @media (max-width: 640px) {
