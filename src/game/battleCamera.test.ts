@@ -4,6 +4,22 @@ import { advanceBattleCamera, projectileCameraTarget, resizeBattleCamera, trackB
 import { createViewport } from './viewport';
 
 const state = (x = 0, target = 2000): BattleCameraState => ({ x, target, velocity: 0, manualUntil: 0, initialized: true });
+test('visible flight does not unnecessarily scroll the ground away vertically', () => {
+    const view = createViewport(390, 500), baseline = view.top, cam = state(1000);
+    for (let i = 0; i < 60; i++) trackBattleCamera(cam, view, { x: 1200, y: 300 }, { x: 25, y: -10 }, 16.667, 150);
+    assert.equal(view.top, baseline);
+    trackBattleCamera(cam, view, { x: 1200, y: 30 }, { x: 25, y: -10 }, 16.667, 150);
+    assert.ok(view.top < baseline);
+    assert.ok((30 - view.top) * view.scale >= 150 - 0.01);
+});
+test('a held network picture cannot make the camera drift ahead on stale raw velocity', () => {
+    const view = createViewport(390, 500), point = { x: 1200, y: 300 };
+    const cam = state(point.x - view.worldWidth * 0.43);
+    const before = cam.x;
+    for (let i = 0; i < 60; i++) trackBattleCamera(cam, view, point, { x: 90, y: -20 }, 16.667, 150);
+    assert.ok(Math.abs(cam.x - before) < 0.001);
+    assert.equal(cam.velocity, 0);
+});
 test('turn travel is continuous and bounded on desktop and phone at 30/60/120Hz', () => {
     for (const [w, h] of [[1280, 600], [390, 600]]) for (const hz of [30, 60, 120]) {
         const view = createViewport(w, h), cam = state();

@@ -124,7 +124,7 @@ describe('king placement, survivability and defeat', () => {
             const id = session.fireProjectile('left', Math.PI / 4, 50)!;
             const ball = Matter.Composite.allBodies(session.getWorld()).find(body => body.id === id)!;
             Matter.Body.setPosition(ball, { x: 866, y: 250 }); Matter.Body.setVelocity(ball, { x: 32, y: 0 });
-            vi.advanceTimersByTime(32); Matter.Composite.remove(session.getWorld(), ball);
+            vi.advanceTimersByTime(100); Matter.Composite.remove(session.getWorld(), ball);
         };
         hit(); expect(player.kingState.hp).toBeGreaterThan(0); expect(player.kingState.hp).toBeLessThanOrEqual(50);
         expect(roundEnd).not.toHaveBeenCalled();

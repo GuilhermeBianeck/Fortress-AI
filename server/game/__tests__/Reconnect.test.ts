@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import Matter from 'matter-js';
 import type { Server, Socket } from 'socket.io';
 import { RoomManager, RECONNECT_GRACE_MS } from '../RoomManager';
+import { SHOT_FLIGHT_RATE } from '../../shared/shotPacing';
 
 let manager: RoomManager;
 let sockets: Map<string, Socket>;
@@ -64,7 +65,7 @@ it('preserves fired ownership and projectile expiry without giving a second shot
     manager.authenticate(socket('new'), identity); expect(sm.canFire()).toBe(false);
     session.handleFireProjectile('new', { angle: 45, power: 10 });
     expect(session.getFullState().n.filter(b => (b as { label: string }).label === 'projectile')).toHaveLength(1);
-    vi.advanceTimersByTime(5000); expect(Matter.Composite.get(world, id, 'body')).toBeNull();
+    vi.advanceTimersByTime(Math.ceil(5000 / SHOT_FLIGHT_RATE)); expect(Matter.Composite.get(world, id, 'body')).toBeNull();
 });
 it('requires both humans to return and abandons both-absent rooms without rewards', () => {
     const { identity, room, session } = battle('pvp');

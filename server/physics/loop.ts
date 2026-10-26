@@ -2,6 +2,7 @@ import Matter from 'matter-js';
 import { Server } from 'socket.io';
 import type { KingState, Side } from '../types';
 import { MATERIAL_COLORS } from '../config/constants';
+import { SHOT_FLIGHT_RATE } from '../shared/shotPacing';
 
 /** Matter.js Body with custom game properties used in loop snapshots */
 interface LoopBody extends Matter.Body {
@@ -44,6 +45,7 @@ export class GameLoop {
     // Delta encoding state
     private knownBodyIds: Set<number> = new Set();
     private snapshotCount = 0;
+    private physicsCredit = 0;
 
     constructor(engine: Matter.Engine, io: Server, roomId: string) {
         this.engine = engine;
@@ -82,11 +84,17 @@ export class GameLoop {
     }
 
     private tick() {
-        // Sub-step: 2 half-updates per tick for better collision detection
-        Matter.Engine.update(this.engine, TICK_DT / 2);
-        this.onTickCallback?.();
-        Matter.Engine.update(this.engine, TICK_DT / 2);
-        this.afterTickCallback?.();
+        const flying = Matter.Composite.allBodies(this.engine.world).some(body =>
+            body.label === 'projectile' && !body.isSleeping && body.speed >= 2.5);
+        this.physicsCredit += flying ? SHOT_FLIGHT_RATE : 1;
+        if (this.physicsCredit >= 1 - 1e-8) {
+            this.physicsCredit = Math.max(0, this.physicsCredit - 1);
+            // Never stretch the Matter timestep: slower wall-clock flight keeps the same path/energy.
+            Matter.Engine.update(this.engine, TICK_DT / 2);
+            this.onTickCallback?.();
+            Matter.Engine.update(this.engine, TICK_DT / 2);
+            this.afterTickCallback?.();
+        }
 
         // Snapshot broadcast
         const now = Date.now();

@@ -1,6 +1,7 @@
 import Matter from 'matter-js';
 import { Server } from 'socket.io';
 import { PausableTimers, type TimerId } from './PausableTimers';
+import { SHOT_FLIGHT_RATE } from '../shared/shotPacing';
 import type { Side, MatchPhase, KingState } from '../types';
 import {
     BUILD_PHASE_DURATION_MS,
@@ -177,7 +178,9 @@ export class MatchStateMachine {
             }
 
             // Hard max timeout
-            if (now - this.settleStart >= SETTLE_MAX_TIMEOUT_MS) {
+            const flightActive = dynamicBodies.some(body => body.label === 'projectile' && !body.isSleeping);
+            const timeout = flightActive ? SETTLE_MAX_TIMEOUT_MS / SHOT_FLIGHT_RATE : SETTLE_MAX_TIMEOUT_MS;
+            if (now - this.settleStart >= timeout) {
                 this.clearSettleInterval();
                 this.onProjectileSettled();
             }

@@ -2,9 +2,36 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Matter from 'matter-js';
 import type { Server } from 'socket.io';
 import { GameLoop } from '../loop';
+import { SHOT_FLIGHT_RATE } from '../../shared/shotPacing';
 
 describe('snapshot pacing', () => {
     afterEach(() => vi.useRealTimers());
+
+    it('slows real flight while preserving exact Matter steps, normalized velocity and 20Hz delivery', () => {
+        vi.useFakeTimers();
+        const engine = Matter.Engine.create(), reference = Matter.Engine.create();
+        engine.gravity.scale = reference.gravity.scale = 0;
+        const ball = Matter.Bodies.circle(0, 0, 9, { label: 'projectile', frictionAir: 0.005 });
+        const expected = Matter.Bodies.circle(0, 0, 9, { label: 'projectile', frictionAir: 0.005 });
+        Matter.Composite.add(engine.world, ball); Matter.Composite.add(reference.world, expected);
+        Matter.Body.setVelocity(ball, { x: 33, y: -12 }); Matter.Body.setVelocity(expected, { x: 33, y: -12 });
+        const emit = vi.fn(), loop = new GameLoop(engine, { to: () => ({ emit }) } as unknown as Server, 'flight');
+        const steps = vi.fn(); loop.setAfterTick(steps);
+        try {
+            loop.start(); vi.advanceTimersByTime(1000);
+            expect(steps.mock.calls.length).toBe(Math.floor(62 * SHOT_FLIGHT_RATE));
+            for (let i = 0; i < steps.mock.calls.length * 2; i++) Matter.Engine.update(reference, 1000 / 120);
+            expect(ball.position.x).toBeCloseTo(expected.position.x, 8);
+            expect(ball.position.y).toBeCloseTo(expected.position.y, 8);
+            expect(ball.velocity.x).toBeCloseTo(expected.velocity.x, 8);
+            expect(emit.mock.calls.length).toBeGreaterThanOrEqual(19);
+            // At this pace a normal full-gap shot cannot vanish across the arena in a few frames.
+            expect(ball.position.x).toBeGreaterThan(500); expect(ball.position.x).toBeLessThan(700);
+            Matter.Composite.remove(engine.world, ball);
+            const before = steps.mock.calls.length;
+            vi.advanceTimersByTime(1000); expect(steps.mock.calls.length - before).toBeGreaterThanOrEqual(62);
+        } finally { loop.stop(); Matter.Engine.clear(engine); Matter.Engine.clear(reference); }
+    });
 
     it('sends authoritative projectile ownership in initial and full-sync metadata', () => {
         vi.useFakeTimers();

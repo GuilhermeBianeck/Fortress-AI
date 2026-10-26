@@ -58,6 +58,7 @@ interface GameBody extends Matter.Body {
 import { PausableTimers, type TimerId } from './PausableTimers';
 import type { BotDifficulty } from '../shared/difficulty';
 import { kingCannonX } from '../shared/battleLayout';
+import { SHOT_FLIGHT_RATE } from '../shared/shotPacing';
 
 export class GameSession {
     readonly id: string;
@@ -75,6 +76,7 @@ export class GameSession {
     private buildHeartbeats = new Set<ReturnType<typeof setInterval>>();
     private interruptedBuildSides = new Set<Side>();
     private projectileBodies: Set<Matter.Body> = new Set();
+    private projectileBornAt = new Map<number, number>();
     private projectileHits = new Map<number, Set<number>>();
     private botShotTracks = new Map<number, {
         target: Matter.Vector; previous: Matter.Vector; closest: Matter.Vector; distance: number;
@@ -529,9 +531,10 @@ export class GameSession {
         });
 
         // Auto-remove after lifespan
-        const timer = this.timers.timeout(() => this.removeProjectile(body), PROJECTILE_LIFESPAN_MS);
+        const timer = this.timers.timeout(() => this.removeProjectile(body), Math.ceil(PROJECTILE_LIFESPAN_MS / SHOT_FLIGHT_RATE));
         this.projectileTimers.set(body.id, timer);
         this.projectileBodies.add(body);
+        this.projectileBornAt.set(body.id, this.engine.timing.timestamp);
         this.projectileHits.set(body.id, new Set());
         if (this.botAI && this.getBotPlayer()?.side === side) {
             const opponent = this.getPlayerBySide(side === 'left' ? 'right' : 'left');
@@ -581,6 +584,7 @@ export class GameSession {
         }
         this.projectileTimers.clear();
         this.projectileBodies.clear();
+        this.projectileBornAt.clear();
         this.projectileHits.clear();
         this.botShotTracks.clear();
         for (const timer of this.hazardTimers) {
@@ -997,7 +1001,8 @@ export class GameSession {
         const tickMaxSpeed = PHYSICS_MAX_SPEED;
         for (const body of this.projectileBodies) {
             this.sampleBotProjectile(body);
-            if (body.position.y > CANVAS_HEIGHT + 50 ||
+            if (this.engine.timing.timestamp - (this.projectileBornAt.get(body.id) ?? 0) >= PROJECTILE_LIFESPAN_MS ||
+                body.position.y > CANVAS_HEIGHT + 50 ||
                 body.position.x < -50 ||
                 body.position.x > WORLD_WIDTH + 50) {
                 this.removeProjectile(body);
@@ -1016,6 +1021,7 @@ export class GameSession {
     }
 
     private removeProjectile(body: Matter.Body) {
+        this.projectileBornAt.delete(body.id);
         this.observeBotProjectile(body);
         this.projectileHits.delete(body.id);
         // Use the projectile Set for O(1) membership check

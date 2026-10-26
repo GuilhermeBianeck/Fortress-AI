@@ -3,6 +3,7 @@ import { WORLD_WIDTH } from '../types';
 import { cartoon } from '../sprites/cartoon';
 import type { ParticleSystem } from '../effects/particles';
 import { minimapRect, showBattleMinimap, worldToScreen, type Viewport } from './viewport';
+import { SHOT_FLIGHT_RATE } from '../../server/shared/shotPacing';
 import { cannonPosition, terrainHeight } from './ballistics';
 import { canPlace } from './placement';
 import { kingPresentation } from './kingAnimation';
@@ -385,7 +386,7 @@ function entities(ctx: CanvasRenderingContext2D, f: BattleFrame) {
         } else if (b.label === 'projectile' || b.circleRadius) {
             const radius = b.circleRadius || 9;
             if (b.label === 'projectile') {
-                const length = Math.min(f.reducedMotion ? 18 : 96, Math.hypot(b.velocity.x, b.velocity.y) * 1.6);
+                const length = Math.min(f.reducedMotion ? 18 : 44, Math.hypot(b.velocity.x, b.velocity.y) * SHOT_FLIGHT_RATE * 1.6);
                 const direction = Math.atan2(b.velocity.y, b.velocity.x) - angle;
                 const dx = Math.cos(direction), dy = Math.sin(direction);
                 const trail = ctx.createLinearGradient(-dx * length, -dy * length, 0, 0);
