@@ -17,6 +17,8 @@ import {
 export interface MatchCallbacks {
     onPhaseChange: (phase: MatchPhase) => void;
     onTurnStart: (side: Side) => void;
+    /** Roll per-turn conditions (wind) before the turn is announced; merged into turn_start. */
+    prepareTurn?: (side: Side) => { wind?: number };
     onMatchResult: (winner: Side, reason: string) => void;
     onRoundEnd: (winner: Side, reason: string) => 'continue' | 'match_over';
     getKingState: (side: Side) => KingState;
@@ -120,6 +122,7 @@ export class MatchStateMachine {
         this.currentTurn = side;
         this.hasFiredThisTurn = false;
 
+        const conditions = this.callbacks.prepareTurn?.(side) ?? {};
         const endsAt = this.endsAt = Date.now() + COMBAT_TURN_DURATION_MS;
         this.io.to(this.roomId).emit('phase_change', {
             phase: 'combat',
@@ -129,6 +132,7 @@ export class MatchStateMachine {
         this.io.to(this.roomId).emit('turn_start', {
             side,
             endsAt,
+            ...conditions,
         });
 
         this.callbacks.onTurnStart(side);
@@ -147,6 +151,9 @@ export class MatchStateMachine {
         // Cancel the turn timer — now we wait for settle
         this.clearPhaseTimer();
         this.hasFiredThisTurn = true;
+        // The shot resolves the turn: clients stop the countdown instead of showing a stale clock.
+        this.endsAt = 0;
+        this.io.to(this.roomId).emit('shot_fired', { side: this.currentTurn });
     }
 
     waitForSettle(): void {
@@ -156,7 +163,7 @@ export class MatchStateMachine {
         this.settleInterval = this.timers.interval(() => {
             const world = this.callbacks.getWorld();
             const dynamicBodies = Matter.Composite.allBodies(world).filter(
-                b => !b.isStatic && b.label !== 'Terrain'
+                b => !b.isStatic && b.label !== 'Terrain' && !(b as { hazardRock?: boolean }).hazardRock
             );
 
             const allSettled = dynamicBodies.every(

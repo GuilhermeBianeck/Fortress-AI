@@ -1,6 +1,7 @@
 import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
 import { reconstructGameState } from '../../src/hooks/gameStateSnapshot';
 import type { BodyState, CompactGameState, GameState } from '../../src/types';
+import { chargeFire } from './helpers';
 
 const read = (page: Page) => page.evaluate(() => JSON.parse((window as Window & { render_game_to_text: () => string }).render_game_to_text()));
 
@@ -31,8 +32,7 @@ test('reveal, turn handoffs and real shots have bounded continuous camera moveme
     });
     await page.getByRole('button', { name: 'Done building, ready for battle' }).click();
     await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled({ timeout: 15000 });
-    await page.locator('#cannon-power').fill('70');
-    await page.getByRole('button', { name: 'Fire', exact: true }).click();
+    await chargeFire(page, 70);
     await expect.poll(async () => (await read(page)).turn, { timeout: 12000 }).toBe('right');
     await page.waitForTimeout(5000);
     const samples = await page.evaluate(() => {

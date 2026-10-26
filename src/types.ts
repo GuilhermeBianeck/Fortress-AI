@@ -91,7 +91,7 @@ export interface SessionState {
     roomId: string; matchId: string; side: Side; mode: 'single' | 'pvp'; difficulty: import('../server/shared/difficulty').BotDifficulty;
     players: { side: Side; name: string; ready: boolean; connected: boolean }[];
     terrain: (TerrainData & { hazards?: import('./game/BattleRenderer').BattleHazard[] }) | null;
-    state: CompactGameState | null; phase: MatchPhase; endsAt: number | null; turn: Side | null; hasFired: boolean; buildReady: boolean; buildInterrupted: boolean;
+    state: CompactGameState | null; phase: MatchPhase; endsAt: number | null; turn: Side | null; hasFired: boolean; wind?: number | null; buildReady: boolean; buildInterrupted: boolean;
     roundScore: { left: number; right: number }; currentRound: number; roundWinner: Side | null;
     result: { winner: Side; reason: string } | null; scores: import('../server/shared/progression').MatchScores | null;
     chat: ChatMessage[]; rematch: 'none' | 'requested' | 'opponent_requested'; pause: PauseState; saveStatus: 'idle' | 'pending' | 'saved';

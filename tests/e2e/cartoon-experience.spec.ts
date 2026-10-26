@@ -117,13 +117,10 @@ test('cartoon battlefield fits every viewport and safely separates placement, in
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
     expect(fireFrames).toHaveLength(0);
     const angle = page.locator('#cannon-angle');
-    const power = page.locator('#cannon-power');
     await angle.focus(); await angle.press('End'); await expect(angle).toHaveValue('170');
     await angle.press('Home'); await expect(angle).toHaveValue('10');
     for (let i = 0; i < 35; i++) await angle.press('ArrowRight');
-    await power.focus(); await power.press('End'); await expect(power).toHaveValue('100');
-    await power.press('Home'); await expect(power).toHaveValue('5');
-    for (let i = 0; i < 30; i++) await power.press('ArrowRight');
+    await expect(page.getByRole('meter', { name: 'Shot power' })).toBeVisible();
     await page.getByRole('button', { name: 'Inspect battlefield' }).click();
     await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Inspect battlefield' }).click();

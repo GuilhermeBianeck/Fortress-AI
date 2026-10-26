@@ -203,16 +203,18 @@
 .game-shell .battle-camera button { flex: 0 0 52px; width: 52px; height: 52px; }
 .game-shell .battle-camera svg { width: 24px; height: 24px; stroke-width: 2.6; }
 .game-shell .battle-aim-controls { gap: 32px; max-width: 1100px; margin-inline: auto; }
-.game-shell .battle-aim-controls label { gap: 1px; color: #ffe8ac; font: 700 16px/1.2 'Inter', system-ui, sans-serif; text-shadow: 0 2px #071c32; }
-.game-shell .battle-aim-controls label > span { justify-content: flex-start; align-items: center; gap: 14px; min-height: 28px; }
+.game-shell .battle-aim-controls :is(label, .battle-power) { gap: 1px; color: #ffe8ac; font: 700 16px/1.2 'Inter', system-ui, sans-serif; text-shadow: 0 2px #071c32; }
+.game-shell .battle-aim-controls :is(label, .battle-power) > span { justify-content: flex-start; align-items: center; gap: 14px; min-height: 28px; }
 .game-shell .battle-aim-controls output { min-width: 60px; padding: 3px 8px; border: 1px solid #b58d48; border-radius: 4px; color: #fff; background: #081b35; font-size: 15px; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums; }
 .game-shell .battle-aim-controls input { appearance: none; height: 44px; background: transparent; accent-color: #ffd064; }
 .game-shell .battle-aim-controls input::-webkit-slider-runnable-track { height: 16px; border: 2px solid #d5aa58; border-radius: 7px; background: #091d35; box-shadow: inset 0 2px 3px #0009, 0 1px #fff4c6; }
 .game-shell .battle-aim-controls input::-moz-range-track { height: 12px; border: 2px solid #d5aa58; border-radius: 7px; background: #091d35; box-shadow: inset 0 2px 3px #0009; }
 .game-shell #cannon-angle::-webkit-slider-runnable-track { background: #124b78; }
 .game-shell #cannon-angle::-moz-range-track { background: #124b78; }
-.game-shell #cannon-power::-webkit-slider-runnable-track { background: #6c281d; }
-.game-shell #cannon-power::-moz-range-track { background: #6c281d; }
+.game-shell .battle-power-track { margin: 13px 0 15px; border: 2px solid #d5aa58; background: #091d35; box-shadow: inset 0 2px 3px #0009, 0 1px #fff4c6; }
+.game-shell .battle-power-fill { background: linear-gradient(90deg, #ffd064, #ff7a2f 70%, #d23823); }
+.game-shell .battle-power-hint { color: #ffe8ac; text-shadow: 0 1px #071c32; }
+.game-shell .battle-power--charging output { background: #8e2414; }
 .game-shell .battle-aim-controls input::-webkit-slider-thumb { appearance: none; width: 29px; height: 34px; margin-top: -11px; border: 3px solid #b37725; border-radius: 50%; background: linear-gradient(90deg, #d18e25, #ffe5a0 48%, #efb53b); box-shadow: inset 0 0 0 2px #ffe499, 0 2px 3px #0007; }
 .game-shell .battle-aim-controls input::-moz-range-thumb { width: 23px; height: 28px; border: 3px solid #b37725; border-radius: 50%; background: linear-gradient(90deg, #d18e25, #ffe5a0 48%, #efb53b); box-shadow: inset 0 0 0 2px #ffe499, 0 2px 3px #0007; }
 .game-shell .battle-aim-controls input:disabled { opacity: 0.5; }
@@ -373,8 +375,8 @@
   .game-shell .battle-dock { gap: 12px; }
   .game-shell .battle-camera { gap: 4px; }
   .game-shell .battle-aim-controls { gap: 14px; }
-  .game-shell .battle-aim-controls label { font-size: 13px; }
-  .game-shell .battle-aim-controls label > span { gap: 6px; }
+  .game-shell .battle-aim-controls :is(label, .battle-power) { font-size: 13px; }
+  .game-shell .battle-aim-controls :is(label, .battle-power) > span { gap: 6px; }
   .game-shell .battle-aim-controls output { min-width: 40px; padding: 2px 5px; font-size: 13px; }
   .game-shell .battle-fire { flex-basis: 118px; font-size: 22px; }
   .game-shell .battle-fire svg { width: 23px; height: 23px; }
@@ -400,8 +402,8 @@
   .game-shell .battle-camera svg { width: 21px; height: 21px; }
   .game-shell .battle-dock-combat .battle-camera { grid-column: 1; grid-row: 1; justify-content: center; }
   .game-shell .battle-aim-controls { grid-column: 1 / -1; grid-row: 2; width: 100%; gap: 20px; padding: 2px 8px 0; }
-  .game-shell .battle-aim-controls label { font-size: 13px; }
-  .game-shell .battle-aim-controls label > span { justify-content: space-between; }
+  .game-shell .battle-aim-controls :is(label, .battle-power) { font-size: 13px; }
+  .game-shell .battle-aim-controls :is(label, .battle-power) > span { justify-content: space-between; }
   .game-shell .battle-fire { grid-column: 1; grid-row: 3; width: 100%; min-height: 48px; height: 48px; padding: 4px 6px; font: 800 19px/1.1 'Inter', system-ui, sans-serif; gap: 7px; }
   .game-shell .battle-fire svg { width: 20px; height: 20px; }
   .game-shell .game-build-dock { max-height: min(196px, 48%); }
@@ -435,8 +437,8 @@
   .game-shell .battle-camera button { width: 44px; height: 44px; }
   .game-shell .battle-camera svg { width: 20px; height: 20px; }
   .game-shell .battle-aim-controls { width: auto; padding: 0; gap: 14px; }
-  .game-shell .battle-aim-controls label { font-size: 12px; }
-  .game-shell .battle-aim-controls label > span { min-height: 20px; gap: 6px; }
+  .game-shell .battle-aim-controls :is(label, .battle-power) { font-size: 12px; }
+  .game-shell .battle-aim-controls :is(label, .battle-power) > span { min-height: 20px; gap: 6px; }
   .game-shell .battle-aim-controls input { height: 44px; }
   .game-shell .battle-fire { flex-basis: 112px; height: 50px; min-height: 50px; font-size: 21px; }
   .game-shell .game-build-dock { max-height: min(116px, 40%); }
@@ -455,7 +457,7 @@
   .game-shell .battle-camera :is([aria-label='Pan left'], [aria-label='Pan right']) { display: none; }
   .game-shell .battle-dock-combat { gap: 8px; padding-inline: 8px; }
   .game-shell .battle-aim-controls { gap: 12px; }
-  .game-shell .battle-aim-controls label > span { justify-content: space-between; }
+  .game-shell .battle-aim-controls :is(label, .battle-power) > span { justify-content: space-between; }
   .game-shell .battle-fire { flex-basis: 100px; }
   .game-shell .game-build-pickers { grid-column: 2; grid-row: 1; gap: 8px; }
 }

@@ -1,3 +1,5 @@
+import { POWER_SPEED_MULTIPLIER } from '../shared/combatTuning';
+
 // === Canvas / World ===
 export const CANVAS_WIDTH = 800;   // viewport size (client canvas)
 export const CANVAS_HEIGHT = 600;
@@ -77,6 +79,8 @@ export const LAVA_DAMAGE_PER_TICK = 0.5;
 export const FALLING_ROCK_INTERVAL_MS = 3000;
 export const FALLING_ROCK_RADIUS = 12;
 export const FALLING_ROCK_DAMAGE = 15;
+export const FALLING_ROCK_LIFESPAN_MS = 6000; // rocks crumble so they never pile up
+export const FALLING_ROCK_MAX = 8;
 
 // === Collision categories (bitmask) ===
 export const COL_DEFAULT = 0x0001;
@@ -123,5 +127,5 @@ export const PROJECTILE_MAX_KING_DAMAGE = 75;
 export const PHYSICS_GRAVITY = 2.0;
 export const PHYSICS_GRAVITY_SCALE = 0.001;
 export const PHYSICS_MAX_SPEED = 1000;
-export const PHYSICS_POWER_MULTIPLIER = 1.0;
+export const PHYSICS_POWER_MULTIPLIER = POWER_SPEED_MULTIPLIER;
 export const PHYSICS_AIR_FRICTION = 0.005;

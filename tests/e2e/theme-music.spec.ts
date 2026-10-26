@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { chargeFire } from './helpers';
 
 type DeckProbe = { media: HTMLAudioElement; analyser: AnalyserNode; context: AudioContext; gain: GainNode };
 type Probe = Window & { musicDecks: DeckProbe[]; musicConnections: Map<AudioNode, AudioNode> };
@@ -71,8 +72,7 @@ test('full themes rotate smoothly, stay audible through battle, and respect mute
     await expect.poll(async () => (await mix()).level).toBeCloseTo(0.24, 2);
     await page.getByRole('button', { name: 'Done building, ready for battle' }).click();
     await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeEnabled({ timeout: 15000 });
-    await page.locator('#cannon-power').fill('70');
-    await page.getByRole('button', { name: 'Fire', exact: true }).click();
+    await chargeFire(page, 70);
     await expect.poll(async () => (await mix()).duck, { intervals: [10, 20] }).toBeLessThan(0.7);
     await expect.poll(async () => (await mix()).duck).toBeCloseTo(1, 2);
     await page.screenshot({ path: `output/music-v8/${testInfo.project.name}-battle.png` });

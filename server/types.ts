@@ -57,6 +57,8 @@ export interface HazardData {
     height: number;
     windDirection?: number;
     windStrength?: number;
+    /** Signed per-turn wind in display units (wind_zone only). */
+    windSpeed?: number;
     damage?: number;
 }
 

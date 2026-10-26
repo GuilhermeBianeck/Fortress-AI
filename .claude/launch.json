@@ -3,19 +3,27 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "/opt/homebrew/bin/node",
-      "runtimeArgs": ["--require", "ts-node/register", "server/index.ts"],
+      "runtimeExecutable": "/Users/guilhermeab/.nvm/versions/node/v22.22.2/bin/node",
+      "runtimeArgs": [
+        "--require",
+        "ts-node/register",
+        "index.ts"
+      ],
       "port": 3001,
+      "autoPort": false,
       "env": {
         "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
-        "NODE_PATH": "server/node_modules",
-        "TS_NODE_PROJECT": "server/tsconfig.json"
-      }
+        "NODE_PATH": "node_modules",
+        "TS_NODE_PROJECT": "tsconfig.json"
+      },
+      "cwd": "server"
     },
     {
       "name": "frontend",
       "runtimeExecutable": "/opt/homebrew/bin/node",
-      "runtimeArgs": ["node_modules/.bin/vite"],
+      "runtimeArgs": [
+        "node_modules/.bin/vite"
+      ],
       "port": 5173,
       "env": {
         "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"

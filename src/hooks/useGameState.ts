@@ -54,6 +54,7 @@ export const useGameState = () => {
     const [pauseState, setPauseState] = useState<PauseState>({ paused: false, at: 0, missing: [] });
     const [syncRevision, setSyncRevision] = useState(0);
     const [serverHasFired, setServerHasFired] = useState(false);
+    const [wind, setWind] = useState<number | null>(null);
     const [progressStatus, setProgressStatus] = useState<'idle' | 'pending' | 'saved'>('idle');
     const [rewardNotice, setRewardNotice] = useState<string | null>(null);
     const rematchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -91,6 +92,7 @@ export const useGameState = () => {
         setPhase('lobby');
         setPhaseEndsAt(null);
         setTurnPlayer(null);
+        setWind(null);
         setMatchResult(null);
         setQueuePosition(null);
         setChatMessages([]);
@@ -153,7 +155,7 @@ export const useGameState = () => {
                 mode: data.mode, difficulty: data.difficulty, ready: me.ready, buildReady: data.buildReady });
             setTerrain(data.terrain); setHazards(data.terrain?.hazards ?? []);
             setPhase(data.phase); setPhaseEndsAt(data.endsAt); setTurnPlayer(data.turn);
-            setServerHasFired(data.hasFired); setRoundScore(data.roundScore); setCurrentRound(data.currentRound);
+            setServerHasFired(data.hasFired); setWind(data.wind ?? null); setRoundScore(data.roundScore); setCurrentRound(data.currentRound);
             setRoundWinner(data.roundWinner); setMatchResult(data.result); setMatchScores(data.scores);
             setChatMessages(data.chat); setRematchState(data.rematch); setProgressStatus(data.saveStatus);
             setPauseState(data.pause); pausedRef.current = data.pause.paused;
@@ -321,14 +323,23 @@ export const useGameState = () => {
         socketRef.current.on('phase_change', (data: { phase: MatchPhase; endsAt?: number; turnPlayer?: Side }) => {
             setPhase(data.phase);
             setPhaseEndsAt(data.endsAt ?? null);
-            if (data.turnPlayer) setTurnPlayer(data.turnPlayer);
+            // A newly announced turn has not fired yet; turn_start follows with the same news.
+            if (data.turnPlayer) { setTurnPlayer(data.turnPlayer); setServerHasFired(false); }
+            if (data.phase !== 'combat') setWind(null);
             setRoomState(prev => prev ? { ...prev, phase: data.phase } : prev);
         });
 
-        socketRef.current.on('turn_start', (data: { side: Side; endsAt: number }) => {
+        socketRef.current.on('turn_start', (data: { side: Side; endsAt: number; wind?: number }) => {
             setServerHasFired(false);
             setTurnPlayer(data.side);
             setPhaseEndsAt(data.endsAt);
+            setWind(data.wind ?? null);
+        });
+
+        // The shot resolves the turn; the countdown no longer applies while it lands and settles.
+        socketRef.current.on('shot_fired', () => {
+            setServerHasFired(true);
+            setPhaseEndsAt(null);
         });
 
         socketRef.current.on('match_result', (data: { winner: Side; reason: string; kings: { left: KingHpState; right: KingHpState } }) => {
@@ -539,7 +550,7 @@ export const useGameState = () => {
     return {
         gameState, terrain, buildStatus, kingsHp,
         roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
-        chatMessages, rematchState, roundScore, currentRound, hazards,
+        chatMessages, rematchState, roundScore, currentRound, hazards, wind,
         matchScores, playerProfile, prevPlayerProfile, isConnected, connectionNotice, roundWinner,
         identityReplaced,
         lobbyError,

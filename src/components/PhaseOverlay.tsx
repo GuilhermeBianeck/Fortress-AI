@@ -9,6 +9,8 @@ interface PhaseOverlayProps {
     phaseEndsAt: number | null;
     turnPlayer: Side | null;
     shotInFlight?: boolean;
+    /** The turn's shot is out; the clock no longer applies while it lands and settles. */
+    turnResolving?: boolean;
     mySide: Side;
     matchResult: { winner: Side; reason: string } | null;
     playerNames?: { left: string; right: string };
@@ -19,7 +21,7 @@ interface PhaseOverlayProps {
     rematchState?: 'none' | 'requested' | 'opponent_requested';
     onRequestRematch?: () => void;
     onReturnToLobby?: () => void;
-    hazards?: { type: string; id: string; windDirection?: number; windStrength?: number }[];
+    hazards?: { type: string; id: string; windDirection?: number; windStrength?: number; windSpeed?: number }[];
     matchScores?: MatchScores | null;
     playerProfile?: PlayerProfile | null;
     prevTotalScore?: number;
@@ -27,7 +29,7 @@ interface PhaseOverlayProps {
     pausedAt?: number;
 }
 
-export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, mySide, matchResult, playerNames, roundScore, currentRound, roundWinner, opponentConnected = true, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile, pausedAt }: PhaseOverlayProps) => {
+export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, turnResolving, mySide, matchResult, playerNames, roundScore, currentRound, roundWinner, opponentConnected = true, rematchState, onRequestRematch, onReturnToLobby, hazards, matchScores, playerProfile, prevTotalScore, prevPlayerProfile, pausedAt }: PhaseOverlayProps) => {
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [botDots, setBotDots] = useState(1);
 
@@ -143,7 +145,7 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, myS
                     <div className="battle-phase-heading">
                         {isMyTurn ? <Flame size={21} aria-hidden="true" /> : <Clock size={21} aria-hidden="true" />}
                         <span className="battle-phase-title">
-                            {shotInFlight ? 'SHOT IN FLIGHT' : isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? <>BOT AIMING<span className="battle-bot-dots" aria-hidden="true">{botDotStr}</span></> : "OPPONENT'S TURN")}
+                            {shotInFlight ? 'SHOT IN FLIGHT' : turnResolving ? 'SHOT LANDED' : isMyTurn ? 'YOUR TURN — FIRE!' : (isBot ? <>BOT AIMING<span className="battle-bot-dots" aria-hidden="true">{botDotStr}</span></> : "OPPONENT'S TURN")}
                         </span>
                         {displayTimeLeft !== null && (
                             <span
@@ -158,14 +160,14 @@ export const PhaseOverlay = ({ phase, phaseEndsAt, turnPlayer, shotInFlight, myS
                     {roundScore && <span className="battle-phase-score" aria-label={`Round ${currentRound ?? 1}. Score: left ${roundScore.left}, right ${roundScore.right}`}>
                         R{currentRound ?? 1} &middot; {roundScore.left} : {roundScore.right}
                     </span>}
-                    {/* Wind Indicator — inline with turn banner */}
+                    {/* Wind Indicator — rolled every turn, read it before you charge */}
                     {windHazard && (() => {
-                        const windSpeed = Math.round((windHazard.windStrength ?? 0.0003) * 20000);
-                        const windLabel = windSpeed < 4 ? 'Light' : windSpeed < 8 ? 'Moderate' : 'Strong';
+                        const speed = windHazard.windSpeed ?? 0;
+                        const calm = Math.abs(speed) < 0.05;
                         return (
-                            <div className="battle-phase-wind">
+                            <div className="battle-phase-wind" aria-label={calm ? 'No wind' : `Wind ${Math.abs(speed).toFixed(1)} blowing ${speed > 0 ? 'right' : 'left'}`}>
                                 <Wind size={18} aria-hidden="true" />
-                                <span>{(windHazard.windDirection ?? 1) > 0 ? '→' : '←'} {windLabel} Wind</span>
+                                <span className="battle-wind-value">{!calm && speed < 0 && '◀ '}{Math.abs(speed).toFixed(1)}{!calm && speed > 0 && ' ▶'}</span>
                             </div>
                         );
                     })()}

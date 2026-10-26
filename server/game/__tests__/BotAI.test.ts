@@ -7,7 +7,7 @@ import type { Side } from '../../types';
 import type { Server } from 'socket.io';
 import { GameSession } from '../GameSession';
 import {
-    BOT_FIRE_DELAY_MS, BOT_BUILD_DELAY_MS, PHYSICS_AIR_FRICTION,
+    BOT_FIRE_DELAY_MS, BOT_BUILD_DELAY_MS, PHYSICS_AIR_FRICTION, PHYSICS_POWER_MULTIPLIER,
     PROJECTILE_RADIUS, PROJECTILE_DENSITY, PROJECTILE_RESTITUTION, PROJECTILE_FRICTION,
 } from '../../config/constants';
 
@@ -38,7 +38,8 @@ function observeLiveShot(scene: BallisticsScene, angle: number, power: number) {
         restitution: PROJECTILE_RESTITUTION, friction: PROJECTILE_FRICTION,
     });
     Matter.Body.setVelocity(ball, {
-        x: (scene.side === 'left' ? 1 : -1) * power * Math.cos(angle), y: -power * Math.sin(angle),
+        x: (scene.side === 'left' ? 1 : -1) * power * PHYSICS_POWER_MULTIPLIER * Math.cos(angle),
+        y: -power * PHYSICS_POWER_MULTIPLIER * Math.sin(angle),
     });
     Matter.Composite.add(engine.world, [...scene.bodies, ball]);
     let closest = { ...ball.position }, previous = closest, distance = Infinity;

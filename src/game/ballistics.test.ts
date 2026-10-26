@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import Matter from 'matter-js';
 import type { Side, Vector } from '../types';
-import { cannonPosition, predictTrajectory, terrainHeight } from './ballistics';
+import { cannonPosition, POWER_SPEED_MULTIPLIER, predictTrajectory, terrainHeight } from './ballistics';
 import type { TrajectoryHazard } from './ballistics';
 
 // The server package is CommonJS; load its reference fixtures without ESM named imports.
@@ -102,6 +102,14 @@ function assertPath(actual: Vector[], expected: Vector[]): void {
     }
 }
 
+test('mirrors the server power-to-speed scale and caps preview frames', () => {
+    assert.equal(POWER_SPEED_MULTIPLIER, PHYSICS_POWER_MULTIPLIER);
+    const full = predictTrajectory({ side: 'left', angle: Math.PI / 4, power: 60, terrainPoints: flat, cannons: { left: { x: 760, y: 500 } } });
+    const preview = predictTrajectory({ side: 'left', angle: Math.PI / 4, power: 60, terrainPoints: flat, cannons: { left: { x: 760, y: 500 } }, maxFrames: 10 });
+    assert.equal(preview.length, 21);
+    assert.deepEqual(preview, full.slice(0, 21));
+});
+
 test('terrain height interpolates, clamps edges, and supplies the server fallback', () => {
     const points = [{ x: 0, y: 500 }, { x: 100, y: 400 }, { x: 2400, y: 550 }];
     assert.equal(terrainHeight(points, 50), 450);
@@ -144,7 +152,8 @@ test('wind uses projectile mass, overlapping zones, defaults, and the midpoint f
         { type: 'wind_zone', position: { x: 0, y: 1000 }, width: 2400, height: 100, windStrength: 1 },
         { type: 'lava_pool', position: { x: 0, y: 0 }, width: 2400, height: 600, windStrength: 1 },
     ];
-    const options = { side: 'left' as const, angle: 0.3, power: 20, terrainPoints: flat };
+    // Launch speed 20 so the ball reaches the narrow leftward gust zone by frame 4.
+    const options = { side: 'left' as const, angle: 0.3, power: 20 / POWER_SPEED_MULTIPLIER, terrainPoints: flat };
     const actual = predictTrajectory({ ...options, hazards });
     const expected = serverFlight({ angle: options.angle, power: options.power, hazards }).path;
     assertPath(actual, expected.slice(0, actual.length));

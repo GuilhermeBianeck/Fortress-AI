@@ -20,7 +20,7 @@ import {
     PROJECTILE_FRICTION, PROJECTILE_LIFESPAN_MS,
     WORLD_WIDTH, CANVAS_HEIGHT,
     LEFT_SIDE, RIGHT_SIDE,
-    FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS,
+    FALLING_ROCK_INTERVAL_MS, FALLING_ROCK_RADIUS, FALLING_ROCK_LIFESPAN_MS, FALLING_ROCK_MAX,
     COL_BLOCK, SHAPE_DIMS,
     PHYSICS_MAX_SPEED, PHYSICS_POWER_MULTIPLIER, PHYSICS_AIR_FRICTION,
 } from '../config/constants';
@@ -45,6 +45,23 @@ function recordAiUsage(uuid: string): void {
     aiRateLimits.set(uuid, timestamps);
 }
 
+/** Map a Gemini failure to a player-facing reason without echoing the raw provider message. */
+export function describeBuildFailure(err: unknown, usedOwnKey: boolean): { message: string; log: string } {
+    const e = (err ?? {}) as { name?: string; status?: number; errorDetails?: { reason?: string }[]; message?: string };
+    const reasons = (Array.isArray(e.errorDetails) ? e.errorDetails : []).map(d => d?.reason).filter(Boolean) as string[];
+    const log = `${e.name ?? 'Error'} status=${e.status ?? 'none'}${reasons.length ? ` reason=${reasons.join(',')}` : ''}`;
+    const keyRejected = reasons.includes('API_KEY_INVALID') || e.status === 401 || e.status === 403
+        || /API key not valid/i.test(e.message ?? '');
+    if (keyRejected) {
+        return { log, message: usedOwnKey
+            ? 'Your Gemini API key was rejected. Check it in the key settings, or build manually.'
+            : 'The AI architect is offline (server key rejected). Build manually or add your own Gemini key.' };
+    }
+    if (e.status === 429) return { log, message: 'The AI architect is busy (rate limited). Try again in a minute or build manually.' };
+    if (/invalid structure/i.test(e.message ?? '')) return { log, message: 'The AI returned an invalid fortress. Try rephrasing your prompt.' };
+    return { log, message: 'AI generation failed. Please try again.' };
+}
+
 /** Matter.js Body extended with custom game properties */
 interface GameBody extends Matter.Body {
     blockHp?: number | null;
@@ -53,12 +70,14 @@ interface GameBody extends Matter.Body {
     originalHeight?: number;
     isBullet?: boolean;
     side?: Side;
+    hazardRock?: boolean;
 }
 
 import { PausableTimers, type TimerId } from './PausableTimers';
 import type { BotDifficulty } from '../shared/difficulty';
 import { kingCannonX } from '../shared/battleLayout';
 import { SHOT_FLIGHT_RATE } from '../shared/shotPacing';
+import { rollWind, turnWindHazard } from '../shared/combatTuning';
 
 export class GameSession {
     readonly id: string;
@@ -92,6 +111,8 @@ export class GameSession {
     private windHazards: HazardData[] = [];
     private lavaHazards: HazardData[] = [];
     private hazardTimers: TimerId[] = [];
+    private rockBodies = new Set<Matter.Body>();
+    private windSpeed: number | null = null;
     private scoreManager: ScoreManager = new ScoreManager();
     private botAI: BotAI | null = null;
     private hazardTickCounter = 0;
@@ -163,6 +184,11 @@ export class GameSession {
                     this.botAI.buildFortress();
                 }
             },
+            prepareTurn: () => {
+                this.windSpeed = rollWind();
+                this.windHazards = [turnWindHazard(this.windSpeed, WORLD_WIDTH, CANVAS_HEIGHT)];
+                return { wind: this.windSpeed };
+            },
             onTurnStart: (side) => {
                 if (this.botAI && this.getBotPlayer()?.side === side) {
                     this.botAI.takeTurn();
@@ -217,8 +243,9 @@ export class GameSession {
         }
 
         // Generate hazards
-        this.hazards = generateHazards(this.terrain, ws.seed);
-        this.windHazards = this.hazards.filter(h => h.type === 'wind_zone');
+        const neutral = this.leftPlayer && this.rightPlayer
+            ? { min: this.leftPlayer.cannonX + 60, max: this.rightPlayer.cannonX - 60 } : undefined;
+        this.hazards = generateHazards(this.terrain, ws.seed, neutral);
         this.lavaHazards = this.hazards.filter(h => h.type === 'lava_pool');
         if (this.hazards.length > 0) {
             console.log(`Hazards: ${this.hazards.map(h => h.type).join(', ')}`);
@@ -231,6 +258,7 @@ export class GameSession {
 
     getFullState() { return this.gameLoop.getFullState(); }
     isPaused() { return this.paused; }
+    getWind(): number | null { return this.windSpeed; }
     buildWasInterrupted(side: Side) { return this.interruptedBuildSides.has(side); }
     rebindPlayer(oldId: string, newId: string): void {
         const player = this.players.get(oldId);
@@ -457,9 +485,10 @@ export class GameSession {
         } catch (err: unknown) {
             clearInterval(heartbeat);
             if (generation !== this.buildGeneration || this.destroyed) return;
-            // Provider error messages can contain credential-bearing URLs.
-            console.error('Build request failed:', err instanceof Error ? err.name : 'Unknown error');
-            socket.emit('build_error', { message: 'AI generation failed. Please try again.' });
+            // Provider error messages can contain credential-bearing URLs; log only status and reason codes.
+            const failure = describeBuildFailure(err, Boolean(clientKey));
+            console.error(`Build request failed: ${failure.log}`);
+            socket.emit('build_error', { message: failure.message });
         } finally {
             clearInterval(heartbeat); this.buildHeartbeats.delete(heartbeat);
             if (generation === this.buildGeneration) this.buildInProgress.delete(socket.id);
@@ -591,6 +620,7 @@ export class GameSession {
             this.timers.clear(timer);
         }
         this.hazardTimers = [];
+        this.rockBodies.clear();
         this.timers.dispose();
     }
 
@@ -605,6 +635,7 @@ export class GameSession {
             if (this.stateMachine.getPhase() !== 'combat') return;
 
             for (const hazard of rockHazards) {
+                if (this.rockBodies.size >= FALLING_ROCK_MAX) break;
                 const rx = hazard.position.x + Math.random() * hazard.width;
                 const ry = 0;
 
@@ -615,26 +646,30 @@ export class GameSession {
                     label: 'stone',
                 });
                 this.stampBlockProps(rock, 'stone', FALLING_ROCK_RADIUS * 2, FALLING_ROCK_RADIUS * 2);
+                (rock as GameBody).hazardRock = true;
 
                 Matter.World.add(this.world, rock);
                 Matter.Body.setVelocity(rock, { x: 0, y: 3 });
+                this.rockBodies.add(rock);
+                // Rocks crumble after a while so rubble never piles up or keeps the turn from settling.
+                this.hazardTimers.push(this.timers.timeout(() => {
+                    this.rockBodies.delete(rock);
+                    Matter.Composite.remove(this.world, rock);
+                }, FALLING_ROCK_LIFESPAN_MS));
             }
         }, FALLING_ROCK_INTERVAL_MS);
         this.hazardTimers.push(interval);
     }
 
     private tickHazards(): void {
-        if (this.hazards.length === 0) return;
-
         // Throttle hazard processing to 15Hz (every 4th tick at 60Hz)
         this.hazardTickCounter++;
         if (this.hazardTickCounter % 4 !== 0) return;
 
-        // Fetch all bodies once and share between hazard helpers
+        // Wind only steers projectiles; multiply force by 4 to compensate for reduced tick rate
+        if (this.projectileBodies.size > 0) applyWindForce([...this.projectileBodies], this.windHazards, 4);
+        if (this.lavaHazards.length === 0) return;
         const bodies = Matter.Composite.allBodies(this.world);
-
-        // Wind — multiply force by 4 to compensate for reduced tick rate
-        applyWindForce(bodies, this.windHazards, 4);
 
         // Lava — reuse the pre-built kingsMap member variable
         checkLavaDamage(bodies, this.world, this.lavaHazards, this.kingsMap, (side, damage) => {
