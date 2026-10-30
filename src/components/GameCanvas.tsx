@@ -84,6 +84,7 @@ function GameCanvasInner(props: GameCanvasProps) {
     const aimRef = useRef(aim);
     const [charging, setCharging] = useState(false);
     const chargeStart = useRef<number | null>(null);
+    const chargeInput = useRef<number | ' ' | 'Enter' | 'assistive' | null>(null);
     const [lastPower, setLastPower] = useState<number | null>(null);
     const [inspect, setInspect] = useState(false);
     const inspectRef = useRef(false);
@@ -175,7 +176,7 @@ function GameCanvasInner(props: GameCanvasProps) {
     }, [size, overview, focus, teamCenter]);
     useEffect(() => {
         pendingRef.current = false; setShotPending(false);
-        chargeStart.current = null; setCharging(false);
+        chargeStart.current = null; chargeInput.current = null; setCharging(false);
         if (shotCamera.current.id === null) followedProjectile.current = null;
     }, [props.phase, props.turnPlayer]);
     useEffect(() => {
@@ -277,17 +278,18 @@ function GameCanvasInner(props: GameCanvasProps) {
         return !p.paused && !impactHold.current && p.phase === 'combat' && p.turnPlayer === p.mySide
             && !pendingRef.current && !inspectRef.current && chargeStart.current === null;
     };
-    const startCharge = useCallback(() => {
+    const startCharge = useCallback((input: number | ' ' | 'Enter' | 'assistive') => {
         if (!canCharge()) return;
+        chargeInput.current = input;
         chargeStart.current = performance.now(); setCharging(true);
         updateAim(aimRef.current.angle, chargePower(0));
     }, [updateAim]);
-    const cancelCharge = useCallback(() => { chargeStart.current = null; setCharging(false); }, []);
+    const cancelCharge = useCallback(() => { chargeStart.current = null; chargeInput.current = null; setCharging(false); }, []);
     // Release fires with the power reached at that instant, not the last rendered frame.
     const releaseCharge = useCallback(() => {
         const start = chargeStart.current;
         if (start === null) return;
-        chargeStart.current = null; setCharging(false);
+        chargeStart.current = null; chargeInput.current = null; setCharging(false);
         updateAim(aimRef.current.angle, chargePower(performance.now() - start));
         fire();
     }, [fire, updateAim]);
@@ -304,6 +306,7 @@ function GameCanvasInner(props: GameCanvasProps) {
         return () => cancelAnimationFrame(frame);
     }, [charging, releaseCharge, updateAim]);
     useEffect(() => { if (props.paused) cancelCharge(); }, [props.paused, cancelCharge]);
+    useEffect(() => { cancelCharge(); }, [props.syncRevision, cancelCharge]);
     useEffect(() => {
         const addEffect = (effect: BattleEffect, sound: () => void) => {
             effects.current.push(effect);
@@ -529,10 +532,10 @@ function GameCanvasInner(props: GameCanvasProps) {
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
             if (latest.current.paused) return;
-            // Space charges even when the Fire button itself has focus.
-            if (e.key === ' ' && e.target instanceof HTMLElement && e.target.matches('.battle-fire')) {
+            // Suppress native button activation so key release submits exactly once.
+            if ((e.key === ' ' || e.key === 'Enter') && e.target instanceof HTMLElement && e.target.matches('.battle-fire')) {
                 e.preventDefault();
-                if (!e.repeat) startCharge();
+                if (!e.repeat) startCharge(e.key);
                 return;
             }
             if (e.target instanceof HTMLElement && (e.target.matches('input, textarea, button, select') || e.target.isContentEditable)) return;
@@ -551,13 +554,13 @@ function GameCanvasInner(props: GameCanvasProps) {
             else if (e.key === 'ArrowRight') updateAim(angle - 2 * degree, power);
             else if (e.key === 'ArrowUp') updateAim(angle + degree, power);
             else if (e.key === 'ArrowDown') updateAim(angle - degree, power);
-            else if (e.key === ' ') { if (!e.repeat) startCharge(); }
+            else if (e.key === ' ') { if (!e.repeat) startCharge(' '); }
             else return;
             e.preventDefault();
         };
         const up = (e: KeyboardEvent) => {
             keys.current.delete(e.key.toLowerCase());
-            if (e.key === ' ' && chargeStart.current !== null) { e.preventDefault(); releaseCharge(); }
+            if (e.key === chargeInput.current && chargeStart.current !== null) { e.preventDefault(); releaseCharge(); }
         };
         const cancel = () => { keys.current.clear(); pointers.current.clear(); gesture.current = null; ghost.current = undefined; cancelCharge(); };
         const visibility = () => {
@@ -655,7 +658,7 @@ function GameCanvasInner(props: GameCanvasProps) {
         if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
     };
     const isMyTurn = props.phase === 'combat' && props.turnPlayer === props.mySide;
-    const toggleInspect = () => { inspectRef.current = !inspectRef.current; setInspect(inspectRef.current); gesture.current = null; };
+    const toggleInspect = () => { cancelCharge(); inspectRef.current = !inspectRef.current; setInspect(inspectRef.current); gesture.current = null; };
     const nudge = (direction: number) => {
         cameraHandoff.current = null;
         camera.current.manualUntil = performance.now() + 12000;
@@ -694,9 +697,14 @@ function GameCanvasInner(props: GameCanvasProps) {
                     </div>
                 </div>
                 <button className={`battle-fire ${charging ? 'battle-fire--charging' : ''}`} type="button" title="Hold to charge, release to fire"
+                    aria-pressed={charging}
                     disabled={!isMyTurn || shotPending || inspect || (shotViewMode === 'impact' && props.preferences.camera === 'follow')}
-                    onPointerDown={e => { if (e.button !== 0) return; e.currentTarget.setPointerCapture(e.pointerId); startCharge(); }}
-                    onPointerUp={releaseCharge} onPointerCancel={cancelCharge}
+                    onPointerDown={e => { if (e.button !== 0 || !e.isPrimary) return; startCharge(e.pointerId); if (chargeInput.current === e.pointerId) e.currentTarget.setPointerCapture(e.pointerId); }}
+                    onPointerUp={e => { if (chargeInput.current === e.pointerId) releaseCharge(); }}
+                    onPointerCancel={e => { if (chargeInput.current === e.pointerId) cancelCharge(); }}
+                    onLostPointerCapture={e => { if (chargeInput.current === e.pointerId) cancelCharge(); }}
+                    onBlur={() => { if (typeof chargeInput.current !== 'number') cancelCharge(); }}
+                    onClick={e => { if (e.detail === 0) { if (chargeInput.current === 'assistive') releaseCharge(); else startCharge('assistive'); } }}
                     onContextMenu={e => e.preventDefault()}><Flame size={20} /><span>{shotViewMode === 'impact' ? 'Impact' : shotPending ? 'Fired' : isMyTurn ? 'Fire' : 'Waiting'}</span></button>
             </>}
         </div>
