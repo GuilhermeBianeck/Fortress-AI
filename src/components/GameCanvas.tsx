@@ -446,6 +446,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                     kingActions.current[side] = kingDirectors.current[side].update({ now, side, phase: p.phase, turn: p.turnPlayer,
                         winner: p.winner, king: body ? renderedPosition(body, transforms) : reference, projectiles: balls,
                         velocity: body?.velocity, hp: hp.hp,
+                        chargePower: side === p.mySide && chargeStart.current !== null && !p.paused ? aimRef.current.power : undefined,
                         shot: shot.current, hitAt: hit?.at, reducedMotion: reducedMotion.current,
                         aimAngle: side === p.mySide ? aimRef.current.angle : shot.current?.side === side ? shot.current.angle : Math.PI / 4 });
                 }

@@ -42,6 +42,11 @@ test('interrupted charges cancel safely and Enter releases one shot', async ({ p
     await fire.focus();
     await page.keyboard.down('Enter');
     await page.waitForTimeout(700);
+    const preparation = await read(page);
+    expect(preparation.kingActions.left.mode).toBe('charge');
+    expect(preparation.kingActions.left.charge).toBeGreaterThan(.3);
+    expect(preparation.kingActions.right.charge).toBe(0);
+    expect(preparation.shot).toBeNull();
     await page.screenshot({ path: `output/playwright/charge-${info.project.name}.png` });
     const power = (await read(page)).aim.power;
     expect(power).toBeGreaterThan(15);
@@ -51,6 +56,33 @@ test('interrupted charges cancel safely and Enter releases one shot', async ({ p
     await expect(fire).toHaveAttribute('aria-pressed', 'false');
     await expect.poll(async () => (await read(page)).shot !== null).toBe(true);
     expect(errors).toEqual([]);
+});
+
+test('king preparation cancels back to aim and reduced motion keeps charging still', async ({ page }) => {
+    await combat(page);
+    const fire = page.locator('.battle-fire');
+    await fire.focus();
+    await page.keyboard.down('Enter');
+    await expect.poll(async () => (await read(page)).kingActions.left.mode).toBe('charge');
+    await page.getByRole('button', { name: 'Enemy fortress', exact: true }).focus();
+    await page.keyboard.up('Enter');
+    await expect.poll(async () => (await read(page)).kingActions.left.charge).toBe(0);
+    expect((await read(page)).aim.pending).toBe(false);
+    expect((await read(page)).kingActions.left.mode).toBe('aim');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect.poll(async () => (await read(page)).rendering.reducedMotion).toBe(true);
+    const still = (await read(page)).livingKingStates;
+    await fire.focus();
+    await page.keyboard.down('Enter');
+    await page.waitForTimeout(400);
+    const charged = await read(page);
+    expect(charged.aim.charging).toBe(true);
+    expect(charged.kingActions.left.mode).toBe('charge');
+    expect(charged.kingActions.left.charge).toBe(0);
+    expect(charged.livingKingStates).toEqual(still);
+    await page.getByRole('button', { name: 'Enemy fortress', exact: true }).focus();
+    await page.keyboard.up('Enter');
+    expect((await read(page)).aim.pending).toBe(false);
 });
 
 test('pointer owns its charge and full power fires only once', async ({ page }) => {
@@ -66,7 +98,8 @@ test('pointer owns its charge and full power fires only once', async ({ page }) 
     await page.keyboard.press('Space');
     expect((await read(page)).aim.pending).toBe(false);
     expect((await read(page)).aim.charging).toBe(true);
-    await expect.poll(async () => (await read(page)).aim.pending, { timeout: 5000 }).toBe(true);
+    // A short shot can finish between polls; the outgoing submission is durable evidence.
+    await expect.poll(() => submissions, { timeout: 5000 }).toBe(1);
     expect((await read(page)).aim.power).toBe(100);
     await page.mouse.up();
     await expect(fire).toHaveAttribute('aria-pressed', 'false');

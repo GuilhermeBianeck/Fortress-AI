@@ -118,7 +118,7 @@ test('action clips change upper-body joints without moving feet or separating re
 
 test('joint clips stay within modest rotations and chest/neck/shoulder bounds', () => {
     for (const mode of ['ready', 'aim', 'recoil', 'brace', 'recover'] as const) for (const side of ['left', 'right'] as const) {
-        const action: KingActionPose = { mode, ready: 0, aim: 0, recoil: 0, brace: 0, recover: 0, airborne: 0, landing: 0, look: 1, aimPitch: 1, threat: 0, [mode]: 1 };
+        const action: KingActionPose = { mode, ready: 0, aim: 0, charge: 0, recoil: 0, brace: 0, recover: 0, airborne: 0, landing: 0, look: 1, aimPitch: 1, threat: 0, [mode]: 1 };
         for (const now of [0, 1600, 2750, 6100, 11400]) {
             const state = livingKingState({ side, now, action, looking: action.look });
             assert.ok(Math.abs(state.armAngle) < .3);
@@ -128,5 +128,24 @@ test('joint clips stay within modest rotations and chest/neck/shoulder bounds', 
             assert.ok(state.headY > -1 && state.headY < 4.2);
             assert.ok(state.shoulderY > -.6 && state.shoulderY < 3.1);
         }
+    }
+});
+
+test('full charge changes both upper-body rigs while feet and blink pivots stay registered', () => {
+    for (const side of ['left', 'right'] as const) {
+        const d = new KingActionDirector();
+        const cue = { side, phase: 'combat' as const, turn: side, king: { x: 600, y: 480 }, projectiles: [], aimAngle: Math.PI / 4, reducedMotion: false };
+        d.update({ ...cue, now: 0, chargePower: 100 });
+        const action = d.update({ ...cue, now: 300, chargePower: 100 });
+        const aim = { ...action, mode: 'aim' as const, charge: 0 };
+        const charged = livingKingState({ side, now: 300, action });
+        const neutral = livingKingState({ side, now: 300, action: aim });
+        assert.ok(charged.armAngle < neutral.armAngle - .1);
+        assert.ok(Math.abs(charged.armAngle) < .45);
+        assert.ok(charged.headY < 2.2 && charged.headY > -.7);
+        const parts = livingKingAttachments({ side, now: 300, action });
+        assert.deepEqual(parts.find(part => part.part === 'body'), { part: 'body', x: 0, y: 0, angle: 0, scaleX: 1, scaleY: 1 });
+        assert.deepEqual({ ...parts.find(part => part.part === 'head_open'), part: '' }, { ...parts.find(part => part.part === 'head_closed'), part: '' });
+        assert.deepEqual(livingKingState({ side, now: 300, action, reducedMotion: true }), livingKingState({ side, now: 0, reducedMotion: true }));
     }
 });

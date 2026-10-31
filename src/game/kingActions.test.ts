@@ -85,3 +85,47 @@ test('falling blends into a bounded landing recovery and never overrides lethal 
     const still = d.update(cue(1000, { reducedMotion: true, velocity: { x: 8, y: 10 } }));
     assert.equal(still.airborne, 0); assert.equal(still.landing, 0);
 });
+
+test('charge adds power-scaled preparation, preserves aim and blends out without snapping', () => {
+    const d = new KingActionDirector(); d.update(cue(0)); d.update(cue(200));
+    assert.equal(d.update(cue(200, { chargePower: 5 })).charge, 0);
+    const low = d.update(cue(400, { chargePower: 5 }));
+    assert.equal(low.mode, 'charge'); assert.equal(low.aim, 1);
+    assert.equal(low.charge, .2875);
+    const high = d.update(cue(600, { chargePower: 100 }));
+    assert.equal(high.charge, 1);
+    const cancelled = d.update(cue(600));
+    assert.equal(cancelled.mode, 'aim'); assert.equal(cancelled.charge, high.charge);
+    assert.ok(d.update(cue(690)).charge > 0 && d.update(cue(690)).charge < 1);
+    assert.equal(d.update(cue(800)).charge, 0);
+});
+
+test('charge is turn/phase gated and cannot override accepted shots, injuries or defeat', () => {
+    for (const extra of [
+        { turn: 'right' as const }, { phase: 'build' as const }, { chargePower: NaN },
+        { hp: 0 }, { hitAt: 0 }, { velocity: { x: 0, y: 5 } },
+        { shot: { id: 7, side: 'left' as const, at: 0 } },
+        { shot: { id: 7, side: 'left' as const, at: -1000 }, projectiles: [{ id: 7, position: { x: 800, y: 400 }, velocity: { x: 10, y: 0 } }] },
+    ]) {
+        const d = new KingActionDirector();
+        assert.notEqual(d.update(cue(0, { chargePower: 80, ...extra })).mode, 'charge');
+    }
+    const d = new KingActionDirector();
+    d.update(cue(0, { chargePower: 100 }));
+    assert.equal(d.update(cue(300, { chargePower: 100 })).charge, 1);
+    assert.equal(d.update(cue(301, { chargePower: 100, reducedMotion: true })).charge, 0);
+    assert.equal(d.update(cue(400, { chargePower: 100 })).charge, 0);
+    assert.equal(d.update(cue(600, { chargePower: 100 })).charge, 1);
+});
+
+test('charge clips are elapsed-time based for both royal identities', () => {
+    for (const side of ['left', 'right'] as const) {
+        const poses = [30, 60, 120].map(hz => {
+            const d = new KingActionDirector();
+            d.update(cue(0, { side, turn: side, chargePower: 60 }));
+            for (let t = 0; t < 400; t += 1000 / hz) d.update(cue(t, { side, turn: side, chargePower: 60 }));
+            return d.update(cue(400, { side, turn: side, chargePower: 60 }));
+        });
+        assert.deepEqual(poses[0], poses[1]); assert.deepEqual(poses[1], poses[2]);
+    }
+});

@@ -1,7 +1,7 @@
 import type { MatchPhase, Side, Vector } from '../types';
 
-export type KingActionMode = 'idle' | 'ready' | 'aim' | 'recoil' | 'brace' | 'hit' | 'recover' | 'airborne' | 'landing' | 'victory' | 'defeat';
-interface Weights { ready: number; aim: number; recoil: number; brace: number; recover: number; airborne: number; landing: number }
+export type KingActionMode = 'idle' | 'ready' | 'aim' | 'charge' | 'recoil' | 'brace' | 'hit' | 'recover' | 'airborne' | 'landing' | 'victory' | 'defeat';
+interface Weights { ready: number; aim: number; charge: number; recoil: number; brace: number; recover: number; airborne: number; landing: number }
 export interface KingActionPose extends Weights {
     mode: KingActionMode;
     look: number;
@@ -23,9 +23,10 @@ export interface KingActionCue {
     shot?: { id: number; side: Side; at: number };
     hitAt?: number;
     aimAngle: number;
+    chargePower?: number;
     reducedMotion: boolean;
 }
-const zero = (): Weights => ({ ready: 0, aim: 0, recoil: 0, brace: 0, recover: 0, airborne: 0, landing: 0 });
+const zero = (): Weights => ({ ready: 0, aim: 0, charge: 0, recoil: 0, brace: 0, recover: 0, airborne: 0, landing: 0 });
 const clamp = (n: number, low = 0, high = 1) => Math.max(low, Math.min(high, n));
 const smooth = (t: number) => { const x = clamp(t); return x * x * (3 - 2 * x); };
 
@@ -63,12 +64,14 @@ export class KingActionDirector {
     private resultAt?: number;
     private inAir = false;
     private landedAt = -Infinity;
+    private chargeIntensity = 0;
 
     reset() {
         this.mode = 'idle'; this.from = zero(); this.target = zero();
         this.changedAt = 0; this.previousNow = undefined; this.resultAt = undefined;
         this.reduced = false;
         this.inAir = false; this.landedAt = -Infinity;
+        this.chargeIntensity = 0;
     }
 
     private weights(now: number): Weights {
@@ -102,20 +105,25 @@ export class KingActionDirector {
             else if (cue.phase === 'combat' && age >= 0 && age < 170) mode = 'recoil';
             else if (cue.phase === 'combat' && age >= 170 && age < 850) mode = 'recover';
             else if (cue.phase === 'combat' && threat.amount > 0) mode = 'brace';
-            else if (cue.phase === 'combat' && cue.turn === cue.side && !ownFlight) mode = 'aim';
+            else if (cue.phase === 'combat' && cue.turn === cue.side && !ownFlight) {
+                mode = Number.isFinite(cue.chargePower) ? 'charge' : 'aim';
+            }
             else if (cue.phase === 'build' || cue.phase === 'reveal') mode = 'ready';
         }
         if (this.previousNow === undefined || mode !== this.mode || this.reduced !== cue.reducedMotion) {
             this.from = this.reduced ? zero() : this.weights(now);
             this.target = zero();
             if (mode in this.target) this.target[mode as keyof Weights] = 1;
+            if (mode === 'charge') this.target.aim = 1;
             this.changedAt = now;
             this.duration = mode === 'recoil' ? 70 : mode === 'brace' ? 110 : 180;
             this.mode = mode;
         }
         this.previousNow = now; this.reduced = cue.reducedMotion;
+        // Preserve intensity while the charge weight blends out after release/cancel.
+        if (mode === 'charge') this.chargeIntensity = .25 + .75 * clamp(cue.chargePower! / 100);
         const weights = cue.reducedMotion ? zero() : this.weights(now);
-        return { ...weights, mode,
+        return { ...weights, charge: weights.charge * this.chargeIntensity, mode,
             look: cue.reducedMotion ? 0 : weights.aim * .5 + weights.brace * threat.look,
             aimPitch: Number.isFinite(cue.aimAngle) ? clamp((cue.aimAngle - Math.PI / 4) / (Math.PI / 2), -1, 1) : 0,
             threat: threat.amount, resultAt: this.resultAt };
