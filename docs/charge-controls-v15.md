@@ -25,4 +25,12 @@
 
 ## Next Acceptance
 
-Use the iPhone 17 Pro for actual touch cancellation, Safari background/foreground, a full match and motion/audio comfort. Repeat the new browser cases in WebKit before the next coordinated release. Then prioritize authored character reactions and broader seeded balance testing over additional menu decoration.
+Use the iPhone 17 Pro for actual touch cancellation, Safari background/foreground, a full match and motion/audio comfort. Then prioritize authored character reactions and broader seeded balance testing over additional menu decoration.
+
+## 31 October Follow-Up
+
+The feature was committed as `7674318` with author and committer date matching the recorded completion time, 30 October 2026 at 21:50:49 UTC/Lisbon, as explicitly requested. Today's test corrections use today's date separately.
+
+WebKit exposed a test portability defect: mouse pointer IDs are not universally 1, and capture must be established before testing its release. The interruption test now records the actual ID, establishes capture through movement, releases it, processes the next movement and verifies cancellation before mouse-up. No runtime change was required. Physical-device and VoiceOver acceptance remain open.
+
+Final isolated WebKit phone run: all three scenarios pass without retries in 25.5 seconds; both affected Chromium interruption cases pass in 17.7 seconds. WebKit screenshot inspected. An earlier concurrent-browser run timed out waiting for full-charge submission; it did not reproduce in the isolated run. That timing observation is retained rather than claiming every attempt passed.

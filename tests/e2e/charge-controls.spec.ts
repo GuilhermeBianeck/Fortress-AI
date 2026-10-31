@@ -17,10 +17,16 @@ test('interrupted charges cancel safely and Enter releases one shot', async ({ p
     await combat(page);
     const fire = page.locator('.battle-fire');
     const box = (await fire.boundingBox())!;
+    await fire.evaluate(node => node.addEventListener('pointerdown', event => {
+        (node as HTMLElement).dataset.testPointerId = String((event as PointerEvent).pointerId);
+    }, { once: true }));
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await expect(fire).toHaveAttribute('aria-pressed', 'true');
-    await fire.evaluate(node => node.releasePointerCapture(1));
+    await page.mouse.move(box.x + box.width / 2 - 1, box.y + box.height / 2);
+    await fire.evaluate(node => node.releasePointerCapture(Number((node as HTMLElement).dataset.testPointerId)));
+    await page.mouse.move(box.x + box.width / 2 + 1, box.y + box.height / 2);
+    await expect(fire).toHaveAttribute('aria-pressed', 'false');
     await page.mouse.up();
     await expect(fire).toHaveAttribute('aria-pressed', 'false');
     expect((await read(page)).aim.pending).toBe(false);
