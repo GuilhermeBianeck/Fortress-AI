@@ -28,3 +28,11 @@
 - Final HUD-aware/invite-link desktop and phone runs pass without retries in50.0seconds; the extended WebKit phone run passes in22.6seconds. One earlier desktop run stalled in manual room-join setup before combat; the final test uses a validated six-character invite and the application's authenticated invite-link flow. No claim that every intermediate attempt passed.
 - Inspected both royal identities from the opposing viewer, including the corrected aiming banner. The prescribed unmodified frame client joined a real private right-side build:12/12 rig pieces loaded, both kings ready, no stale preview. Its screenshot and text readout were inspected separately from the combat evidence.
 - Physical iPhone/VoiceOver and sustained network/load acceptance remain unverified. Publication requires matching frontend and backend; this feature is not automatically deployed by local implementation.
+
+## Production Release: 1 November 2026
+
+- Runtime `dd56fcd` published to main; Vercel reports a successful deployment. Local revalidation passed148 frontend tests,208 backend tests and both production builds.
+- VPS fast-forwarded from791f120 to the same runtime, built successfully and passed208/208 backend tests there. Restarted only `fortress-backend` after a fresh zero-connected-client check; saved PM2 state. Production environment was byte-identical to its protected backup. Analytics retained; no dependency, proxy, firewall, OpenClaw or Tailscale change.
+- Verified online progression snapshot: `/var/backups/fortress-ai/fortress-v17-20261101.iMGiRq.sqlite`. Protected configuration/PM2/source rollback information: `/root/fortress-v17-20261101.iMGiRq/`. Same-host backups do not replace offsite recovery.
+- Public-site private two-player acceptance passed without retries in mobile-sized Chromium (31.0seconds) and WebKit (30.5seconds). Both runs cover both aim/charge directions, cancellation, actual accepted fire, the correct aiming banner, deliberately dropped preview messages and a real reload during held input with no accidental shot. No page exceptions. Inspected live screenshots; test browser contexts closed.
+- Physical iPhone, VoiceOver and sustained-load acceptance are still separate. This receipt does not claim those tests.
