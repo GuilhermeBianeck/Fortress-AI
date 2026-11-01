@@ -182,6 +182,10 @@ io.on('connection', (socket) => {
         room.session.handleFireProjectile(socket.id, data);
     });
 
+    socket.on('aim_preview', (data: unknown) => {
+        roomManager.getRoom(socket.id)?.session?.handleAimPreview(socket.id, data);
+    });
+
     // --- Rematch ---
 
     socket.on('request_rematch', () => {

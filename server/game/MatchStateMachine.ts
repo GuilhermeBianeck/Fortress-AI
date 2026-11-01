@@ -18,7 +18,7 @@ export interface MatchCallbacks {
     onPhaseChange: (phase: MatchPhase) => void;
     onTurnStart: (side: Side) => void;
     /** Roll per-turn conditions (wind) before the turn is announced; merged into turn_start. */
-    prepareTurn?: (side: Side) => { wind?: number };
+    prepareTurn?: (side: Side) => { wind?: number; aimEpoch?: string };
     onMatchResult: (winner: Side, reason: string) => void;
     onRoundEnd: (winner: Side, reason: string) => 'continue' | 'match_over';
     getKingState: (side: Side) => KingState;

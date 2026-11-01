@@ -27,12 +27,15 @@ import { advanceBattleCamera, trackBattleCamera, resizeBattleCamera, type Battle
 import type { BattlePreferences } from '../game/battlePreferences';
 import type { KingDamageEvent, ProjectileImpactEvent, BlockDestroyedEvent } from '../types';
 import { ShotCamera, type ShotReceipt } from '../game/shotCamera';
+import { currentOpponentAim, OpponentBarrel, AIM_UPDATE_MS, type ReceivedAim } from '../game/opponentAim';
 import './GameCanvas.css';
 
 interface GameCanvasProps {
     paused?: boolean;
     syncRevision?: number;
     serverHasFired?: boolean;
+    opponentAim?: ReceivedAim | null;
+    onAimPreview?: (angle: number, power: number, charging: boolean) => void;
     preferences: BattlePreferences;
     gameState: GameState | null;
     terrain: TerrainData | null;
@@ -85,6 +88,9 @@ function GameCanvasInner(props: GameCanvasProps) {
     const [charging, setCharging] = useState(false);
     const chargeStart = useRef<number | null>(null);
     const chargeInput = useRef<number | ' ' | 'Enter' | 'assistive' | null>(null);
+    const previewSent = useRef({ at: -Infinity, charging: false });
+    const opponentBarrel = useRef(new OpponentBarrel());
+    const opponentAngle = useRef(Math.PI / 4);
     const [lastPower, setLastPower] = useState<number | null>(null);
     const [inspect, setInspect] = useState(false);
     const inspectRef = useRef(false);
@@ -179,6 +185,7 @@ function GameCanvasInner(props: GameCanvasProps) {
         chargeStart.current = null; chargeInput.current = null; setCharging(false);
         if (shotCamera.current.id === null) followedProjectile.current = null;
     }, [props.phase, props.turnPlayer]);
+    useEffect(() => { opponentBarrel.current.reset(); previewSent.current = { at: -Infinity, charging: false }; }, [props.syncRevision, props.phase, props.turnPlayer]);
     useEffect(() => {
         latest.current = props;
     }, [props]);
@@ -369,6 +376,16 @@ function GameCanvasInner(props: GameCanvasProps) {
                 const elapsed = lastFrame ? Math.max(0, now - lastFrame) : 16.667;
                 const delta = Math.min(50, elapsed);
                 lastFrame = now;
+                const preview = !p.paused && p.phase === 'combat' ? currentOpponentAim(p.opponentAim, now, p.turnPlayer, Boolean(p.serverHasFired)) : null;
+                const remoteTarget = preview?.angle ?? (shot.current?.side !== p.mySide ? shot.current?.angle : undefined) ?? Math.PI / 4;
+                opponentAngle.current = opponentBarrel.current.sample(remoteTarget, delta, reducedMotion.current);
+                const chargingNow = chargeStart.current !== null;
+                if (p.phase === 'combat' && p.turnPlayer === p.mySide && !p.paused && !pendingRef.current && !p.serverHasFired && document.visibilityState !== 'hidden') {
+                    if (now - previewSent.current.at >= AIM_UPDATE_MS || (previewSent.current.charging && !chargingNow)) {
+                        p.onAimPreview?.(aimRef.current.angle, aimRef.current.power, chargingNow);
+                        previewSent.current = { at: now, charging: chargingNow };
+                    }
+                }
                 const cam = camera.current;
                 const sample = p.paused ? undefined : snapshots.current.sample(now);
                 presented.current = sample;
@@ -446,14 +463,16 @@ function GameCanvasInner(props: GameCanvasProps) {
                     kingActions.current[side] = kingDirectors.current[side].update({ now, side, phase: p.phase, turn: p.turnPlayer,
                         winner: p.winner, king: body ? renderedPosition(body, transforms) : reference, projectiles: balls,
                         velocity: body?.velocity, hp: hp.hp,
-                        chargePower: side === p.mySide && chargeStart.current !== null && !p.paused ? aimRef.current.power : undefined,
+                        chargePower: side === p.mySide ? (chargingNow && !p.paused ? aimRef.current.power : undefined)
+                            : preview?.side === side && preview.charging ? preview.power : undefined,
                         shot: shot.current, hitAt: hit?.at, reducedMotion: reducedMotion.current,
-                        aimAngle: side === p.mySide ? aimRef.current.angle : shot.current?.side === side ? shot.current.angle : Math.PI / 4 });
+                        aimAngle: side === p.mySide ? aimRef.current.angle : opponentAngle.current });
                 }
                 const frame = { view: v, camera: cam.x, now, reducedMotion: reducedMotion.current,
                     state: renderState, terrain: p.terrain, transforms, kings: p.kingsHp,
                     names: p.playerNames, side: p.mySide, phase: p.phase, turn: p.turnPlayer, winner: p.winner,
                     angle: aimRef.current.angle, trajectory: trajectory.current, hazards: p.hazards ?? [],
+                    opponentAngle: opponentAngle.current,
                     effects: effects.current, particles: particles.current, shot: shot.current, ghost: ghost.current,
                     projectileId: followedProjectile.current,
                     kingActions: kingActions.current, hitLabels: p.preferences.hitLabels,
@@ -505,6 +524,7 @@ function GameCanvasInner(props: GameCanvasProps) {
                 reactionsLoaded: kingReactions.loaded,
                 livingKingsLoaded: livingKings.loaded,
                 kingActions: kingActions.current,
+                opponentPreparation: { angle: opponentAngle.current, preview: currentOpponentAim(p.opponentAim, performance.now(), p.turnPlayer, Boolean(p.serverHasFired)) },
                 livingKingStates: Object.fromEntries((['left', 'right'] as const).map(side => [side, livingKingState({
                     side, now: performance.now(), reducedMotion: reducedMotion.current,
                     shootAt: shot.current?.side === side ? shot.current.at : undefined,

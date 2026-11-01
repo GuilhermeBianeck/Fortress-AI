@@ -292,6 +292,7 @@ export class RoomManager {
             roomId: room.id, matchId: room.matchId, side: player.side, mode: room.mode, difficulty: room.difficulty,
             players: [...room.players.values()].map(p => ({ side: p.side, name: p.name, ready: p.ready, connected: !room.absences.has(p.socketId) })),
             terrain: room.session?.getTerrainData() ?? null, state: room.session?.getFullState() ?? null,
+            aim: room.session?.getAimState() ?? null,
             phase: room.phase, endsAt: status?.endsAt || null, turn: status?.turn ?? null, hasFired: status?.hasFired ?? false, wind: room.session?.getWind() ?? null,
             buildReady: status?.ready.includes(id) ?? false, roundScore: room.roundScore, currentRound: room.phase === 'intermission' ? room.currentRound - 1 : room.currentRound,
             buildInterrupted: room.session?.buildWasInterrupted(player.side) ?? false,

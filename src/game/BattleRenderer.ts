@@ -42,6 +42,7 @@ export interface BattleFrame {
     winner?: Side | null;
     turn: Side | null;
     angle: number;
+    opponentAngle?: number;
     trajectory: Vector[];
     hazards: BattleHazard[];
     effects: BattleEffect[];
@@ -243,7 +244,7 @@ function hazards(ctx: CanvasRenderingContext2D, f: BattleFrame) {
 
 function cannon(ctx: CanvasRenderingContext2D, f: BattleFrame, side: Side) {
     const pos = cannonPosition(side, f.terrain?.points ?? [], f.terrain?.cannons);
-    const angle = side === f.side ? f.angle : f.shot?.side === side ? f.shot.angle : Math.PI / 4;
+    const angle = side === f.side ? f.angle : f.opponentAngle ?? (f.shot?.side === side ? f.shot.angle : Math.PI / 4);
     const facing = side === 'left' ? 1 : -1;
     const base = cartoon.get('cannon_base');
     const barrel = cartoon.get('cannon_barrel');

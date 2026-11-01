@@ -78,6 +78,7 @@ import type { BotDifficulty } from '../shared/difficulty';
 import { kingCannonX } from '../shared/battleLayout';
 import { SHOT_FLIGHT_RATE } from '../shared/shotPacing';
 import { rollWind, turnWindHazard } from '../shared/combatTuning';
+import { AimPreviewState } from './AimPreview';
 
 export class GameSession {
     readonly id: string;
@@ -91,6 +92,7 @@ export class GameSession {
     private projectileTimers: Map<number, TimerId> = new Map();
     private timers = new PausableTimers();
     private paused = false;
+    private aimPreview = new AimPreviewState();
     private buildGeneration = 0;
     private buildHeartbeats = new Set<ReturnType<typeof setInterval>>();
     private interruptedBuildSides = new Set<Side>();
@@ -173,6 +175,7 @@ export class GameSession {
         // Create state machine
         this.stateMachine = new MatchStateMachine(io, roomId, {
             onPhaseChange: (phase) => {
+                if (phase !== 'combat') this.clearAimPreview();
                 this.onPhaseChangeCallback?.(phase);
                 if (phase === 'combat') {
                     for (const support of this.buildSupports) Matter.Composite.remove(this.world, support);
@@ -185,9 +188,10 @@ export class GameSession {
                 }
             },
             prepareTurn: () => {
+                const aim = this.clearAimPreview();
                 this.windSpeed = rollWind();
                 this.windHazards = [turnWindHazard(this.windSpeed, WORLD_WIDTH, CANVAS_HEIGHT)];
-                return { wind: this.windSpeed };
+                return { wind: this.windSpeed, aimEpoch: aim.epoch };
             },
             onTurnStart: (side) => {
                 if (this.botAI && this.getBotPlayer()?.side === side) {
@@ -259,8 +263,22 @@ export class GameSession {
     getFullState() { return this.gameLoop.getFullState(); }
     isPaused() { return this.paused; }
     getWind(): number | null { return this.windSpeed; }
+    getAimState() { return this.aimPreview.state(); }
+    private clearAimPreview() {
+        const state = this.aimPreview.reset();
+        this.io.to(this.roomId).emit('aim_preview', state);
+        return state;
+    }
+    handleAimPreview(socketId: string, data: unknown): void {
+        if (this.destroyed || this.paused || !this.stateMachine.canFire()) return;
+        const player = this.players.get(socketId);
+        if (!player || player.side !== this.stateMachine.getCurrentTurn()) return;
+        const state = this.aimPreview.accept(data, player.side, Date.now());
+        if (state) this.io.to(this.roomId).emit('aim_preview', state);
+    }
     buildWasInterrupted(side: Side) { return this.interruptedBuildSides.has(side); }
     rebindPlayer(oldId: string, newId: string): void {
+        this.clearAimPreview();
         const player = this.players.get(oldId);
         if (!player) return;
         this.players.delete(oldId); player.socketId = newId; this.players.set(newId, player);
@@ -278,6 +296,7 @@ export class GameSession {
     }
     pause(): void {
         if (this.paused) return;
+        this.clearAimPreview();
         this.paused = true; this.invalidateBuilds();
         this.gameLoop.stop(); this.stateMachine.pause(); this.scoreManager.pause();
     }
@@ -526,6 +545,7 @@ export class GameSession {
         const angle = Math.max(minAngle, Math.min(maxAngle, rawAngle));
         // Ensure power is capped at 100
         const power = Math.max(5, Math.min(100, rawPower));
+        this.clearAimPreview();
 
         // Cannon position based on player's side
         const cannonX = player.cannonX;
@@ -602,6 +622,7 @@ export class GameSession {
     }
 
     destroy() {
+        this.clearAimPreview();
         this.destroyed = true;
         this.invalidateBuilds();
         this.botAI?.destroy();

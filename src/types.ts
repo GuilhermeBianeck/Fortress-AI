@@ -88,6 +88,7 @@ export interface RoomState {
 
 export interface PauseState { paused: boolean; at: number; missing: { side: Side; deadline: number }[] }
 export interface SessionState {
+    aim?: import('../server/shared/aimPreview').AimState | null;
     roomId: string; matchId: string; side: Side; mode: 'single' | 'pvp'; difficulty: import('../server/shared/difficulty').BotDifficulty;
     players: { side: Side; name: string; ready: boolean; connected: boolean }[];
     terrain: (TerrainData & { hazards?: import('./game/BattleRenderer').BattleHazard[] }) | null;

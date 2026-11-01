@@ -21,6 +21,7 @@ import { track } from './analytics/tracker';
 import { royalMenu } from './sprites/royalMenu';
 import { turnWindHazard } from '../server/shared/combatTuning';
 import { battleArt } from './sprites/battleArt';
+import { currentShotInFlight } from './game/battleFeedback';
 import './components/RoyalMenuShell.css';
 import './components/BattleShell.css';
 
@@ -38,7 +39,7 @@ function App() {
     roomState, phase, phaseEndsAt, turnPlayer, matchResult, queuePosition,
     chatMessages, rematchState, roundScore, currentRound, hazards, wind,
     matchScores, playerProfile, prevPlayerProfile, isConnected, connectionNotice, roundWinner,
-    pauseState, syncRevision, serverHasFired, progressStatus, rewardNotice, claimReward, getHistory,
+    pauseState, syncRevision, serverHasFired, progressStatus, rewardNotice, claimReward, getHistory, opponentAim, publishAim,
     identityReplaced,
     lobbyError,
     createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
@@ -375,7 +376,7 @@ function App() {
                       phase={phase}
                       phaseEndsAt={phaseEndsAt}
                       turnPlayer={turnPlayer}
-                      shotInFlight={gameState?.bodies.some(body => body.label === 'projectile' && Math.hypot(body.velocity.x, body.velocity.y) > 1)}
+                      shotInFlight={currentShotInFlight(gameState?.bodies ?? [], turnPlayer, serverHasFired)}
                       turnResolving={serverHasFired}
                       mySide={mySide}
                       matchResult={matchResult}
@@ -437,6 +438,8 @@ function App() {
                     paused={!isConnected || pauseState.paused}
                     syncRevision={syncRevision}
                     serverHasFired={serverHasFired}
+                    opponentAim={opponentAim}
+                    onAimPreview={publishAim}
                     preferences={battlePreferences}
                     gameState={gameState}
                     terrain={terrain}

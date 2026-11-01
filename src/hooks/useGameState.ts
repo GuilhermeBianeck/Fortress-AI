@@ -8,6 +8,8 @@ import { readStorage, writeStorage } from './browserStorage';
 import type { BotDifficulty } from '../../server/shared/difficulty';
 import type { SessionState, PauseState, RewardKind } from '../types';
 import type { KingDamageEvent, ProjectileImpactEvent, BlockDestroyedEvent } from '../types';
+import type { AimState } from '../../server/shared/aimPreview';
+import type { ReceivedAim } from '../game/opponentAim';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
 
@@ -55,6 +57,8 @@ export const useGameState = () => {
     const [syncRevision, setSyncRevision] = useState(0);
     const [serverHasFired, setServerHasFired] = useState(false);
     const [wind, setWind] = useState<number | null>(null);
+    const aimEpoch = useRef<string | null>(null);
+    const [opponentAim, setOpponentAim] = useState<ReceivedAim | null>(null);
     const [progressStatus, setProgressStatus] = useState<'idle' | 'pending' | 'saved'>('idle');
     const [rewardNotice, setRewardNotice] = useState<string | null>(null);
     const rematchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,6 +83,7 @@ export const useGameState = () => {
     const kingDamageCbRef = useRef<((data: KingDamageEvent) => void) | null>(null);
 
     const resetMatch = useCallback(() => {
+        aimEpoch.current = null; setOpponentAim(null);
         if (buildStatusTimerRef.current) clearTimeout(buildStatusTimerRef.current);
         buildStatusTimerRef.current = null;
         if (rematchTimerRef.current) clearTimeout(rematchTimerRef.current);
@@ -142,6 +147,7 @@ export const useGameState = () => {
             socketRef.current?.emit('get_profile');
         });
         socketRef.current.on('session_state', (data: SessionState) => {
+            aimEpoch.current = data.aim?.epoch ?? null; setOpponentAim(null);
             const me = data.players.find(p => p.side === data.side)!;
             const opponent = data.players.find(p => p.side !== data.side);
             bodyCacheRef.current.clear();
@@ -165,6 +171,7 @@ export const useGameState = () => {
             setConnectionNotice(null); socketRef.current?.emit('get_profile');
         });
         socketRef.current.on('match_paused', (data: PauseState) => {
+            setOpponentAim(null);
             pausedRef.current = data.paused; setPauseState(data);
             updateBuildStatus({ status: 'idle', message: '' });
         });
@@ -302,6 +309,7 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('match_started', (data: { side: Side; kingsHp?: { left: KingHpState; right: KingHpState }; currentRound?: number; roundScore?: { left: number; right: number } }) => {
+            aimEpoch.current = null; setOpponentAim(null);
             updateBuildStatus({ status: 'idle', message: '' });
             // Emitted before the first metadata snapshot for every new round/session.
             bodyCacheRef.current.clear();
@@ -321,6 +329,7 @@ export const useGameState = () => {
         // --- Phase events ---
 
         socketRef.current.on('phase_change', (data: { phase: MatchPhase; endsAt?: number; turnPlayer?: Side }) => {
+            setOpponentAim(null);
             setPhase(data.phase);
             setPhaseEndsAt(data.endsAt ?? null);
             // A newly announced turn has not fired yet; turn_start follows with the same news.
@@ -329,7 +338,8 @@ export const useGameState = () => {
             setRoomState(prev => prev ? { ...prev, phase: data.phase } : prev);
         });
 
-        socketRef.current.on('turn_start', (data: { side: Side; endsAt: number; wind?: number }) => {
+        socketRef.current.on('turn_start', (data: { side: Side; endsAt: number; wind?: number; aimEpoch?: string }) => {
+            aimEpoch.current = data.aimEpoch ?? null; setOpponentAim(null);
             setServerHasFired(false);
             setTurnPlayer(data.side);
             setPhaseEndsAt(data.endsAt);
@@ -338,8 +348,16 @@ export const useGameState = () => {
 
         // The shot resolves the turn; the countdown no longer applies while it lands and settles.
         socketRef.current.on('shot_fired', () => {
+            setOpponentAim(null);
             setServerHasFired(true);
             setPhaseEndsAt(null);
+        });
+
+        socketRef.current.on('aim_preview', (data: AimState) => {
+            if (!data.preview) { aimEpoch.current = data.epoch; setOpponentAim(null); return; }
+            if (data.epoch !== aimEpoch.current || data.preview.side === mySideRef.current || pausedRef.current) return;
+            setOpponentAim(previous => previous?.epoch === data.epoch && previous.sequence >= data.preview!.sequence
+                ? previous : { ...data.preview!, receivedAt: performance.now() });
         });
 
         socketRef.current.on('match_result', (data: { winner: Side; reason: string; kings: { left: KingHpState; right: KingHpState } }) => {
@@ -418,6 +436,7 @@ export const useGameState = () => {
         });
 
         socketRef.current.on('disconnect', () => {
+            aimEpoch.current = null; setOpponentAim(null);
             if (buildStatusTimerRef.current) clearTimeout(buildStatusTimerRef.current);
             buildStatusTimerRef.current = null;
             activeRef.current = false;
@@ -495,6 +514,11 @@ export const useGameState = () => {
         socketRef.current?.emit('fire_projectile', { angle, power });
     }, []);
 
+    const publishAim = useCallback((angle: number, power: number, charging: boolean) => {
+        if (!socketRef.current?.connected || !activeRef.current || pausedRef.current || !aimEpoch.current) return;
+        socketRef.current.volatile.emit('aim_preview', { epoch: aimEpoch.current, angle, power, charging });
+    }, []);
+
     const sendChatMessage = useCallback((text: string) => {
         if (!socketRef.current?.connected || !activeRef.current || pausedRef.current) return;
         socketRef.current?.emit('chat_message', { text });
@@ -554,7 +578,7 @@ export const useGameState = () => {
         matchScores, playerProfile, prevPlayerProfile, isConnected, connectionNotice, roundWinner,
         identityReplaced,
         lobbyError,
-        pauseState, syncRevision, serverHasFired, progressStatus, rewardNotice, claimReward, getHistory,
+        pauseState, syncRevision, serverHasFired, progressStatus, rewardNotice, claimReward, getHistory, opponentAim, publishAim,
         createRoom, joinRoom, joinQueue, leaveQueue, playerReady,
         spawnBox, requestBuild, fireProjectile,
         sendChatMessage, requestRematch, getProfile, returnToLobby,
