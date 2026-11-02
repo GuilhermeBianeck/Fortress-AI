@@ -1190,411 +1190,250 @@ WebApp.setBackgroundColor('#0a0a1a');
 
 ---
 
-## 20. Project Roadmap (Phased Engineering Tasks)
-
-> **Status note:** Phases 1–6 and Phase 8 are complete. The core game is fully playable with multiplayer support, AI fortress building, turn-based combat, environmental hazards, and room-based matchmaking. Remaining work focuses on persistence/progression (Phase 7), audio/visual polish (Phase 9), Telegram Mini App integration (Phase 10), and deployment/scaling (Phase 11).
-
-### Phase 1: Sandbox Foundation [COMPLETE]
-- [x] Vite + React + TypeScript + Tailwind init
-- [x] Express + Socket.io server with Matter.js physics (60 Hz tick, 20 Hz broadcast)
-- [x] Procedural terrain generation (seeded noise, build zone detection)
-- [x] God Tools: manual spawn with material + shape selection
-- [x] Canvas 2D renderer (background, terrain, bodies, King, HP bars)
-- [x] King unit with HP, collision damage system
-
-### Phase 2: AI Architect Pipeline [COMPLETE]
-- [x] Gemini API integration with structured JSON output
-- [x] Zod schema validation for AI responses
-- [x] System prompt with terrain context, King position, block size guidance
-- [x] Safe Spawn overlap resolution
-- [x] BYOK (Bring Your Own Key) API key management
-- [x] Build status overlay (generating → building → success/error)
-
-### Phase 3: Physics Polish [COMPLETE]
-- [x] Fix AABB size flicker (stamp original dimensions)
-- [x] Gravity tuning (1 → 2), sleeping enabled
-- [x] Material property rebalancing (densities 4-5x heavier)
-- [x] Block size reduction (50px → 30px default)
-- [x] Damage scaling factor (0.3x) for new physics values
-
----
-
-### Phase 4: Sandbox Combat [COMPLETE]
-
-Single-player combat in the sandbox. Player builds a fortress, switches to fire mode, and bombards it. This phase delivers all combat *mechanics* without any multiplayer complexity.
-
-#### 4-A: Build/Fire Mode Switch
-> *Goal: Player can toggle between building and firing in the sandbox.*
-
-- [x] **4-A.1 — Add `sandboxMode` state to `App.tsx`**
-  - New state: `sandboxMode: 'build' | 'fire'` (default `'build'`).
-  - Pass down to `GameCanvas` and `GodTools` as props.
-
-- [x] **4-A.2 — Mode toggle in GodTools**
-  - Segmented control ("Build / Fire") in the GodTools bar.
-  - When `fire` mode is selected, material/shape selectors hidden. Power readout shown.
-  - Keyboard shortcut: `Tab` toggles mode.
-
-- [x] **4-A.3 — Canvas click behavior by mode**
-  - In `GameCanvas.tsx`, mode determines whether click emits `spawn` or `fire_projectile`.
-  - `onFire: (angle: number, power: number) => void` prop on `GameCanvas`.
-
-#### 4-B: Cannon & Aiming UI
-> *Goal: Player sees a cannon on the left edge and can aim/fire with click-drag.*
-
-- [x] **4-B.1 — Cannon rendering in `GameCanvas.tsx`**
-  - Cannon drawn in fire mode: dark rectangle at cannon position, rotated to match aim angle.
-  - Cannon base is a small circle at the pivot point.
-
-- [x] **4-B.2 — Drag-to-aim interaction**
-  - `mousedown`/`touchstart` records start position.
-  - `mousemove`/`touchmove` calculates angle and power (clamped 5–30). Updates cannon rotation and trajectory preview.
-  - `mouseup`/`touchend` fires. Emits `fire_projectile` event.
-
-- [x] **4-B.3 — Trajectory preview arc**
-  - Dotted arc from cannon position. 15 ballistic steps computed.
-  - Small circles (radius 2, white, 50% opacity). Does NOT account for wind.
-
-- [x] **4-B.4 — Keyboard fallback aiming**
-  - Left/Right arrows adjust angle ±2°. Up/Down arrows adjust power ±1. Spacebar fires.
-  - Numeric readout "Angle: 45° | Power: 20" shown near cannon.
-
-#### 4-C: Projectile System (Server)
-> *Goal: Server spawns projectile bodies and handles their lifecycle.*
-
-- [x] **4-C.1 — `fire_projectile` Socket.io handler**
-  - Event handler routes to `GameSession.handleFireProjectile()`.
-  - Projectile body: circle, radius 8, density 0.05, restitution 0.3.
-  - Velocity set from angle and power.
-
-- [x] **4-C.2 — Projectile lifespan (auto-remove after 5s)**
-  - Timeout removes projectile from world.
-  - Out-of-bounds removal.
-
-- [x] **4-C.3 — Projectile rendering in `GameCanvas.tsx`**
-  - Projectiles rendered with special styling (dark gray fill, white stroke).
-
-#### 4-D: Block HP & Destruction (Server)
-> *Goal: Blocks take damage from projectile impacts and break apart.*
-
-- [x] **4-D.1 — Block HP constants and stamping**
-  - `MATERIAL_BLOCK_HP` defined in `server/config/constants.ts`: wood=30, stone=80, ice=15, rubber=40, steel=200.
-  - `blockHp` stamped on body at creation.
-
-- [x] **4-D.2 — Projectile-vs-block collision handler**
-  - Collision handler calculates impact force. Threshold of 3 prevents trivial damage.
-  - Block damage = impactForce × 2.0. On HP ≤ 0, body removed, `block_destroyed` emitted.
-
-- [x] **4-D.3 — Block HP in gameState broadcast**
-  - `blockHp` and `blockMaxHp` included in body data.
-
-- [x] **4-D.4 — Visual damage indicators in `GameCanvas.tsx`**
-  - HP > 66%: no overlay. 33%–66%: crack lines. < 33%: heavy cracks + desaturation.
-
-#### 4-E: Screen Shake
-> *Goal: Canvas shakes on impacts for game feel.*
-
-- [x] **4-E.1 — Screen shake state in `GameCanvas.tsx`**
-  - Shake ref with amplitude and remaining ticks. Linear decay.
-
-- [x] **4-E.2 — Shake triggers from Socket.io events**
-  - `king_damage`: amplitude 6, 18 ticks. `block_destroyed`: amplitude 2, 8 ticks.
-
-#### 4-F: Destruction Particles
-> *Goal: Blocks burst into colored debris when destroyed.*
-
-- [x] **4-F.1 — Particle system module: `src/effects/particles.ts`**
-  - `ParticleSystem` class with emit(), update(), draw(). Max 200 particles.
-  - Mini-gravity on particles. Alpha fade based on remaining life.
-
-- [x] **4-F.2 — Integrate particles into `GameCanvas.tsx`**
-  - `ParticleSystem` instance via `useRef`.
-  - `block_destroyed` triggers particle emission with material color.
-
-- [x] **4-F.3 — Projectile impact particles**
-  - `projectile_impact` event triggers gray particle emission at impact position.
-
-#### 4-G: Integration & Polish
-> *Goal: Everything works together smoothly in sandbox.*
-
-- [x] **4-G.1 — `useGameState.ts` additions**
-  - `fireProjectile(angle, power)` callback emits `fire_projectile`.
-  - `block_destroyed` and `projectile_impact` event listeners for particles/shake.
-
-- [x] **4-G.2 — Projectile cleanup**
-  - Projectiles removed from gameState when destroyed.
-
-- [x] **4-G.3 — End-to-end testing**
-  - Full flow works: build → fire → impact → damage → destruction → collapse → King damage.
-
----
-
-### Phase 5: 1v1 Battlefield Architecture [COMPLETE]
-
-Refactored the server from a single global engine to per-match isolated instances. Widened the map to 1600px. This was a **major architectural change**.
-
-#### 5-A: Match Manager (Server Refactor)
-- [x] **5-A.1 — `server/game/RoomManager.ts`**
-  - Class that creates, tracks, and destroys rooms. Manages matchmaking queue.
-  - `createRoom(socket, name)`, `joinRoom(socket, roomId, name)`, `joinQueue(socket, name)`.
-  - Disconnect handling with automatic room cleanup.
-
-- [x] **5-A.2 — `server/game/GameSession.ts`**
-  - Per-room game logic: owns Matter.js engine, terrain, Kings, collision handlers, projectile system.
-  - Broadcasts `gameState` only to sockets in its room (`io.to(roomId)`).
-  - Manages block HP, damage, and environmental hazards.
-
-- [x] **5-A.3 — Refactored `server/index.ts`**
-  - Thin event router: handles `connection`, delegates all game events to `RoomManager` and `GameSession`.
-  - No global physics state — all per-room.
-
-#### 5-B: 1600px Battlefield
-- [x] **5-B.1 — Terrain generator: 1600px width**
-  - `WORLD_WIDTH = 1600` in constants. Terrain spans full width.
-  - At least 1 build zone guaranteed per 800px half.
-
-- [x] **5-B.2 — Two Kings, two build zones**
-  - King 1 in the first build zone of the left half (x < 800).
-  - King 2 in the first build zone of the right half (x ≥ 800).
-  - Build zones restricted to each player's half.
-
-- [x] **5-B.3 — Two cannons**
-  - Player 1 cannon at left edge, fires rightward.
-  - Player 2 cannon at right edge, fires leftward.
-
-- [x] **5-B.4 — Client camera system**
-  - Camera offset in `GameCanvas.tsx`. Build phase: locked to player's half.
-  - Combat phase: full view with pan support. A/D keys and two-finger touch panning.
-  - Minimap for battlefield overview.
-
-#### 5-C: Per-Socket State
-- [x] **5-C.1 — Player-to-match mapping**
-  - Server tracks socket-to-room mapping. Events routed to correct GameSession.
-
-- [x] **5-C.2 — Build zone enforcement**
-  - Spawn and build requests validated to player's half of the map.
-
----
-
-### Phase 6: Multiplayer Combat Flow [COMPLETE]
-
-Built the full match lifecycle around the combat mechanics from Phase 4 and the architecture from Phase 5.
-
-- [x] **6.1 — Matchmaking queue**
-  - `join_queue` / `leave_queue` handlers in `server/index.ts`.
-  - In-memory queue in `RoomManager`. Queue position emitted via `queue_status`.
-  - On match: create room, join both sockets, emit `match_found`.
-
-- [x] **6.2 — Build phase with timer**
-  - `MatchStateMachine` enters `build` phase. Starts 90s countdown.
-  - Emits `phase_change` to room. Both players can build independently.
-  - On timer expire or both players signal `player_ready` → transition to reveal.
-
-- [x] **6.3 — Fog-of-war (client)**
-  - During build phase, `GameCanvas` renders the opponent's half as hidden.
-  - Server only includes bodies from the player's own half in `gameState` during build phase.
-
-- [x] **6.4 — Reveal phase**
-  - Server broadcasts full state (both sides) to both clients.
-  - 5s camera pan animation across the full 1600px.
-  - Phase overlay shows "Revealing fortresses" with hazard information.
-
-- [x] **6.5 — Turn system**
-  - `MatchStateMachine` tracks: `currentTurn` (side), turn timer (15s).
-  - Emits `turn_start` at start of each turn.
-  - Only the active player's `fire_projectile` events accepted. `hasFiredThisTurn` flag prevents duplicates.
-  - After fire: wait for physics to settle → evaluate King HP → next turn or result.
-
-- [x] **6.6 — Match result**
-  - On King death: emit `match_result` with winner and reason.
-  - `round_result` emitted with score tracking for best-of-3.
-  - Rematch system: `request_rematch` → `rematch_requested` → both agree → `rematch_start`.
-
-- [ ] **6.7 — Sudden death (round 11+)**
-  - Round 11+: shrink terrain by 50px from each edge per round.
-  - Round 13+: increase gravity by 0.5 per round.
-  - Round 15: highest remaining King HP wins.
-
-- [ ] **6.8 — Ghost matches**
-  - Query a previous match's fortress JSON + move history.
-  - Replay ghost's fortress and fire moves.
-
----
-
-### Phase 7: Persistence & Progression
-
-- [ ] **7.1 — Supabase setup**
-  - Create Supabase project. Run SQL migrations (§11.2 schema).
-  - Install `@supabase/supabase-js` in server.
-  - Configure `.env` with Supabase URL + service role key.
-
-- [ ] **7.2 — Auth integration**
-  - Anonymous auth on first visit (Supabase anonymous sign-in).
-  - Store JWT in `httpOnly` cookie or `localStorage`.
-  - Server validates JWT on socket connection.
-
-- [ ] **7.3 — Player profiles**
-  - Auto-create `profiles` row on first auth.
-  - Elo, games played, games won tracked and updated after each match.
-
-- [ ] **7.4 — Match history**
-  - `MatchInstance` writes to `matches` table on match start and on finish.
-  - `moves` table records each `fire` event for replay.
-
-- [ ] **7.5 — Replay system**
-  - Replay page/component that loads match data by ID.
-  - Generates terrain from seed, spawns fortresses, replays fire moves sequentially.
-  - Playback controls: play/pause, 0.5x/1x/2x/4x speed, scrub bar.
-  - Share URL: `/replay/{matchId}`.
-
-- [ ] **7.6 — Elo calculation**
-  - K=32, floor=100. Standard Elo formula (§11.5).
-  - Ghost matches: half K on win, zero on loss.
-
-- [ ] **7.7 — Ammo unlocks**
-  - Check player Elo against unlock thresholds (§4.1 table) on match start.
-  - Send unlocked ammo list in `match_found` payload.
-  - Ammo selection UI in fire mode (dropdown or button row).
-
-- [ ] **7.8 — Leaderboard**
-  - API endpoint: `/api/leaderboard?limit=100`.
-  - Cached in-memory, refreshed every 5 minutes.
-  - Client component: table with rank, name, Elo, win rate.
-
----
-
-### Phase 8: Environmental Hazards [COMPLETE]
-
-Implemented in parallel with multiplayer flow. No database dependency.
-
-- [x] **8.1 — Hazard selection per match**
-  - On `GameSession` creation, 1-2 hazards selected from pool.
-  - Included in `terrain` payload so both clients know.
-  - PhaseOverlay displays hazard information during build and combat.
-
-- [x] **8.2 — Wind gust**
-  - In game loop, if wind zone active, apply horizontal force to all non-static bodies.
-  - Direction and strength defined per hazard instance.
-  - Client: PhaseOverlay shows wind indicator with direction arrow and strength percentage.
-
-- [x] **8.3 — Lava pool**
-  - Lava zones deal continuous damage to blocks and Kings touching the surface.
-  - Blocks destroyed when HP reaches 0 from lava damage.
-
-- [x] **8.4 — Falling rocks**
-  - Stone bodies drop from above periodically during combat.
-
-- [ ] **8.5 — Earthquake**
-  - Oscillate terrain body position horizontally.
-  - Client: screen shake overlay + "EARTHQUAKE!" banner.
-
-- [ ] **8.6 — Rising flood (sudden death)**
-  - Static rectangle at bottom, translating upward.
-  - Remove bodies submerged below water line.
-  - Client: blue translucent water overlay.
-
-- [ ] **8.7 — Hazard warning UI**
-  - Emit `hazard_warning` 1 turn before activation.
-  - Client: show hazard icon + warning banner.
-
----
-
-### Phase 9: Audio & Visual Polish
-
-- [ ] **9.1 — Web Audio API sound manager**
-  - `src/audio/SoundManager.ts`: preload all clips into `AudioBuffer` map. `play(name)` method.
-  - Volume control (global slider in settings).
-  - Mute toggle.
-
-- [ ] **9.2 — Combat sound effects**
-  - Cannon fire, projectile impact (structure/terrain), block destroyed (per material), King damage/death.
-  - Pitch/volume scale with impact force.
-
-- [ ] **9.3 — UI sound effects**
-  - Block placed, AI build start/complete, button clicks, mode switch.
-
-- [ ] **9.4 — Background music**
-  - Build phase: calm ambient loop.
-  - Combat phase: tense percussion loop.
-  - Crossfade on phase transition (1s fade).
-
-- [ ] **9.5 — Block spawn animation**
-  - On AI build, blocks appear with staggered pop-in (scale 0→1, 0.3s each, 50ms stagger).
-
-- [ ] **9.6 — Phase transition animations**
-  - Fog-of-war lift: left-to-right wipe (2s).
-  - "BATTLE BEGINS" text: scale up + fade in, hold 1s, fade out.
-  - Victory/Defeat banner: bounce-in, hold 3s, fade-out.
-
-- [ ] **9.7 — Victory/Defeat screen**
-  - Full-screen overlay with result, stats, Elo change, action buttons (Rematch, New Match, Replay, Share).
-
----
-
-### Phase 10: Telegram Mini App
-
-- [ ] **10.1 — TMA SDK integration**
-  - Install `@twa-dev/sdk`. Initialize `WebApp.ready()`, `expand()`, theme colors.
-  - Detect TMA environment vs standalone web.
-
-- [ ] **10.2 — Telegram Auth → Supabase linking**
-  - Extract `initData` from TMA. Send to server for HMAC validation.
-  - Create/link Supabase auth user with Telegram user ID.
-  - Guest progress merge (FR-06).
-
-- [ ] **10.3 — Deep link challenges**
-  - Generate `t.me/FortressAIBot?start=challenge_{userId}` links.
-  - Parse `start` param on TMA load → auto-join private match room.
-
-- [ ] **10.4 — Haptic feedback**
-  - Wire up `impactOccurred` / `notificationOccurred` to game events (§15.4 table).
-
-- [ ] **10.5 — Viewport scaling**
-  - Scale canvas to fit webview width. Use `viewportStableHeight` to avoid keyboard jitter.
-  - Prompt input and HUD adapt to remaining vertical space.
-
-- [ ] **10.6 — Main button state management**
-  - Map game state to Telegram Main Button text/color (§15.6).
-
-- [ ] **10.7 — Telegram Stars payments (cosmetics)**
-  - `WebApp.openInvoice()` for Gem purchases.
-  - Server validates via Bot API before crediting.
-
----
-
-### Phase 11: Launch & Scale
-
-- [ ] **11.1 — CI/CD pipeline**
-  - GitHub Actions: lint → type check → unit tests → build → deploy.
-  - Separate jobs for frontend (Vercel) and server (Railway/Fly.io).
-
-- [ ] **11.2 — Staging environment**
-  - Separate Supabase project. Separate server instance.
-  - Deploy on every PR merge to `develop` branch.
-
-- [ ] **11.3 — Production deployment**
-  - Deploy on merge to `main`.
-  - Domain setup, SSL, CORS configuration.
-
-- [ ] **11.4 — Performance profiling**
-  - Test 100 bodies at 60 FPS on target device (Snapdragon 7-series).
-  - Profile `GameLoop.tick()` duration. Optimize if > 10ms.
-  - Measure `gameState` payload size. Compress if > 5 KB.
-
-- [ ] **11.5 — Load testing**
-  - Simulate 500 concurrent matches (1000 sockets) with Artillery.io or k6.
-  - Identify bottleneck (CPU, memory, network).
-  - Add Redis adapter for Socket.io if multi-instance needed.
-
-- [ ] **11.6 — Monitoring & analytics**
-  - Sentry for error tracking (both client and server).
-  - PostHog for product analytics (prompt success rates, match completion rates, retention).
-  - Uptime monitoring (Uptime Robot or similar).
-
-- [ ] **11.7 — Public launch**
-  - Submit TMA to BotFather for review.
-  - Social media announcement. Share deep links.
-  - Monitor error rates and server load for first 48 hours.
+## 20. Project Roadmap
+
+> **Last verified:** 2 November 2026 against `0c4fad8` (V17, the live release). This replaces the February task list, which remains in git history. Sections 1-19 of this spec were not revised in this pass and can disagree with the code: they describe a 1600px world and 15-second turns, while the code uses 2400px and 25 seconds. Where they differ, trust this section and the code.
+
+**Results from this audit**
+
+| Check | Result |
+| :--- | :--- |
+| Frontend unit tests | 148 of 148 pass |
+| Backend tests | 208 of 208 pass on Node 22.22.2 |
+| Frontend and backend production builds | Both pass; main JS chunk is 539 kB |
+| Two real socket clients on a private local backend | Build, reveal, combat, turn rules and zone limits behave as listed below |
+| Public site | `www.fortressbattle.com` returns 200, its bundle contains V17's `aim_preview`, and `api.fortressbattle.com` answers; Vercel reports success for `0c4fad8` |
+| Playwright e2e, production build | **Incomplete and not a clean pass.** Stopped at 86 of 88 tests: 31 pass, 55 fail after one retry. See problem 3 |
+| Whole-repo lint | Fails with 27 errors |
+
+**Not verified:** anything needing a physical phone, a live Gemini call (no key was used), the VPS internals (taken from `docs/opponent-aim-v17.md`), and sustained load.
+
+### 20.1 Next Up
+
+The order is a recommendation: test with real devices and players first, and let the results decide which features to build.
+
+| # | Work | Why | Reference |
+| :--- | :--- | :--- | :--- |
+| **Now** | | | |
+| 1 | Run the 20-minute physical iPhone 17 Pro acceptance | Open since V12. Every sign-off row still reads "not run". Needs the owner's phone | `docs/mobile-device-acceptance.md` |
+| 2 | Fix fortress visibility during the build phase | Enemy fortresses can be seen before the reveal (problem 1) | Item 6.3 |
+| 3 | Repair the e2e suite and add CI for lint, tests and builds | The suite cannot currently catch regressions, and nothing runs automatically (problems 3 and 4) | Item 11.1 |
+| 4 | Test with real new players | `progress.md` records no recruited player tests. Add the missing analytics events first, such as `post_match_rating_submitted` | `CONCEPT_VALIDATION_TEST_PLAN.md` |
+| **Next, informed by 1 and 4** | | | |
+| 5 | Authored character reactions and broader seeded balance testing | The next development work named in the docs | `docs/charge-controls-v15.md` |
+| 6 | Add a stalemate rule | No turn cap or draw path exists (problem 2) | Item 6.7 |
+| 7 | Further multiplayer polish | V17 was called the first milestone, but no later ones are defined. Scope from player results | `progress.md` |
+| **Operations, in parallel** | | | |
+| 8 | Offsite progression backups | V17 backups are on the same host as the server | `docs/opponent-aim-v17.md` |
+| 9 | Upgrade the VPS operating system | Flagged as unsupported in the docs; not rechecked in this audit | `docs/production-backend.md` |
+| 10 | Rerun the sustained soak on V17 and add a load test | The last soak was V12, and no load tooling exists | Items 11.4, 11.5 |
+| 11 | Get a mid-range Android test device | None supplied yet | `docs/mobile-device-acceptance.md` |
+| 12 | Clear dependency warnings and lint errors | Problems 4 and 5 | |
+
+### 20.2 Parked: Decisions Needed
+
+These are not scheduled and not cancelled. Decide after player testing.
+
+| Decision | Items waiting on it | Current state |
+| :--- | :--- | :--- |
+| Is Telegram still a release target? | All of Phase 10, 11.7 | No Telegram code exists |
+| Stay on SQLite or move to Supabase? | 7.1, 7.2, 10.2, 11.2 | SQLite works for one server process; several hosts would need a storage change (`docs/progression-operations.md`) |
+| Add competitive systems? | 6.8, 7.5, 7.6, 7.7, 7.8 | Rank tiers and match history exist; Elo, replays, ghost matches, ammo unlocks and a leaderboard do not |
+| Add more hazards and polish? | 8.5, 8.6, 8.7, 9.5 | Not built |
+
+### 20.3 Problems Found in This Audit
+
+1. **Enemy fortresses are not hidden during build.** The server sends every body to the whole room (`server/physics/loop.ts`). In the socket test, a player received the opponent's block at x=1800 during build. The renderer has no phase or side filter, the minimap draws all blocks, and the A/D camera keys work during build. The rendering part comes from reading the code and was not tested visually.
+2. **Stalemates have no ending.** No turn cap or draw rule was found, and `MAX_ROUNDS` is defined but unused. Timed-out turns simply pass, so two passive players can continue indefinitely.
+3. **The e2e suite cannot be used as a gate yet.** 24 of the 55 failures wait for a "Single Player" button the menu no longer has, so those specs are stale. The other 31 are **not triaged**, so game bugs among them cannot be ruled out; they include newer specs (`cartoon-experience`, `cartoon-menu`, `comfort-feedback`, `game-review`, `theme-music`). `visual-regression` has no committed baselines. The run used browser build 1223, not the 1217 this Playwright version expects. These specs passed on desktop and mobile: `charge-controls`, `opponent-aim`, `battle-art`, `king-actions`, `cartoon-vfx`, `royal-menu`, `playtest-corrections`.
+4. **Tooling is unpinned and unenforced.** There is no `.nvmrc` or `engines` field. On Node 18, `npm install` left out `rolldown`'s native package and the server tests failed to start; the tested runtime is Node 22.22.2, which `node:sqlite` needs. There are no CI workflows, and lint fails with 27 errors.
+5. **Dependency warnings remain.** Root: 20 (14 high), including 3 in production dependencies (`ws` and `socket.io-parser` are high). Server: 6 (4 high), none in production dependencies.
+6. **Other docs are stale.** `CLAUDE.md` and `AGENTS.md` still describe the 1600px world.
+
+### 20.4 Status by Phase
+
+**Status:** ✅ shipped as planned · 🔄 shipped differently · 🟡 partly built · ❌ not built · ➖ removed
+
+**Checked by:** C code read · T automated unit or server test · R two-client socket run · E passing e2e spec · P public site
+
+| Phase | ✅ | 🔄 | 🟡 | ❌ | ➖ |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Phase 1: Sandbox Foundation | 5 | 1 | 0 | 0 | 0 |
+| Phase 2: AI Architect Pipeline | 6 | 0 | 0 | 0 | 0 |
+| Phase 3: Physics Polish | 5 | 0 | 0 | 0 | 0 |
+| Phase 4: Sandbox Combat | 10 | 9 | 0 | 0 | 3 |
+| Phase 5: 1v1 Battlefield Architecture | 5 | 4 | 0 | 0 | 0 |
+| Phase 6: Multiplayer Combat Flow | 4 | 1 | 0 | 3 | 0 |
+| Phase 7: Persistence & Progression | 0 | 4 | 0 | 4 | 0 |
+| Phase 8: Environmental Hazards | 2 | 2 | 1 | 2 | 0 |
+| Phase 9: Audio & Visual Polish | 0 | 3 | 3 | 1 | 0 |
+| Phase 10: Telegram Mini App | 0 | 0 | 2 | 5 | 0 |
+| Phase 11: Launch & Scale | 0 | 1 | 4 | 2 | 0 |
+| **Total (92 items)** | **37** | **25** | **10** | **17** | **3** |
+
+#### Phase 1: Sandbox Foundation
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| Vite, React, TypeScript, Tailwind | ✅ | C | `package.json`; production build passes |
+| Express, Socket.io, Matter.js server | ✅ | C, R | 60 Hz tick, 20 Hz snapshots (`server/physics/loop.ts`); websocket transport only |
+| Procedural terrain and build zones | ✅ | C | Seeded noise and `findBuildZones` in `server/physics/terrain.ts` |
+| God Tools manual placement | ✅ | C, R | Material and shape selection in `GodTools.tsx`; available during build |
+| Canvas 2D renderer | 🔄 | C, E | Now illustrated cartoon art in `src/game/BattleRenderer.ts` |
+| King HP and collision damage | ✅ | C, T | `server/game/impactDamage.ts` |
+
+#### Phase 2: AI Architect Pipeline
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| Gemini structured JSON output | ✅ | C | `gemini-2.5-flash` in `server/ai/gemini.ts`; no live call made in this audit |
+| Zod validation | ✅ | C | `FortressSchema`, maximum 50 bodies |
+| System prompt with terrain and King context | ✅ | C | `server/ai/prompts.ts` |
+| Safe Spawn overlap resolution | ✅ | C, T | `safeSpawn` in `server/ai/overlap.ts` |
+| Bring your own API key | ✅ | C | Falls back to a server key, limited to 3 requests per hour |
+| Build status overlay | ✅ | C | Status states in `useGameState.ts` |
+
+#### Phase 3: Physics Polish
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| AABB size flicker fix | ✅ | C | `originalWidth` and `originalHeight` used in snapshots |
+| Gravity 2, sleeping enabled | ✅ | C | `server/physics/world.ts` |
+| Material rebalancing | ✅ | C | `MATERIAL_PROPS` in `server/config/constants.ts` |
+| 30px default block size | ✅ | C | `SHAPE_DIMS` |
+| 0.3x damage scale | ✅ | C, T | `DAMAGE_SCALE`, used for non-projectile impacts |
+
+#### Phase 4: Sandbox Combat
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 4-A.1 `sandboxMode` state | ➖ | C | Not in the code. Match phases now control what input does |
+| 4-A.2 Build/Fire toggle, Tab key | 🔄 | C | Now a Build/Inspect toggle; firing belongs to the combat phase; no Tab shortcut |
+| 4-A.3 Click behaviour by mode | 🔄 | C | Chosen by phase and mode in `GameCanvas.tsx` |
+| 4-B.1 Cannon rendering | ✅ | C, E | Illustrated base and barrel |
+| 4-B.2 Drag to aim, release to fire | 🔄 | C, T, E | Dragging only aims; release never fires. Fire is a hold-to-charge control, power 5-100 |
+| 4-B.3 Trajectory preview | 🔄 | C, T | `predictTrajectory` now includes wind and terrain |
+| 4-B.4 Keyboard aiming | 🔄 | C, E | Arrows adjust angle only (±2° and ±1°); hold Space or Enter to charge |
+| 4-C.1 `fire_projectile` handler | 🔄 | C, R | Radius 9, density 0.08, restitution 0.1 |
+| 4-C.2 Projectile lifespan | ✅ | C, T | 5s of simulated time, paced for slower flight, plus out-of-bounds removal |
+| 4-C.3 Projectile rendering | ✅ | C | `BattleRenderer.ts` |
+| 4-D.1 Block HP values | ✅ | C | Wood 30, stone 80, ice 15, rubber 40, steel 200 |
+| 4-D.2 Projectile block damage | 🔄 | C, T | Threshold 3, multiplier 3.0, capped at 90 per hit |
+| 4-D.3 Block HP in snapshots | ✅ | C | `blockHp` and `blockMaxHp` |
+| 4-D.4 Damage visuals | 🔄 | C | Cracks below 67%, heavier below 34%; no desaturation |
+| 4-E.1 Screen shake state | ➖ | C | Removed in `954201c` (19 October 2026); no shake code remains |
+| 4-E.2 Shake triggers | ➖ | C | Removed with 4-E.1 |
+| 4-F.1 Particle system | 🔄 | C, T | `ParticleSystem`, maximum now 300 |
+| 4-F.2 Destruction particles | ✅ | C, E | Material debris and smoke |
+| 4-F.3 Impact particles | ✅ | C, E | `emitImpact`; skipped under reduced motion |
+| 4-G.1 State hook additions | ✅ | C | `fireProjectile` and event listeners |
+| 4-G.2 Projectile cleanup | ✅ | C | Removed IDs sent in snapshots |
+| 4-G.3 End-to-end flow | ✅ | R, E | Real shots covered by `opponent-aim` and `battle-art` |
+
+#### Phase 5: 1v1 Battlefield Architecture
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 5-A.1 RoomManager | ✅ | C, T, R | Rooms, queue and disconnect handling |
+| 5-A.2 GameSession | ✅ | C, T, R | One engine per room; room-scoped emits |
+| 5-A.3 Thin `server/index.ts` router | ✅ | C | Delegates to RoomManager and GameSession |
+| 5-B.1 1600px terrain | 🔄 | C | World is now 2400px, 1200px per side. A usable zone is not guaranteed; the King falls back to the side's centre |
+| 5-B.2 Two Kings, two zones | 🔄 | C, R | King uses the suitable zone nearest its side's centre, on a foundation |
+| 5-B.3 Cannons at map edges | 🔄 | C | Now placed beside each King (`kingCannonX`) |
+| 5-B.4 Camera system | 🔄 | C, T | Follow, turn and manual modes; not locked during build; minimap only on screens at least 900x320 |
+| 5-C.1 Player-to-room mapping | ✅ | C, R | Server-side lookup per socket |
+| 5-C.2 Build zone enforcement | ✅ | C, R | Placement on the enemy half was ignored in the socket test |
+
+#### Phase 6: Multiplayer Combat Flow
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 6.1 Matchmaking queue | ✅ | C | `join_queue`, `leave_queue`, `queue_status`, `match_found` |
+| 6.2 Build phase and timer | ✅ | C, R | 90s; both players ready skips ahead |
+| 6.3 Fog of war | ❌ | C, R | **Claim was false.** Enemy bodies are sent and drawable during build (problem 1) |
+| 6.4 Reveal phase | ✅ | C, R | Measured 5.0s |
+| 6.5 Turn system | 🔄 | C, T, R | Turns are now 25s. Out-of-turn shots ignored; a double fire produced one shot |
+| 6.6 Match result and rematch | ✅ | C, T | Best of 3 with intermission and rematch |
+| 6.7 Sudden death | ❌ | C | Not built; no stalemate ending exists (problem 2) |
+| 6.8 Ghost matches | ❌ | C | Not built; individual shots are not stored |
+
+#### Phase 7: Persistence & Progression
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 7.1 Supabase setup | 🔄 | C, T | Built on SQLite instead (`server/storage/ProfileStore.ts`) |
+| 7.2 Auth integration | 🔄 | C, T | Anonymous server-issued tokens, stored hashed; no accounts |
+| 7.3 Player profiles | 🔄 | C, T | Persistent profiles with score-based rank tiers instead of Elo |
+| 7.4 Match history | 🔄 | C, T | Results and a history screen; no per-shot records |
+| 7.5 Replay system | ❌ | C | Not built |
+| 7.6 Elo calculation | ❌ | C | Not built; rank tiers are used instead |
+| 7.7 Ammo unlocks | ❌ | C | Not built |
+| 7.8 Leaderboard | ❌ | C | Not built |
+
+#### Phase 8: Environmental Hazards
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 8.1 Hazard selection | 🔄 | C | 1-2 chosen from lava and falling rocks; wind is now separate |
+| 8.2 Wind | 🔄 | C, T, R | Rolled every turn; pushes projectiles only |
+| 8.3 Lava pool | ✅ | C | `checkLavaDamage` |
+| 8.4 Falling rocks | ✅ | C | Interval, lifespan and count limits |
+| 8.5 Earthquake | ❌ | C | Not built |
+| 8.6 Rising flood | ❌ | C | Not built |
+| 8.7 Hazard warning UI | 🟡 | C | Hazards are listed in phase banners; no advance `hazard_warning` |
+
+#### Phase 9: Audio & Visual Polish
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 9.1 Sound manager | 🔄 | C, T | Sounds generated with Web Audio; mute saved; no volume slider |
+| 9.2 Combat sound effects | 🟡 | C | Fire, material impacts and block breaks. No scaling by force, no distinct King death sound |
+| 9.3 UI sound effects | 🟡 | C | Menu only; no placement or AI build sounds |
+| 9.4 Background music | 🔄 | C, T | Two full themes with a 4s crossfade, not per phase. The `theme-music` e2e spec failed and is not triaged |
+| 9.5 Block spawn animation | ❌ | C | Not built |
+| 9.6 Phase transition animations | 🟡 | C | Phase banners and reveal camera; no fog wipe or "BATTLE BEGINS" |
+| 9.7 Victory/Defeat screen | 🔄 | C | Result, score breakdown, rematch, lobby and share; no Elo or replay |
+
+#### Phase 10: Telegram Mini App
+
+No Telegram code exists. See 20.2.
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 10.1 TMA SDK | ❌ | C | Not built |
+| 10.2 Telegram auth linking | ❌ | C | Not built |
+| 10.3 Deep link challenges | 🟡 | C | Web invite links (`?room=`) and native share only |
+| 10.4 Haptic feedback | ❌ | C | Not built |
+| 10.5 Viewport scaling | 🟡 | C, T, E | Responsive for web browsers; nothing Telegram-specific |
+| 10.6 Main Button management | ❌ | C | Not built |
+| 10.7 Telegram Stars payments | ❌ | C | Not built |
+
+#### Phase 11: Launch & Scale
+
+| Item | Status | By | Current state |
+| :--- | :--- | :--- | :--- |
+| 11.1 CI/CD pipeline | 🟡 | C, P | Vercel deploys `main`. No GitHub Actions; the VPS backend is released by hand |
+| 11.2 Staging environment | ❌ | C | No staging setup or `develop` branch found |
+| 11.3 Production deployment | 🔄 | C, P | Vercel and a VPS running PM2 behind Traefik, not Railway or Fly.io |
+| 11.4 Performance profiling | 🟡 | C | Browser soak on V12 and a `performance` spec, which is stale. No results recorded for the target device or the 100-body, tick or payload targets |
+| 11.5 Load testing | ❌ | C | No tooling found |
+| 11.6 Monitoring and analytics | 🟡 | C | Own `/api/events` and `/api/stats`; no Sentry or PostHog; no uptime monitor in the repo |
+| 11.7 Public launch | 🟡 | P | The site is public. No Telegram submission; whether a launch was announced cannot be told from the repo |
+
+### 20.5 Shipped Beyond the Original Plan
+
+| Feature | By | Reference |
+| :--- | :--- | :--- |
+| Solo play against a bot with Easy, Normal and Hard | C, T | `server/game/BotAI.ts`, `server/shared/difficulty.ts` |
+| Reconnect with a 20s grace period, 60s match budget and full state sync | C, T | `docs/match-continuity-v12-verification.md` |
+| Rank tiers, achievements, check-ins, rewards and Embers | C, T | `server/shared/progression.ts` |
+| Hold-to-charge power and per-turn wind | C, T, E | `docs/charge-controls-v15.md` |
+| Live opponent aim and charge preview (V17) | C, T, E | `docs/opponent-aim-v17.md` |
+| Animated kings, including charge anticipation | C, T, E | `docs/king-actions-v7-verification.md`, `docs/charge-anticipation-v16.md` |
+| Illustrated battlefield and royal menu | C, E | `asset-workbench/` |
+| Comfort settings: camera modes, reduced motion, hit labels | C, T | `src/game/battlePreferences.ts`, `docs/comfort-feedback-v10.md` |
+| Shot-following camera and readable flight pacing | C, T | `docs/mobile-camera-v13.md`, `docs/artillery-pacing-v14.md` |
+| In-game chat | C | `src/components/ChatPanel.tsx` |
 
 ---
 
